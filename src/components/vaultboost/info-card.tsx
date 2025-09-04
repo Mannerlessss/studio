@@ -1,23 +1,28 @@
 import type { FC, ReactNode } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface InfoCardProps {
   title: string;
   value: string;
   icon: ReactNode;
-  footerText: string;
+  isStatus?: boolean;
 }
 
-export const InfoCard: FC<InfoCardProps> = ({ title, value, icon, footerText }) => {
+export const InfoCard: FC<InfoCardProps> = ({ title, value, icon, isStatus = false }) => {
   return (
-    <Card className="shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ease-in-out">
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        {icon}
-      </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground pt-2">{footerText}</p>
+    <Card className="shadow-md">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 mb-2">
+          {icon}
+          <p className="text-sm text-muted-foreground">{title}</p>
+        </div>
+        {isStatus ? (
+          <Badge variant="outline" className="font-semibold">{value}</Badge>
+        ) : (
+          <p className="text-2xl font-bold">{value}</p>
+        )}
       </CardContent>
     </Card>
   );

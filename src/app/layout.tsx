@@ -22,8 +22,11 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-body antialiased h-full">
-        {children}
+      <body className="font-body antialiased h-full bg-background">
+        <div className="relative flex flex-col h-full">
+          <main className="flex-grow pb-20">{children}</main>
+          {/* Placeholder for BottomNav */}
+        </div>
         <Toaster />
       </body>
     </html>
