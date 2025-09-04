@@ -1,6 +1,6 @@
 
 import type { FC } from 'react';
-import { Bell, Settings, Gem } from 'lucide-react';
+import { MessageCircle, Crown, Gem } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 
@@ -19,12 +19,12 @@ export const Header: FC = () => {
       </div>
       <div className="flex items-center gap-1">
         <Button variant="ghost" size="icon" className={buttonClasses}>
-          <Bell className="h-5 w-5" />
-          <span className="sr-only">Notifications</span>
+          <MessageCircle className="h-5 w-5" />
+          <span className="sr-only">Customer Support</span>
         </Button>
         <Button variant="ghost" size="icon" className={buttonClasses}>
-          <Settings className="h-5 w-5" />
-          <span className="sr-only">Settings</span>
+          <Crown className="h-5 w-5" />
+          <span className="sr-only">Pro Plan</span>
         </Button>
       </div>
     </header>
