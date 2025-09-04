@@ -1,6 +1,6 @@
 
 import type { FC } from 'react';
-import { MessageCircle, Crown, Gem } from 'lucide-react';
+import { Headset, Crown, Gem } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -8,8 +8,8 @@ import Link from 'next/link';
 export const Header: FC = () => {
   const pathname = usePathname();
   const isReferPage = pathname === '/refer';
-  const headerClasses = isReferPage ? 'bg-transparent text-white' : 'bg-card text-foreground';
-  const buttonClasses = isReferPage ? 'text-white hover:bg-white/20 hover:text-white' : 'text-muted-foreground hover:bg-accent/10 hover:text-accent-foreground';
+  const headerClasses = 'bg-card text-foreground';
+  const buttonClasses = 'text-muted-foreground hover:bg-accent/10 hover:text-accent-foreground';
   const iconColor = 'text-primary';
   const proIconColor = 'text-primary';
 
@@ -22,7 +22,7 @@ export const Header: FC = () => {
       <div className="flex items-center gap-1">
         <Link href="/support">
           <Button variant="ghost" size="icon" className={buttonClasses}>
-            <MessageCircle className="h-5 w-5" />
+            <Headset className="h-5 w-5" />
             <span className="sr-only">Customer Support</span>
           </Button>
         </Link>
