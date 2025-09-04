@@ -10,6 +10,7 @@ export const Header: FC = () => {
   const headerClasses = isReferPage ? 'bg-transparent text-white' : 'bg-card text-foreground';
   const buttonClasses = isReferPage ? 'text-white hover:bg-white/20 hover:text-white' : 'text-muted-foreground hover:bg-accent/10 hover:text-accent-foreground';
   const iconColor = isReferPage ? 'text-white' : 'text-primary';
+  const proIconColor = isReferPage ? 'text-white' : 'text-primary';
 
   return (
     <header className={`flex items-center justify-between p-4 border-b ${headerClasses}`}>
@@ -23,7 +24,7 @@ export const Header: FC = () => {
           <span className="sr-only">Customer Support</span>
         </Button>
         <Button variant="ghost" size="icon" className={buttonClasses}>
-          <Crown className="h-5 w-5" />
+          <Crown className={`h-5 w-5 ${proIconColor}`} />
           <span className="sr-only">Pro Plan</span>
         </Button>
       </div>
