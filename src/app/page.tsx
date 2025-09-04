@@ -1,3 +1,4 @@
+
 'use client';
 import type { NextPage } from 'next';
 import { useState } from 'react';
@@ -15,6 +16,7 @@ import { Fab } from '@/components/vaultboost/fab';
 
 const Home: NextPage = () => {
   const [earnings, setEarnings] = useState(0);
+  const userName = 'Nikhil';
 
   const handleBonusClaim = (amount: number) => {
     setEarnings((prevEarnings) => prevEarnings + amount);
@@ -24,7 +26,7 @@ const Home: NextPage = () => {
     <div className="bg-background min-h-full">
       <Header />
       <div className="p-4 space-y-6">
-        <WelcomeCard name="Nikhil" membership="Basic Member" />
+        <WelcomeCard name={userName} membership="Basic Member" />
         <div className="grid grid-cols-2 gap-4">
           <InfoCard
             title="Invested"
@@ -51,7 +53,7 @@ const Home: NextPage = () => {
         <DailyBonusCard onBonusClaim={handleBonusClaim} />
         <WithdrawCard />
         <TransactionHistoryCard />
-        <UpgradeCard />
+        <UpgradeCard userName={userName}/>
       </div>
       <Fab />
       <BottomNav activePage="dashboard" />

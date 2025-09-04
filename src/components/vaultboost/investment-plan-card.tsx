@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Zap, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 interface InvestmentPlanCardProps {
   amount: number;
@@ -12,6 +13,7 @@ interface InvestmentPlanCardProps {
   duration: number;
   mostPurchased?: boolean;
   badgeText?: string;
+  userName?: string;
 }
 
 export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
@@ -19,9 +21,12 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
   dailyReturn,
   duration,
   mostPurchased = false,
-  badgeText = 'Most Purchased'
+  badgeText = 'Most Purchased',
+  userName = 'User',
 }) => {
   const totalProfit = dailyReturn * duration;
+  const message = `Hi, I'm ${userName} and I want to buy the plan for ${amount} Rs.`;
+  const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
 
   return (
     <Card className={cn('shadow-lg relative overflow-hidden', mostPurchased ? 'border-primary border-2' : '')}>
@@ -50,10 +55,12 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
         </div>
       </CardContent>
       <CardFooter>
-        <Button className="w-full" size="lg">
-          <Zap className="mr-2 h-4 w-4" />
-          Invest Now
-        </Button>
+        <Link href={whatsappUrl} className="w-full" target="_blank">
+            <Button className="w-full" size="lg">
+            <Zap className="mr-2 h-4 w-4" />
+            Invest Now
+            </Button>
+        </Link>
       </CardFooter>
     </Card>
   );

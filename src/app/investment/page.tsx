@@ -14,6 +14,7 @@ const InvestmentPage: NextPage = () => {
     { amount: 1000, dailyReturn: 100, duration: 30 },
     { amount: 2000, dailyReturn: 200, duration: 30 },
   ];
+  const userName = 'Nikhil';
 
   return (
     <div className="bg-background min-h-full">
@@ -21,7 +22,7 @@ const InvestmentPage: NextPage = () => {
       <div className="p-4 space-y-6">
         <h2 className="text-2xl font-bold text-center">Investment Plans</h2>
         {plans.map((plan, index) => (
-          <InvestmentPlanCard key={index} {...plan} />
+          <InvestmentPlanCard key={index} {...plan} userName={userName} />
         ))}
       </div>
       <Fab />

@@ -1,9 +1,18 @@
+
 'use client';
 import type { FC } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
-export const UpgradeCard: FC = () => {
+interface UpgradeCardProps {
+    userName?: string;
+}
+
+export const UpgradeCard: FC<UpgradeCardProps> = ({ userName = 'User' }) => {
+    const message = `Hi, I'm ${userName} and I want to upgrade to the PRO plan for 99 Rs.`;
+    const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
+
   return (
     <Card className="shadow-md border border-accent bg-accent/5">
         <CardHeader>
@@ -22,7 +31,9 @@ export const UpgradeCard: FC = () => {
                 <p className="text-sm font-semibold">PRO Plan:</p>
                 <p className="text-sm font-bold">13% daily returns</p>
             </div>
-            <Button className="w-full" size="lg">Upgrade for 99 Rs.</Button>
+            <Link href={whatsappUrl} className='w-full' target='_blank'>
+                <Button className="w-full" size="lg">Upgrade for 99 Rs.</Button>
+            </Link>
         </div>
       </CardContent>
     </Card>
