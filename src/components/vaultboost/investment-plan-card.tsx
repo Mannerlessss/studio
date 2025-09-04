@@ -11,6 +11,7 @@ interface InvestmentPlanCardProps {
   dailyReturn: number;
   duration: number;
   mostPurchased?: boolean;
+  badgeText?: string;
 }
 
 export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
@@ -18,6 +19,7 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
   dailyReturn,
   duration,
   mostPurchased = false,
+  badgeText = 'Most Purchased'
 }) => {
   const totalProfit = dailyReturn * duration;
 
@@ -26,7 +28,7 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
       {mostPurchased && (
         <Badge className="absolute top-2 right-2 bg-primary text-primary-foreground">
           <Star className="w-3 h-3 mr-1" />
-          Most Purchased
+          {badgeText}
         </Badge>
       )}
       <CardHeader>
