@@ -19,12 +19,12 @@ const Home: NextPage = () => {
           />
           <InfoCard
             title="Earnings"
-            value="₹77"
+            value="₹0"
             icon={<TrendingUp className="h-6 w-6 text-green-500" />}
           />
           <InfoCard
             title="Referral"
-            value="₹75"
+            value="₹0"
             icon={<Users className="h-6 w-6 text-yellow-500" />}
           />
           <InfoCard
