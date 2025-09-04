@@ -128,8 +128,8 @@ const ReferPage: NextPage = () => {
             </CardHeader>
              <CardContent className="text-sm text-muted-foreground space-y-3">
                  <p>1. Share your referral code with your friends.</p>
-                 <p>2. Your friend signs up and joins their first plan.</p>
-                 <p>3. You get a <span className='font-bold text-primary'>75 Rs.</span> bonus instantly!</p>
+                 <p>2. Your friend signs up and invests at least 100 Rs. in a plan.</p>
+                 <p>3. You get a <span className='font-bold text-primary'>75 Rs.</span> bonus instantly! (Only after your friend's first investment of 100 Rs. or more)</p>
                  <p>4. You also get a <span className='font-bold text-primary'>3% commission</span> on all their future earnings, forever!</p>
              </CardContent>
         </Card>
