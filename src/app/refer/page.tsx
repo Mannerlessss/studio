@@ -90,7 +90,7 @@ const ReferPage: NextPage = () => {
         </div>
 
 
-        <Card className="text-center shadow-lg">
+        <Card className="text-center shadow-lg border border-primary">
             <CardHeader>
                 <div className='flex justify-center items-center gap-3 mb-2'>
                     <Gift className="h-8 w-8 text-primary" />
