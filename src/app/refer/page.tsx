@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Copy, Gift, Users, Star, Share2, MessageCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/contexts/auth-context';
 
 const ReferPage: NextPage = () => {
     const { toast } = useToast();
-    const referralCode = 'REF69FE72';
+    const { userData } = useAuth();
+    const referralCode = userData?.referralCode || 'REFCODE';
     const referralLink = `https://vaultboost.app/ref/${referralCode}`;
     const shareMessage = `Check out VaultBoost! I'm earning money by investing. Join using my code and you can earn too! My referral code is ${referralCode}. Link: ${referralLink}`;
 

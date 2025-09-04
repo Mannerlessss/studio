@@ -58,8 +58,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (!loading && !user && pathname !== '/login') {
+    if (loading) return;
+
+    if (!user && pathname !== '/login') {
       router.push('/login');
+    } else if (user && pathname === '/login') {
+      router.push('/');
     }
   }, [user, loading, pathname, router]);
 
@@ -67,14 +71,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, pass: string, name: string, phone: string, referCode?: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
     const user = userCredential.user;
+    const userReferralCode = 'REF' + user.uid.substring(0, 6).toUpperCase();
     const userData: UserData = {
         name,
         email,
         phone,
-        membership: 'Basic'
+        membership: 'Basic',
+        referralCode: userReferralCode,
     };
     if(referCode) {
-        userData.referralCode = referCode;
+        // Here you could add logic to validate the referCode and give benefits
     }
     await setDoc(doc(db, 'users', user.uid), userData);
     setUser(user);
@@ -90,7 +96,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return signOut(auth);
   };
   
-  if (loading && pathname !== '/login') {
+  if (loading) {
     return (
         <div className="flex flex-col h-full items-center justify-center space-y-4 bg-background p-4">
             <Skeleton className="h-24 w-full max-w-md" />
