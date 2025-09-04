@@ -24,7 +24,7 @@ const ReferPage: NextPage = () => {
     };
 
     const shareOnWhatsApp = () => {
-        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+        const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(shareMessage)}`;
         window.open(whatsappUrl, '_blank');
     };
 
@@ -55,31 +55,31 @@ const ReferPage: NextPage = () => {
 
 
   return (
-    <div className="bg-gradient-to-b from-blue-400 to-cyan-400 min-h-full text-white">
+    <div className="bg-background min-h-full">
       <Header />
       <div className="p-4 space-y-6 text-center">
         <h2 className="text-2xl font-bold">Turn your network into your net worth!</h2>
         <p className="text-lg">Earn <span className="font-bold">75 Rs.</span> for every friend who invests.</p>
-        <p className="flex items-center justify-center gap-2 text-yellow-300 font-semibold">
+        <p className="flex items-center justify-center gap-2 text-accent font-semibold">
             <Star className="w-5 h-5" />
             Unlimited Earning Potential
             <Star className="w-5 h-5" />
         </p>
 
         <div className="grid grid-cols-3 gap-4">
-            <Card className="bg-white/20 backdrop-blur-sm border-0 text-white">
+            <Card className="bg-card">
                 <CardContent className="p-4">
                     <p className="text-3xl font-bold">0</p>
                     <p className="text-xs flex items-center justify-center gap-1"><Users className='w-3 h-3'/> Total Referred</p>
                 </CardContent>
             </Card>
-            <Card className="bg-white/20 backdrop-blur-sm border-0 text-white">
+            <Card className="bg-card">
                 <CardContent className="p-4">
                     <p className="text-3xl font-bold">0</p>
                     <p className="text-xs flex items-center justify-center gap-1"><Star className='w-3 h-3' /> Successfully Invested</p>
                 </CardContent>
             </Card>
-            <Card className="bg-white/20 backdrop-blur-sm border-0 text-white">
+            <Card className="bg-card">
                 <CardContent className="p-4">
                     <p className="text-3xl font-bold">0 <span className='text-xl'>Rs.</span></p>
                     <p className="text-xs flex items-center justify-center gap-1"><Gift className='w-3 h-3' /> Total Earnings</p>
@@ -88,19 +88,19 @@ const ReferPage: NextPage = () => {
         </div>
 
 
-        <Card className="text-center bg-white/90 text-slate-800 shadow-lg">
+        <Card className="text-center shadow-lg">
             <CardHeader>
                 <div className='flex justify-center items-center gap-3 mb-2'>
                     <Gift className="h-8 w-8 text-primary" />
                     <CardTitle className="text-2xl font-bold">Your Magic Code</CardTitle>
                     <Badge>Premium</Badge>
                 </div>
-                <CardDescription className="text-slate-600">Share this golden ticket with friends and watch your earnings grow!</CardDescription>
+                <CardDescription>Share this golden ticket with friends and watch your earnings grow!</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div>
                     <p className="text-muted-foreground mb-2 text-sm">Your Referral Code</p>
-                    <div className="flex items-center justify-center p-3 border-dashed border-2 rounded-lg bg-slate-100">
+                    <div className="flex items-center justify-center p-3 border-dashed border-2 rounded-lg bg-muted/50">
                         <p className="text-lg font-mono font-bold tracking-widest mr-4">{referralCode}</p>
                         <Button size="icon" variant="ghost" onClick={copyToClipboard}>
                             <Copy className="h-5 w-5"/>
@@ -120,7 +120,7 @@ const ReferPage: NextPage = () => {
                 </div>
             </CardContent>
         </Card>
-         <Card className="text-left bg-white/90 text-slate-800 shadow-lg">
+         <Card className="text-left shadow-lg">
             <CardHeader>
                 <CardTitle>How The Magic Happens</CardTitle>
             </CardHeader>
