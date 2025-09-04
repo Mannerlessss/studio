@@ -60,7 +60,7 @@ const ReferPage: NextPage = () => {
       <div className="p-4 space-y-6 text-center">
         <h2 className="text-2xl font-bold">Turn your network into your net worth!</h2>
         <div className="p-4 rounded-lg border border-primary">
-          <p className="text-lg text-foreground">Earn <span className="font-bold text-primary">75 Rs.</span> for every friend who invests.</p>
+          <p className="text-lg text-foreground">Earn <span className="font-bold text-primary">75 Rs.</span> for every friend who joins the action.</p>
         </div>
         <p className="flex items-center justify-center gap-2 text-accent font-semibold">
             <Star className="w-5 h-5" />
@@ -128,7 +128,7 @@ const ReferPage: NextPage = () => {
             </CardHeader>
              <CardContent className="text-sm text-muted-foreground space-y-3">
                  <p>1. Share your referral code with your friends.</p>
-                 <p>2. Your friend signs up and makes their first investment.</p>
+                 <p>2. Your friend signs up and joins their first plan.</p>
                  <p>3. You get a <span className='font-bold text-primary'>75 Rs.</span> bonus instantly!</p>
                  <p>4. You also get a <span className='font-bold text-primary'>3% commission</span> on all their future earnings, forever!</p>
              </CardContent>
