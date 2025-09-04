@@ -106,6 +106,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     )
   }
 
+  if (!user && pathname !== '/login') {
+    return null;
+  }
+
   return (
     <AuthContext.Provider value={{ user, loading, logIn, signUp, logOut, userData }}>
       {children}
