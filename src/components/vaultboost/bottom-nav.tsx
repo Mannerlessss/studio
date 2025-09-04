@@ -5,7 +5,7 @@ import { LayoutDashboard, TrendingUp, Users, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface BottomNavProps {
-  activePage: 'dashboard' | 'investment' | 'refer' | 'settings';
+  activePage: 'dashboard' | 'investment' | 'refer' | 'settings' | 'support';
 }
 
 export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {

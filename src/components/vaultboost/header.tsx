@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import { MessageCircle, Crown, Gem } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 
 export const Header: FC = () => {
   const pathname = usePathname();
@@ -19,10 +20,12 @@ export const Header: FC = () => {
         <h1 className="text-2xl font-bold font-headline">VaultBoost</h1>
       </div>
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" className={buttonClasses}>
-          <MessageCircle className="h-5 w-5" />
-          <span className="sr-only">Customer Support</span>
-        </Button>
+        <Link href="/support">
+          <Button variant="ghost" size="icon" className={buttonClasses}>
+            <MessageCircle className="h-5 w-5" />
+            <span className="sr-only">Customer Support</span>
+          </Button>
+        </Link>
         <Button variant="ghost" size="icon" className={buttonClasses}>
           <Crown className={`h-5 w-5 ${proIconColor}`} />
           <span className="sr-only">Pro Plan</span>
