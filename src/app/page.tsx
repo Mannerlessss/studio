@@ -14,17 +14,17 @@ const Home: NextPage = () => {
         <div className="grid grid-cols-2 gap-4">
           <InfoCard
             title="Invested"
-            value="0"
+            value="₹0"
             icon={<Wallet className="h-6 w-6 text-primary" />}
           />
           <InfoCard
             title="Earnings"
-            value="0"
+            value="₹0"
             icon={<TrendingUp className="h-6 w-6 text-primary" />}
           />
           <InfoCard
             title="Referral"
-            value="0"
+            value="₹0"
             icon={<Users className="h-6 w-6 text-primary" />}
           />
           <InfoCard
