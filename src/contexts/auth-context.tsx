@@ -12,6 +12,7 @@ import { auth, db } from '@/lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
+import {NextRouter} from "next/router";
 
 interface AuthContextType {
   user: User | null;
@@ -91,6 +92,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   if (loading || (!user && pathname !== '/login')) {
+    if (pathname === '/login') {
+        return (
+            <AuthContext.Provider value={{ user, loading, logIn, signUp, logOut, userData }}>
+              {children}
+            </AuthContext.Provider>
+          );
+    }
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4 space-y-4">
             <Skeleton className="h-24 w-full" />
