@@ -30,9 +30,9 @@ const Home: NextPage = () => {
         <div className="mb-8 flex justify-between items-center">
           <div>
             <h1 className="text-3xl lg:text-4xl font-bold font-headline">Welcome back, {user.name}!</h1>
-            <p className="text-muted-foreground flex items-center gap-2 mt-1">
+            <div className="text-muted-foreground flex items-center gap-2 mt-1">
               You are on the <Badge variant="outline" className="border-accent text-accent bg-accent/10">{user.membership}</Badge> plan.
-            </p>
+            </div>
           </div>
           <Avatar className="h-12 w-12 lg:h-16 lg:w-16">
             <Image src="https://picsum.photos/100/100" width={100} height={100} alt="User Avatar" data-ai-hint="person portrait" className="rounded-full" />
