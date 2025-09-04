@@ -16,7 +16,7 @@ export const WelcomeCard: FC<WelcomeCardProps> = ({ name, membership }) => {
         <div>
           <h1 className="text-2xl font-bold">Welcome, {name}!</h1>
           <p className="text-sm opacity-90">
-            {membership} • Your investment journey continues
+            {membership} • The treasure awaits
           </p>
         </div>
       </div>
