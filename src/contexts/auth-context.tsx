@@ -97,8 +97,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logOut = () => {
     return signOut(auth);
   };
-  
-  if (loading && pathname !== '/login') {
+
+  const isAuthPage = pathname === '/login';
+  if (loading && !isAuthPage) {
     return (
         <div className="flex flex-col h-full items-center justify-center space-y-4 bg-background p-4">
             <Skeleton className="h-24 w-full max-w-md" />
@@ -114,14 +115,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     )
   }
 
-  if (!user && pathname !== '/login') {
+  if ((!user && !isAuthPage) || (user && isAuthPage)) {
     return null;
   }
-  
-  if (user && pathname === '/login') {
-    return null;
-  }
-
 
   return (
     <AuthContext.Provider value={{ user, loading, logIn, signUp, logOut, userData }}>
