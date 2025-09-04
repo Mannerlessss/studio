@@ -1,17 +1,16 @@
 import type { FC } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, TrendingUp, Star, Users, Settings } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Users, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface BottomNavProps {
-  activePage: 'dashboard' | 'investment' | 'pro' | 'refer' | 'settings';
+  activePage: 'dashboard' | 'investment' | 'refer' | 'settings';
 }
 
 export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {
   const navItems = [
     { href: '/', icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard' },
     { href: '/investment', icon: TrendingUp, label: 'Investment', page: 'investment' },
-    { href: '/pro', icon: Star, label: 'Pro Plan', page: 'pro' },
     { href: '/refer', icon: Users, label: 'Refer', page: 'refer' },
     { href: '/settings', icon: Settings, label: 'Settings', page: 'settings' },
   ];
