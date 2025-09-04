@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
@@ -25,7 +26,6 @@ export default function RootLayout({
       <body className="font-body antialiased h-full bg-background">
         <div className="relative flex flex-col h-full">
           <main className="flex-grow pb-20">{children}</main>
-          {/* Placeholder for BottomNav */}
         </div>
         <Toaster />
       </body>

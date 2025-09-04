@@ -1,3 +1,4 @@
+
 import type { FC } from 'react';
 import Link from 'next/link';
 import { LayoutDashboard, TrendingUp, Users, Settings } from 'lucide-react';

@@ -9,6 +9,9 @@ import { Wallet, TrendingUp, Users, Star } from 'lucide-react';
 import { UpgradeCard } from '@/components/vaultboost/upgrade-card';
 import { WithdrawCard } from '@/components/vaultboost/withdraw-card';
 import { TransactionHistoryCard } from '@/components/vaultboost/transaction-history-card';
+import { Header } from '@/components/vaultboost/header';
+import { Fab } from '@/components/vaultboost/fab';
+
 
 const Home: NextPage = () => {
   const [earnings, setEarnings] = useState(0);
@@ -19,6 +22,7 @@ const Home: NextPage = () => {
 
   return (
     <div className="bg-background min-h-full">
+      <Header />
       <div className="p-4 space-y-6">
         <WelcomeCard name="Nikhil" membership="Basic Member" />
         <div className="grid grid-cols-2 gap-4">
@@ -49,6 +53,7 @@ const Home: NextPage = () => {
         <TransactionHistoryCard />
         <UpgradeCard />
       </div>
+      <Fab />
       <BottomNav activePage="dashboard" />
     </div>
   );
