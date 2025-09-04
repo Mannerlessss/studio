@@ -1,4 +1,6 @@
+'use client';
 import type { NextPage } from 'next';
+import { useState } from 'react';
 import { WelcomeCard } from '@/components/vaultboost/welcome-card';
 import { InfoCard } from '@/components/vaultboost/info-card';
 import { DailyBonusCard } from '@/components/vaultboost/daily-bonus-card';
@@ -7,6 +9,12 @@ import { BottomNav } from '@/components/vaultboost/bottom-nav';
 import { Wallet, TrendingUp, Users, Star } from 'lucide-react';
 
 const Home: NextPage = () => {
+  const [earnings, setEarnings] = useState(0);
+
+  const handleBonusClaim = (amount: number) => {
+    setEarnings((prevEarnings) => prevEarnings + amount);
+  };
+
   return (
     <div className="bg-background min-h-full">
       <div className="p-4 space-y-6">
@@ -19,7 +27,7 @@ const Home: NextPage = () => {
           />
           <InfoCard
             title="Earnings"
-            value="0 Rs."
+            value={`${earnings} Rs.`}
             icon={<TrendingUp className="h-6 w-6 text-primary" />}
           />
           <InfoCard
@@ -34,7 +42,7 @@ const Home: NextPage = () => {
             isStatus
           />
         </div>
-        <DailyBonusCard />
+        <DailyBonusCard onBonusClaim={handleBonusClaim} />
         <UpgradeCard />
       </div>
       <BottomNav />
