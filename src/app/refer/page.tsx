@@ -111,7 +111,7 @@ const ReferPage: NextPage = () => {
                 </div>
 
                 <div className='space-y-3 pt-2'>
-                    <Button className='w-full bg-blue-500 hover:bg-blue-600 text-white' size='lg' onClick={shareOnWhatsApp}>
+                    <Button className='w-full' size='lg' onClick={shareOnWhatsApp}>
                         <MessageCircle className='mr-2'/>
                         Share on WhatsApp
                     </Button>
