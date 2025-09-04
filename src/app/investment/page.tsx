@@ -10,7 +10,7 @@ const InvestmentPage: NextPage = () => {
   const plans = [
     { amount: 100, dailyReturn: 10, duration: 30, mostPurchased: true, badgeText: 'Everyone Buys' },
     { amount: 300, dailyReturn: 30, duration: 30 },
-    { amount: 500, dailyReturn: 50, duration: 30 },
+    { amount: 500, dailyReturn: 50, duration: 30, mostPurchased: true, badgeText: 'Hot' },
     { amount: 1000, dailyReturn: 100, duration: 30 },
     { amount: 2000, dailyReturn: 200, duration: 30 },
   ];
