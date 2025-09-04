@@ -25,14 +25,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-   env: {
-    NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyDLhmKP9BeoHGn_zz8UaVURix83lPfWSds",
-    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "upi-boost-vault-f64fw.firebaseapp.com",
-    NEXT_PUBLIC_FIREBASE_PROJECT_ID: "upi-boost-vault-f64fw",
-    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "upi-boost-vault-f64fw.firebasestorage.app",
-    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "1017948596718",
-    NEXT_PUBLIC_FIREBASE_APP_ID: "1:1017948596718:web:b25de6f4ed5d179b5046ff",
-  }
 };
 
 export default nextConfig;
