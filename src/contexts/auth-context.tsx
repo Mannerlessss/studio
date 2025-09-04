@@ -102,7 +102,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   if (loading) {
-    return (
+    const isAuthPage = pathname === '/login';
+    if (!isAuthPage) {
+      return (
         <div className="flex flex-col h-full items-center justify-center space-y-4 bg-background p-4">
             <Skeleton className="h-24 w-full max-w-md" />
             <div className="grid w-full max-w-md grid-cols-2 gap-4">
@@ -114,7 +116,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
              <Skeleton className="h-32 w-full max-w-md" />
              <Skeleton className="h-32 w-full max-w-md" />
         </div>
-    )
+      );
+    }
   }
 
   return (
