@@ -4,7 +4,6 @@ import { InfoCard } from '@/components/vaultboost/info-card';
 import { DailyBonusCard } from '@/components/vaultboost/daily-bonus-card';
 import { UpgradeCard } from '@/components/vaultboost/upgrade-card';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
-import { Fab } from '@/components/vaultboost/fab';
 import { Wallet, TrendingUp, Users, Star } from 'lucide-react';
 
 const Home: NextPage = () => {
@@ -38,7 +37,6 @@ const Home: NextPage = () => {
         <DailyBonusCard />
         <UpgradeCard />
       </div>
-      <Fab />
       <BottomNav />
     </div>
   );
