@@ -46,8 +46,8 @@ const Home: NextPage = () => {
         </div>
         <DailyBonusCard onBonusClaim={handleBonusClaim} />
         <WithdrawCard />
-        <UpgradeCard />
         <TransactionHistoryCard />
+        <UpgradeCard />
       </div>
       <BottomNav activePage="dashboard" />
     </div>
