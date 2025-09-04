@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { WelcomeCard } from '@/components/vaultboost/welcome-card';
 import { InfoCard } from '@/components/vaultboost/info-card';
 import { DailyBonusCard } from '@/components/vaultboost/daily-bonus-card';
-import { UpgradeCard } from '@/components/vaultboost/upgrade-card';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
 import { Wallet, TrendingUp, Users, Star } from 'lucide-react';
 
@@ -43,9 +42,8 @@ const Home: NextPage = () => {
           />
         </div>
         <DailyBonusCard onBonusClaim={handleBonusClaim} />
-        <UpgradeCard />
       </div>
-      <BottomNav />
+      <BottomNav activePage="dashboard" />
     </div>
   );
 };
