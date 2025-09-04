@@ -20,20 +20,18 @@ export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {
     <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-t-lg">
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => (
-          <Link href={item.href} key={item.label} legacyBehavior>
-            <a className="flex-1">
-              <Button
-                variant="ghost"
-                className={`flex flex-col items-center justify-center h-full w-full rounded-none ${
-                  activePage === item.page
-                    ? 'text-primary bg-primary/10'
-                    : 'text-muted-foreground'
-                }`}
-              >
-                <item.icon className="h-6 w-6 mb-1" />
-                <span className="text-xs">{item.label}</span>
-              </Button>
-            </a>
+          <Link href={item.href} key={item.label} className="flex-1">
+            <Button
+              variant="ghost"
+              className={`flex flex-col items-center justify-center h-full w-full rounded-none ${
+                activePage === item.page
+                  ? 'text-primary bg-primary/10'
+                  : 'text-muted-foreground'
+              }`}
+            >
+              <item.icon className="h-6 w-6 mb-1" />
+              <span className="text-xs">{item.label}</span>
+            </Button>
           </Link>
         ))}
       </div>
