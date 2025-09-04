@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Gift, Shield } from 'lucide-react';
+import { User, Gift, Shield, LogOut } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const SettingsPage: NextPage = () => {
@@ -88,6 +88,11 @@ const SettingsPage: NextPage = () => {
             </div>
           </CardContent>
         </Card>
+
+        <Button variant="destructive" className="w-full">
+            <LogOut className="mr-2" />
+            Logout
+        </Button>
 
       </div>
       <BottomNav activePage="settings" />
