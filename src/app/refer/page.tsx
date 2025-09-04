@@ -59,8 +59,8 @@ const ReferPage: NextPage = () => {
       <Header />
       <div className="p-4 space-y-6 text-center">
         <h2 className="text-2xl font-bold">Turn your network into your net worth!</h2>
-        <div className="p-4 rounded-lg bg-accent/10 text-accent-foreground">
-          <p className="text-lg">Earn <span className="font-bold text-accent">75 Rs.</span> for every friend who invests.</p>
+        <div className="p-4 rounded-lg">
+          <p className="text-lg text-foreground">Earn <span className="font-bold text-primary">75 Rs.</span> for every friend who invests.</p>
         </div>
         <p className="flex items-center justify-center gap-2 text-accent font-semibold">
             <Star className="w-5 h-5" />
