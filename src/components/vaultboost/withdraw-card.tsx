@@ -20,7 +20,7 @@ export function WithdrawCard() {
     <Card>
       <CardHeader>
         <CardTitle>Withdraw Earnings</CardTitle>
-        <CardDescription>Available Balance: ₹0.00</CardDescription>
+        <CardDescription>Available Balance: 0.00 Rs.</CardDescription>
       </CardHeader>
       <CardContent>
         {!showWithdrawForm ? (

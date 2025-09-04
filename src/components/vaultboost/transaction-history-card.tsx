@@ -6,9 +6,9 @@ export function TransactionHistoryCard() {
     const transactions = [
         {
             id: 1,
-            description: 'Daily bonus claim - ₹2',
+            description: 'Daily bonus claim - 2 Rs.',
             date: '4 Sept 2025, 10:06 am',
-            amount: '+₹2.00',
+            amount: '+2.00 Rs.',
             status: 'completed'
         }
     ];

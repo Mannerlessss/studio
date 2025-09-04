@@ -22,7 +22,7 @@ export const UpgradeCard: FC = () => {
                 <p className="text-sm font-semibold">PRO Plan:</p>
                 <p className="text-sm font-bold">13% daily returns</p>
             </div>
-            <Button className="w-full" size="lg">Upgrade for 99 Rs</Button>
+            <Button className="w-full" size="lg">Upgrade for 99 Rs.</Button>
         </div>
       </CardContent>
     </Card>
