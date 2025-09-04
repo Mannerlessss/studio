@@ -12,14 +12,14 @@ interface InfoCardProps {
 
 export const InfoCard: FC<InfoCardProps> = ({ title, value, icon, isStatus = false }) => {
   return (
-    <Card className="shadow-md">
+    <Card className="shadow-md bg-card">
       <CardContent className="p-4">
         <div className="flex items-center gap-2 mb-2">
           {icon}
           <p className="text-sm text-muted-foreground">{title}</p>
         </div>
         {isStatus ? (
-          <Badge variant="outline" className="font-semibold">{value}</Badge>
+          <Badge variant="outline" className="font-semibold border-primary text-primary">{value}</Badge>
         ) : (
           <p className="text-2xl font-bold">{value}</p>
         )}

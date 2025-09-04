@@ -20,17 +20,17 @@ const Home: NextPage = () => {
           <InfoCard
             title="Earnings"
             value="₹0"
-            icon={<TrendingUp className="h-6 w-6 text-green-500" />}
+            icon={<TrendingUp className="h-6 w-6 text-primary" />}
           />
           <InfoCard
             title="Referral"
             value="₹0"
-            icon={<Users className="h-6 w-6 text-yellow-500" />}
+            icon={<Users className="h-6 w-6 text-primary" />}
           />
           <InfoCard
             title="Status"
             value="Basic"
-            icon={<Star className="h-6 w-6 text-orange-500" />}
+            icon={<Star className="h-6 w-6 text-primary" />}
             isStatus
           />
         </div>
