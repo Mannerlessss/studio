@@ -11,7 +11,6 @@ import { UpgradeCard } from '@/components/vaultboost/upgrade-card';
 import { WithdrawCard } from '@/components/vaultboost/withdraw-card';
 import { TransactionHistoryCard } from '@/components/vaultboost/transaction-history-card';
 import { Header } from '@/components/vaultboost/header';
-import { Fab } from '@/components/vaultboost/fab';
 
 
 const Home: NextPage = () => {
@@ -55,7 +54,6 @@ const Home: NextPage = () => {
         <TransactionHistoryCard />
         <UpgradeCard userName={userName}/>
       </div>
-      <Fab />
       <BottomNav activePage="dashboard" />
     </div>
   );

@@ -6,7 +6,6 @@ import { BottomNav } from '@/components/vaultboost/bottom-nav';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, User, Lock, LogOut } from 'lucide-react';
-import { Fab } from '@/components/vaultboost/fab';
 
 
 const SettingsPage: NextPage = () => {
@@ -42,7 +41,6 @@ const SettingsPage: NextPage = () => {
         </Button>
 
       </div>
-      <Fab />
       <BottomNav activePage="settings" />
     </div>
   );

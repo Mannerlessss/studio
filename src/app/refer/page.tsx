@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Copy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Fab } from '@/components/vaultboost/fab';
 
 const ReferPage: NextPage = () => {
     const { toast } = useToast();
@@ -51,7 +50,6 @@ const ReferPage: NextPage = () => {
             </CardContent>
         </Card>
       </div>
-      <Fab />
       <BottomNav activePage="refer" />
     </div>
   );

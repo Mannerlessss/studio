@@ -4,7 +4,6 @@ import type { NextPage } from 'next';
 import { Header } from '@/components/vaultboost/header';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
 import { InvestmentPlanCard } from '@/components/vaultboost/investment-plan-card';
-import { Fab } from '@/components/vaultboost/fab';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Info } from 'lucide-react';
 
@@ -37,13 +36,10 @@ const InvestmentPage: NextPage = () => {
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>• All investment plans will automatically expire after 30 days from the date of purchase.</p>
                 <p>• Daily earnings are credited to your account every 24 hours.</p>
-                <p>• The minimum withdrawal amount is 1000 Rs. Withdrawals are processed within 24-48 hours.</p>
-                <p>• For any support or inquiries, please contact us via the chat button.</p>
             </CardContent>
         </Card>
 
       </div>
-      <Fab />
       <BottomNav activePage="investment" />
     </div>
   );
