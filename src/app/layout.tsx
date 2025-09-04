@@ -2,6 +2,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { AuthProvider } from '@/contexts/auth-context';
 
 export const metadata: Metadata = {
   title: 'VaultBoost',
@@ -24,10 +25,12 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased h-full bg-background">
-        <div className="relative flex flex-col h-full">
-          <main className="flex-grow pb-20">{children}</main>
-        </div>
-        <Toaster />
+        <AuthProvider>
+            <div className="relative flex flex-col h-full">
+              <main className="flex-grow pb-20">{children}</main>
+            </div>
+            <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );

@@ -11,11 +11,13 @@ import { UpgradeCard } from '@/components/vaultboost/upgrade-card';
 import { WithdrawCard } from '@/components/vaultboost/withdraw-card';
 import { TransactionHistoryCard } from '@/components/vaultboost/transaction-history-card';
 import { Header } from '@/components/vaultboost/header';
+import { useAuth } from '@/contexts/auth-context';
 
 
 const Home: NextPage = () => {
   const [earnings, setEarnings] = useState(0);
-  const userName = 'Nikhil';
+  const { userData } = useAuth();
+  const userName = userData?.name || 'User';
 
   const handleBonusClaim = (amount: number) => {
     setEarnings((prevEarnings) => prevEarnings + amount);
@@ -25,7 +27,7 @@ const Home: NextPage = () => {
     <div className="bg-background min-h-full">
       <Header />
       <div className="p-4 space-y-6">
-        <WelcomeCard name={userName} membership="Basic Member" />
+        <WelcomeCard name={userName} membership={userData?.membership ? `${userData.membership} Member` : 'Basic Member'} />
         <div className="grid grid-cols-2 gap-4">
           <InfoCard
             title="Invested"
@@ -44,7 +46,7 @@ const Home: NextPage = () => {
           />
           <InfoCard
             title="Status"
-            value="Basic"
+            value={userData?.membership || 'Basic'}
             icon={<Star className="h-6 w-6 text-primary" />}
             isStatus
           />

@@ -6,6 +6,7 @@ import { BottomNav } from '@/components/vaultboost/bottom-nav';
 import { InvestmentPlanCard } from '@/components/vaultboost/investment-plan-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Info } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
 
 const InvestmentPage: NextPage = () => {
   const plans = [
@@ -15,7 +16,8 @@ const InvestmentPage: NextPage = () => {
     { amount: 1000, dailyReturn: 100, duration: 30 },
     { amount: 2000, dailyReturn: 200, duration: 30 },
   ];
-  const userName = 'Nikhil';
+  const { userData } = useAuth();
+  const userName = userData?.name || 'User';
 
   return (
     <div className="bg-background min-h-full">

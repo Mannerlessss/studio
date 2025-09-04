@@ -4,12 +4,15 @@ import type { FC } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/auth-context';
 
 interface UpgradeCardProps {
     userName?: string;
 }
 
-export const UpgradeCard: FC<UpgradeCardProps> = ({ userName = 'User' }) => {
+export const UpgradeCard: FC<UpgradeCardProps> = ({ userName: propUserName }) => {
+    const { userData } = useAuth();
+    const userName = propUserName || userData?.name || 'User';
     const message = `Hi, I'm ${userName} and I want to upgrade to the PRO plan for 99 Rs.`;
     const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
 

@@ -9,8 +9,32 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { User, Gift, Shield, LogOut } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/contexts/auth-context';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 const SettingsPage: NextPage = () => {
+    const { userData, logOut } = useAuth();
+    const { toast } = useToast();
+    const router = useRouter();
+
+    const handleLogout = async () => {
+        try {
+            await logOut();
+            toast({
+                title: 'Logged Out',
+                description: 'You have been successfully logged out.',
+            });
+            router.push('/login');
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Logout Failed',
+                description: error.message,
+            });
+        }
+    }
+
   return (
     <div className="bg-background min-h-full">
       <Header />
@@ -29,14 +53,14 @@ const SettingsPage: NextPage = () => {
             <div className="space-y-2">
               <Label htmlFor="full-name">Full Name</Label>
               <div className="flex gap-2">
-                <Input id="full-name" defaultValue="Nikhil" />
+                <Input id="full-name" defaultValue={userData?.name} />
                 <Button>Update</Button>
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone-number">Phone Number</Label>
               <div className="flex gap-2">
-                <Input id="phone-number" placeholder="Enter your phone number" />
+                <Input id="phone-number" placeholder="Enter your phone number" defaultValue={userData?.phone} />
                 <Button>Update</Button>
               </div>
             </div>
@@ -75,21 +99,21 @@ const SettingsPage: NextPage = () => {
             <div className="flex justify-between items-center">
                 <div>
                     <p className="text-sm text-muted-foreground">Email Address</p>
-                    <p className="font-semibold">nikhil@example.com</p>
+                    <p className="font-semibold">{userData?.email}</p>
                 </div>
                 <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20">Verified</Badge>
             </div>
             <div className="flex justify-between items-center">
                  <div>
                     <p className="text-sm text-muted-foreground">Referral Code</p>
-                    <p className="font-semibold">REF69FE72</p>
+                    <p className="font-semibold">{userData?.referralCode || 'N/A'}</p>
                 </div>
-                <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 border-blue-500/20">Active</Badge>
+                {userData?.referralCode && <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 border-blue-500/20">Active</Badge>}
             </div>
           </CardContent>
         </Card>
 
-        <Button variant="destructive" className="w-full">
+        <Button variant="destructive" className="w-full" onClick={handleLogout}>
             <LogOut className="mr-2" />
             Logout
         </Button>
