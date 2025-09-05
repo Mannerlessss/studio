@@ -65,13 +65,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
-                await fetchUserData(currentUser.uid);
-                setUser(currentUser);
+                // User is authenticated with Firebase, now get our custom user data
+                await fetchUserData(currentUser);
             } else {
+                // No user, clear all states
                 setUser(null);
                 setUserData(null);
             }
-            // Defer setting loading to false until we are sure about auth state
             setLoading(false);
         });
 
@@ -94,31 +94,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [user, loading, pathname, router]);
     
-    const fetchUserData = async (uid: string) => {
+    const fetchUserData = async (firebaseUser: User) => {
         setLoading(true);
         try {
-            const userDocRef = doc(db, 'users', uid);
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
             const docSnap = await getDoc(userDocRef);
             if (docSnap.exists()) {
                 const fetchedData = docSnap.data() as UserData;
                 setUserData(fetchedData);
+                setUser(firebaseUser); // Set the firebase user state
                 await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
             } else {
-                // This case should ideally be handled by handleSuccessfulLogin
-                console.log("User doc does not exist yet.");
+                // This can happen if the user record wasn't created properly
+                // Or if this is the very first login after signup.
+                // We'll handle creation in handleSuccessfulLogin
+                console.log("User doc does not exist yet. It will be created on login.");
                 setUserData(null);
+                setUser(firebaseUser); // Still set the base user
             }
         } catch (error) {
             console.error("Error fetching user data:", error);
-            // On permission error, sign out the user to avoid loops
-            await signOut(auth);
-            setUser(null);
-            setUserData(null);
             toast({
                 variant: 'destructive',
                 title: 'Session Error',
                 description: 'Could not verify your session. Please log in again.',
             });
+            await signOut(auth); // Sign out on error to prevent loops
+            setUser(null);
+            setUserData(null);
         } finally {
             setLoading(false);
         }
@@ -127,53 +130,66 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
         setLoading(true);
         const userDocRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(userDocRef);
+        let finalUserData: UserData | null = null;
+        
+        try {
+            const docSnap = await getDoc(userDocRef);
 
-        if (!docSnap.exists()) {
-             let referredBy = null;
-            if (additionalData.referralCode) {
-                 try {
-                    const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
-                    const querySnapshot = await getDocs(q);
-                    if (!querySnapshot.empty) {
-                        referredBy = querySnapshot.docs[0].id;
-                    } else {
-                        toast({ variant: 'destructive', title: 'Invalid Referral Code' });
+            if (!docSnap.exists()) {
+                let referredBy = null;
+                if (additionalData.referralCode) {
+                    try {
+                        const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
+                        const querySnapshot = await getDocs(q);
+                        if (!querySnapshot.empty) {
+                            referredBy = querySnapshot.docs[0].id;
+                        } else {
+                            toast({ variant: 'destructive', title: 'Invalid Referral Code' });
+                        }
+                    } catch (e) {
+                        console.error("Error validating referral code:", e);
                     }
-                 } catch (e) {
-                    console.error("Error validating referral code:", e);
-                 }
+                }
+                
+                const newUser: UserData = {
+                    uid: user.uid,
+                    email: user.email || '',
+                    name: additionalData.name || user.displayName || 'Vault User',
+                    phone: additionalData.phone || '',
+                    referralCode: generateReferralCode(),
+                    usedReferralCode: referredBy ? additionalData.referralCode : undefined,
+                    referredBy: referredBy || undefined,
+                    membership: 'Basic',
+                    rank: 'Bronze',
+                    totalBalance: 0,
+                    invested: 0,
+                    earnings: 0,
+                    projected: 0,
+                    referralEarnings: 0,
+                    bonusEarnings: 0,
+                    investmentEarnings: 0,
+                    createdAt: serverTimestamp(),
+                    lastLogin: serverTimestamp(),
+                };
+                await setDoc(userDocRef, newUser);
+                finalUserData = newUser;
+            } else {
+                await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+                finalUserData = docSnap.data() as UserData;
             }
             
-            const newUser: UserData = {
-                uid: user.uid,
-                email: user.email || '',
-                name: additionalData.name || user.displayName || 'Vault User',
-                phone: additionalData.phone || '',
-                referralCode: generateReferralCode(),
-                usedReferralCode: referredBy ? additionalData.referralCode : undefined,
-                referredBy: referredBy || undefined,
-                membership: 'Basic',
-                rank: 'Bronze',
-                totalBalance: 0,
-                invested: 0,
-                earnings: 0,
-                projected: 0,
-                referralEarnings: 0,
-                bonusEarnings: 0,
-                investmentEarnings: 0,
-                createdAt: serverTimestamp(),
-                lastLogin: serverTimestamp(),
-            };
-            await setDoc(userDocRef, newUser);
-            setUserData(newUser);
-        } else {
-            // Data will be fetched by the onAuthStateChanged listener,
-            // but we can pre-emptively fetch it here too.
-             await fetchUserData(user.uid);
+            setUser(user);
+            setUserData(finalUserData);
+
+        } catch (error) {
+             console.error("Error during handleSuccessfulLogin:", error);
+             toast({ variant: 'destructive', title: 'Login Error', description: 'Could not initialize your account.' });
+        } finally {
+            setLoading(false);
+            if (finalUserData) {
+                router.push('/');
+            }
         }
-        setUser(user);
-        setLoading(false);
     }
 
     const signInWithGoogle = async () => {
@@ -230,7 +246,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await signOut(auth);
             setUser(null);
             setUserData(null);
-            router.push('/login');
+            // The useEffect hook will handle the redirect to /login
         } catch (error: any) {
             toast({
                 variant: 'destructive',
@@ -280,7 +296,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
         }
 
-        await fetchUserData(user.uid);
+        await fetchUserData(user);
     };
 
 
@@ -316,5 +332,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
