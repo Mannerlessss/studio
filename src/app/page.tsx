@@ -1,5 +1,4 @@
 'use client';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Gem } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
@@ -16,12 +15,10 @@ const GoogleIcon = () => (
 
 
 export default function LoginPage() {
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, loading } = useAuth();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
 
   const handleGoogleSignIn = async () => {
-    setLoading(true);
     try {
       await signInWithGoogle();
       // The onAuthStateChanged listener in AuthProvider will handle navigation
@@ -31,7 +28,6 @@ export default function LoginPage() {
         title: 'Sign-In Failed',
         description: error.message || 'Could not sign in with Google.',
       });
-      setLoading(false);
     }
   };
 
