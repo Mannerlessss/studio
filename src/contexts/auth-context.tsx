@@ -1,7 +1,17 @@
 
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import type { User } from 'firebase/auth';
+import { 
+    User, 
+    onAuthStateChanged,
+    GoogleAuthProvider,
+    signInWithPopup,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut,
+} from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
+import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs, writeBatch, increment } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Gem } from 'lucide-react';
@@ -40,46 +50,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock user data for offline development
-const mockUser: User = {
-    uid: 'mock-user-id',
-    email: 'test@example.com',
-    displayName: 'Mock User',
-    photoURL: null,
-    phoneNumber: '1234567890',
-    emailVerified: true,
-    isAnonymous: false,
-    metadata: {},
-    providerData: [],
-    providerId: 'password',
-    tenantId: null,
-    delete: async () => {},
-    getIdToken: async () => 'mock-token',
-    getIdTokenResult: async () => ({ token: 'mock-token', expirationTime: '', authTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null, claims: {} }),
-    reload: async () => {},
-    toJSON: () => ({}),
-};
-
-
-const mockUserData: UserData = {
-  uid: 'mock-user-id',
-  name: 'Gagan Sharma',
-  email: 'gagansharma.gs107@gmail.com',
-  phone: '+91 78885 40806',
-  referralCode: 'VBKRT45F',
-  usedReferralCode: 'FRIENDCODE',
-  membership: 'Pro',
-  rank: 'Gold',
-  totalBalance: 2500,
-  invested: 10000,
-  earnings: 2500,
-  projected: 15000,
-  referralEarnings: 750,
-  bonusEarnings: 50,
-  investmentEarnings: 1700,
-  createdAt: new Date(),
-  lastLogin: new Date(),
-};
+const generateReferralCode = () => {
+    return 'VB' + Math.random().toString(36).substring(2, 8).toUpperCase();
+}
 
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -91,50 +64,186 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { toast } = useToast();
 
     useEffect(() => {
-        // This effect now handles redirection for the mock auth flow
-        const isLoginPage = pathname === '/login';
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            setLoading(true);
+            if (user) {
+                setUser(user);
+                const userRef = doc(db, 'users', user.uid);
+                const userSnap = await getDoc(userRef);
+                if (userSnap.exists()) {
+                    setUserData(userSnap.data() as UserData);
+                    // Update last login
+                    await setDoc(userRef, { lastLogin: serverTimestamp() }, { merge: true });
+                } else {
+                    // This case might happen if user is created in Auth but not in Firestore
+                    // Or for a new Google Sign-in
+                    const { displayName, email } = user;
+                    const newUser: UserData = {
+                        uid: user.uid,
+                        name: displayName || 'Vault User',
+                        email: email || '',
+                        phone: '',
+                        referralCode: generateReferralCode(),
+                        membership: 'Basic',
+                        rank: 'Bronze',
+                        totalBalance: 0,
+                        invested: 0,
+                        earnings: 0,
+                        projected: 0,
+                        referralEarnings: 0,
+                        bonusEarnings: 0,
+                        investmentEarnings: 0,
+                        createdAt: serverTimestamp(),
+                        lastLogin: serverTimestamp(),
+                    };
+                    await setDoc(userRef, newUser);
+                    setUserData(newUser);
+                }
+            } else {
+                setUser(null);
+                setUserData(null);
+            }
+            setLoading(false);
+        });
 
-        if (!user && !isLoginPage) {
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        if (loading) return;
+
+        const isAuthPage = pathname === '/login';
+        const isAdminPage = pathname.startsWith('/admin');
+
+        if (!user && !isAuthPage && !isAdminPage) {
             router.push('/login');
-        } else if (user && isLoginPage) {
+        } else if (user && isAuthPage) {
             router.push('/');
         }
-        setLoading(false);
-    }, [user, pathname, router]);
-
-    // Simulate login by setting mock data
-    const simulateLogin = () => {
-        setLoading(true);
-        toast({ title: 'Login Successful!', description: 'Welcome to VaultBoost (Offline Mode).' });
-        setUser(mockUser);
-        setUserData(mockUserData);
-        router.push('/');
-    };
+    }, [user, loading, pathname, router]);
 
     const signInWithGoogle = async () => {
-        simulateLogin();
+        setLoading(true);
+        const provider = new GoogleAuthProvider();
+        try {
+            await signInWithPopup(auth, provider);
+             toast({ title: 'Login Successful!', description: 'Welcome to VaultBoost.' });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Login Failed', description: error.message });
+            setLoading(false);
+        }
     };
 
     const signUpWithEmail = async (details: any) => {
-        console.log('Signing up with:', details);
-        simulateLogin();
+        setLoading(true);
+        const { email, password, name, phone, referralCode } = details;
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const newUser: UserData = {
+                uid: userCredential.user.uid,
+                name,
+                email,
+                phone,
+                referralCode: generateReferralCode(),
+                membership: 'Basic',
+                rank: 'Bronze',
+                totalBalance: 0,
+                invested: 0,
+                earnings: 0,
+                projected: 0,
+                referralEarnings: 0,
+                bonusEarnings: 0,
+                investmentEarnings: 0,
+                createdAt: serverTimestamp(),
+                lastLogin: serverTimestamp(),
+            };
+
+            if (referralCode) {
+                 await redeemReferralCode(referralCode, userCredential.user.uid);
+            }
+
+            await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
+            toast({ title: 'Account Created!', description: 'Welcome to VaultBoost.' });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Sign Up Failed', description: error.message });
+            setLoading(false);
+        }
     };
 
     const signInWithEmail = async (details: any) => {
-        console.log('Signing in with:', details);
-        simulateLogin();
+        setLoading(true);
+        const { email, password } = details;
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+            toast({ title: 'Login Successful!', description: 'Welcome back!' });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Login Failed', description: error.message });
+            setLoading(false);
+        }
     }
 
     const logOut = async () => {
         setLoading(true);
-        setUser(null);
-        setUserData(null);
-        router.push('/login');
-        toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
+        try {
+            await signOut(auth);
+            toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Logout Failed', description: error.message });
+        } finally {
+            // State will be updated by onAuthStateChanged listener
+        }
     };
 
-    const redeemReferralCode = async (code: string) => {
-        toast({ title: 'Code Redeemed!', description: `Code ${code} accepted in offline mode.` });
+    const redeemReferralCode = async (code: string, forUserId?: string) => {
+        const currentUserId = forUserId || user?.uid;
+        if (!currentUserId) throw new Error("User not found");
+        if (userData?.usedReferralCode) throw new Error("You have already used a referral code.");
+
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('referralCode', '==', code));
+        
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            throw new Error('Invalid referral code.');
+        }
+
+        const referrerDoc = querySnapshot.docs[0];
+        const referrerId = referrerDoc.id;
+
+        if (referrerId === currentUserId) {
+            throw new Error("You cannot use your own referral code.");
+        }
+
+        const batch = writeBatch(db);
+
+        // Update current user
+        const currentUserRef = doc(db, 'users', currentUserId);
+        batch.update(currentUserRef, {
+            usedReferralCode: code,
+            referredBy: referrerId
+        });
+
+        // Update referrer user
+        const referrerRef = doc(db, 'users', referrerId);
+        batch.update(referrerRef, {
+            referralEarnings: increment(75), // Example reward
+            totalBalance: increment(75),
+        });
+
+        await batch.commit();
+
+        // Give the new user their bonus
+        await setDoc(currentUserRef, {
+            bonusEarnings: increment(75),
+            totalBalance: increment(75)
+        }, { merge: true });
+
+
+        // Manually update local state to reflect change immediately
+        if (userData) {
+            setUserData({ ...userData, usedReferralCode: code });
+        }
     };
 
     const value: AuthContextType = {
