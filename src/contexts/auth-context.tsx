@@ -1,9 +1,6 @@
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, User } from 'firebase/auth';
-import { doc, setDoc, getDoc, increment } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { User } from 'firebase/auth';
 import { Gem } from 'lucide-react';
 
 interface AuthContextType {
@@ -31,80 +28,53 @@ interface UserData {
     investmentEarnings: number;
 }
 
+const mockUser = {
+  uid: 'mock-user-id',
+  email: 'test@example.com',
+  displayName: 'Test User',
+} as User;
+
+const mockUserData: UserData = {
+    name: 'Test User',
+    email: 'test@example.com',
+    phone: '123-456-7890',
+    referralCode: 'MOCKREF123',
+    membership: 'Pro',
+    rank: 'Gold',
+    totalBalance: 5000,
+    invested: 2000,
+    earnings: 500,
+    projected: 550,
+    referralEarnings: 200,
+    bonusEarnings: 50,
+    investmentEarnings: 250,
+};
+
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const pathname = usePathname();
+  const [user, setUser] = useState<User | null>(mockUser);
+  const [userData, setUserData] = useState<UserData | null>(mockUserData);
+  const [loading, setLoading] = useState(false); // Set loading to false by default
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          setUserData(userDoc.data() as UserData);
-        }
-      } else {
-        setUserData(null);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (loading) return;
-
-    const isAuthPage = pathname === '/login';
-    const isAdminPage = pathname.startsWith('/admin');
-
-    if (isAdminPage) return;
-
-    if (!user && !isAuthPage) {
-      router.push('/login');
-    } else if (user && isAuthPage) {
-      router.push('/');
-    }
-  }, [user, loading, pathname, router]);
-
-  const signUp = async (email: string, pass: string, name: string, phone: string, referCode?: string) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-    const user = userCredential.user;
-    const referralCode = `REF-${user.uid.substring(0, 6).toUpperCase()}`;
-    const newUser: UserData = {
-        name,
-        email,
-        phone,
-        referralCode,
-        membership: 'Basic',
-        rank: 'Bronze',
-        totalBalance: 0,
-        invested: 0,
-        earnings: 0,
-        projected: 0,
-        referralEarnings: 0,
-        bonusEarnings: 0,
-        investmentEarnings: 0,
-    };
-    await setDoc(doc(db, "users", user.uid), newUser);
-    setUserData(newUser);
-    return userCredential;
+  const signUp = async () => {
+    console.log("Signup disabled");
+    return Promise.resolve();
   }
 
-  const logIn = (email: string, pass: string) => {
-    return signInWithEmailAndPassword(auth, email, pass);
+  const logIn = async () => {
+    console.log("Login disabled");
+    return Promise.resolve();
   }
 
-  const logOut = () => {
-    return signOut(auth);
+  const logOut = async () => {
+    console.log("Logout disabled");
+    setUser(null);
+    setUserData(null);
+    return Promise.resolve();
   }
-
+  
   if (loading) {
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-background">
