@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/auth-context';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'VaultBoost',
@@ -27,7 +28,14 @@ export default function RootLayout({
       <body className="font-body antialiased h-full bg-background">
         <AuthProvider>
             <div className="relative flex flex-col h-full">
-              <main className="flex-grow pb-20">{children}</main>
+              <main className="flex-grow pb-28">{children}</main>
+               <footer className="p-4 text-center text-xs text-muted-foreground space-y-2">
+                    <p>This is a risk-based investment product. Please invest at your own discretion.</p>
+                    <div className="flex justify-center gap-4">
+                        <Link href="/terms" className="underline">Terms & Conditions</Link>
+                        <Link href="/privacy" className="underline">Privacy Policy</Link>
+                    </div>
+              </footer>
             </div>
             <Toaster />
         </AuthProvider>
