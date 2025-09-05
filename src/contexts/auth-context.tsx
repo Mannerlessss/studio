@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from 'firebase/auth';
 import { Gem } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface AuthContextType {
   user: User | null;
@@ -28,17 +29,40 @@ interface UserData {
     investmentEarnings: number;
 }
 
-const mockUser = {
+// Mock user object that Firebase would typically provide
+const mockUser = (email: string, name: string): User => ({
   uid: 'mock-user-id',
-  email: 'test@example.com',
-  displayName: 'Test User',
-} as User;
+  email: email,
+  displayName: name,
+  // Add other User properties as needed, with mock values
+  emailVerified: true,
+  isAnonymous: false,
+  metadata: {},
+  providerData: [],
+  providerId: 'password',
+  refreshToken: 'mock-refresh-token',
+  tenantId: null,
+  delete: async () => {},
+  getIdToken: async () => 'mock-id-token',
+  getIdTokenResult: async () => ({
+    token: 'mock-id-token',
+    claims: {},
+    authTime: '',
+    issuedAtTime: '',
+    signInProvider: null,
+    signInSecondFactor: null,
+    expirationTime: '',
+  }),
+  reload: async () => {},
+  toJSON: () => ({}),
+});
 
-const mockUserData: UserData = {
-    name: 'Test User',
-    email: 'test@example.com',
-    phone: '123-456-7890',
-    referralCode: 'MOCKREF123',
+
+const mockUserData = (name: string, email: string, phone: string, referCode?: string): UserData => ({
+    name: name,
+    email: email,
+    phone: phone,
+    referralCode: referCode || 'MOCKREF123',
     membership: 'Pro',
     rank: 'Gold',
     totalBalance: 5000,
@@ -48,30 +72,60 @@ const mockUserData: UserData = {
     referralEarnings: 200,
     bonusEarnings: 50,
     investmentEarnings: 250,
-};
+});
 
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(mockUser);
-  const [userData, setUserData] = useState<UserData | null>(mockUserData);
-  const [loading, setLoading] = useState(false); // Set loading to false by default
+  const [user, setUser] = useState<User | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const pathname = usePathname();
 
-  const signUp = async () => {
-    console.log("Signup disabled");
-    return Promise.resolve();
+   useEffect(() => {
+    // In a real app, this is where you'd check for a logged-in user.
+    // We'll just finish loading.
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    
+    const isAuthPage = pathname === '/login';
+    const isAdminPage = pathname.startsWith('/admin');
+
+    if (!user && !isAuthPage && !isAdminPage) {
+      router.push('/login');
+    } else if (user && isAuthPage) {
+      router.push('/');
+    }
+
+  }, [user, loading, pathname, router]);
+
+
+  const signUp = async (email: string, pass: string, name: string, phone: string, referCode?: string) => {
+    const newUser = mockUser(email, name);
+    const newUserData = mockUserData(name, email, phone, referCode);
+    setUser(newUser);
+    setUserData(newUserData);
+    return Promise.resolve(newUser);
   }
 
-  const logIn = async () => {
-    console.log("Login disabled");
-    return Promise.resolve();
+  const logIn = async (email: string, pass: string) => {
+     // For mock purposes, any login is successful
+    const loggedInUser = mockUser(email, 'Test User');
+    const loggedInUserData = mockUserData('Test User', email, '123-456-7890');
+    setUser(loggedInUser);
+    setUserData(loggedInUserData);
+    return Promise.resolve(loggedInUser);
   }
 
   const logOut = async () => {
-    console.log("Logout disabled");
     setUser(null);
     setUserData(null);
+    router.push('/login');
     return Promise.resolve();
   }
   
