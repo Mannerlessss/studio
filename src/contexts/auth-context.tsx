@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true);
+      setLoading(true); // Set loading to true when auth state changes
       if (user) {
         setUser(user);
         const userRef = doc(db, 'users', user.uid);
@@ -84,7 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setUserData(null);
       }
-      setLoading(false);
+      setLoading(false); // Set loading to false after handling auth state
     });
 
     return () => unsubscribe();
