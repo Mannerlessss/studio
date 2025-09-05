@@ -63,36 +63,16 @@ export function GuidedTour() {
 
   const currentStep = tourSteps[step];
   
-  // Note: This is a simplified positioning logic for the prototype.
-  // In a real app, you might use a library for more robust positioning.
-  const getPosition = (targetId: string) => {
-    if (typeof window === 'undefined') return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
-    const element = document.getElementById(targetId);
-    if (!element) return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
-
-    const rect = element.getBoundingClientRect();
-    if (targetId.startsWith('bottom-nav')) {
-       return { top: `${rect.top - 180}px`, left: `${rect.left + rect.width / 2 - 150}px`};
-    }
-    return { top: `${rect.bottom + 10}px`, left: `${rect.left}px` };
-  };
-
-  const positionStyles = getPosition(currentStep.targetId);
-
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
-       <div
-        className="fixed z-[101] transition-all duration-300"
-        style={positionStyles}
-        >
-        <Card className="w-80 shadow-2xl animate-in fade-in-50 zoom-in-90">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+       <Card className="w-full max-w-md shadow-2xl animate-in fade-in-50 zoom-in-90">
             <CardContent className="p-4">
                 <div className="flex justify-between items-start">
                     <div>
                         <h3 className="font-bold text-lg mb-2">{currentStep.title}</h3>
                         <p className="text-sm text-muted-foreground">{currentStep.content}</p>
                     </div>
-                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleEndTour}>
+                     <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={handleEndTour}>
                         <X className="h-4 w-4" />
                     </Button>
                 </div>
@@ -107,7 +87,6 @@ export function GuidedTour() {
                 </div>
             </CardContent>
         </Card>
-      </div>
     </div>
   );
 }
