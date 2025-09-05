@@ -83,10 +83,14 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
           </>
         ) : (
           <>
-            {claimedAmount !== null && (
+            {claimedAmount !== null ? (
               <p className="text-lg font-semibold text-accent mb-2">
                 You won {claimedAmount} Rs!
               </p>
+            ) : (
+                 <p className="text-muted-foreground mb-2">
+                    Bonus claimed!
+                </p>
             )}
             <p className="text-muted-foreground">
               Come back in <span className="font-semibold text-primary">{timeRemaining}</span> for another bonus.
