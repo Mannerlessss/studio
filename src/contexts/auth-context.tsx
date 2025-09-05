@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setLoading(true);
       if (user) {
         setUser(user);
         const userDoc = await getDoc(doc(db, 'users', user.uid));
@@ -65,12 +66,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isAuthPage = pathname === '/login';
     const isAdminPage = pathname.startsWith('/admin');
 
-    // If there is no user, and they are not on an auth page or admin page, redirect to login
     if (!user && !isAuthPage && !isAdminPage) {
       router.push('/login');
-    } 
-    // If there is a user, and they are on the login page, redirect to the dashboard
-    else if (user && isAuthPage) {
+    } else if (user && isAuthPage) {
       router.push('/');
     }
 
@@ -119,19 +117,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await signOut(auth);
     setUser(null);
     setUserData(null);
-    // No need to push here, the useEffect hook will handle it.
+    router.push('/login');
   }
-  
-  const isAuthPage = pathname === '/login';
-  if (loading || (!user && !isAuthPage)) {
-    return (
+
+  // Do not render a loading screen. Let the effect handle redirection.
+  // This prevents the app from getting stuck.
+  if (loading && pathname !== '/login') {
+     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-background">
             <Gem className="w-12 h-12 text-primary animate-pulse" />
             <p className="mt-4 text-muted-foreground">Loading Vault...</p>
         </div>
     );
   }
-
+  
   return (
     <AuthContext.Provider value={{ user, userData, loading, signUp, logIn, logOut }}>
       {children}
