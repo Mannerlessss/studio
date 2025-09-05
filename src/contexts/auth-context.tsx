@@ -63,10 +63,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { toast } = useToast();
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
-            if (!currentUser) {
-                setUserData(null);
+            if (currentUser) {
+                await fetchUserData(currentUser);
             }
             setLoading(false);
         });
@@ -85,11 +85,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!user && (protectedRoutes.includes(pathname) || isAdminRoute)) {
             router.push('/login');
         } else if (user && isAuthRoute) {
-            if (userData) { // Only redirect if we have data
-                router.push('/');
-            }
+             router.push('/');
         }
-    }, [user, userData, loading, pathname, router]);
+    }, [user, loading, pathname, router]);
 
     const fetchUserData = async (firebaseUser: User): Promise<UserData | null> => {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -100,6 +98,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUserData(fetchedData);
                 return fetchedData;
             } else {
+                 // This case will be handled by handleSuccessfulLogin for new users
                 return null;
             }
         } catch (error) {
@@ -109,12 +108,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return null;
         }
     };
-
+    
     const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
         const userDocRef = doc(db, 'users', user.uid);
         try {
             const docSnap = await getDoc(userDocRef);
-            let finalUserData: UserData;
 
             if (!docSnap.exists()) {
                 let referredBy = null;
@@ -149,14 +147,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     lastLogin: serverTimestamp(),
                 };
                 await setDoc(userDocRef, newUser);
-                finalUserData = newUser;
+                setUserData(newUser);
             } else {
                 await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-                finalUserData = docSnap.data() as UserData;
+                // We already fetched data on auth state change, no need to set it again here
+                // unless it was a new user.
+                if (userData === null) {
+                    await fetchUserData(user);
+                }
             }
-            
-            setUser(user);
-            setUserData(finalUserData);
         } catch (error: any) {
             console.error("Login/Signup Error: ", error);
             toast({
@@ -165,10 +164,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 description: "Could not initialize your account.",
             });
             await signOut(auth);
-            setUser(null);
-            setUserData(null);
         }
     };
+
 
     const signInWithGoogle = async () => {
         setLoading(true);
@@ -182,6 +180,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Google Sign-In Failed',
                 description: "Could not complete Google sign-in.",
             });
+        } finally {
             setLoading(false);
         }
     };
@@ -198,6 +197,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-Up Failed',
                 description: error.message,
             });
+        } finally {
             setLoading(false);
         }
     };
@@ -214,14 +214,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-In Failed',
                 description: "Invalid email or password.",
             });
+        } finally {
             setLoading(false);
         }
     };
 
     const logOut = async () => {
         await signOut(auth);
-        setUser(null);
         setUserData(null);
+        setUser(null);
         router.push('/login');
     };
 
