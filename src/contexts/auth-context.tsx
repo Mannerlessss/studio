@@ -1,8 +1,10 @@
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User } from 'firebase/auth';
+import { User, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Gem } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
+import { auth, db } from '@/lib/firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -29,52 +31,6 @@ interface UserData {
     investmentEarnings: number;
 }
 
-// Mock user object that Firebase would typically provide
-const mockUser = (email: string, name: string): User => ({
-  uid: 'mock-user-id',
-  email: email,
-  displayName: name,
-  // Add other User properties as needed, with mock values
-  emailVerified: true,
-  isAnonymous: false,
-  metadata: {},
-  providerData: [],
-  providerId: 'password',
-  refreshToken: 'mock-refresh-token',
-  tenantId: null,
-  delete: async () => {},
-  getIdToken: async () => 'mock-id-token',
-  getIdTokenResult: async () => ({
-    token: 'mock-id-token',
-    claims: {},
-    authTime: '',
-    issuedAtTime: '',
-    signInProvider: null,
-    signInSecondFactor: null,
-    expirationTime: '',
-  }),
-  reload: async () => {},
-  toJSON: () => ({}),
-});
-
-
-const mockUserData = (name: string, email: string, phone: string, referCode?: string): UserData => ({
-    name: name,
-    email: email,
-    phone: phone,
-    referralCode: referCode || 'MOCKREF123',
-    membership: 'Pro',
-    rank: 'Gold',
-    totalBalance: 5000,
-    invested: 2000,
-    earnings: 500,
-    projected: 550,
-    referralEarnings: 200,
-    bonusEarnings: 50,
-    investmentEarnings: 250,
-});
-
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -84,10 +40,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
 
-   useEffect(() => {
-    // In a real app, this is where you'd check for a logged-in user.
-    // We'll just finish loading.
-    setLoading(false);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUser(user);
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+            setUserData(userDoc.data() as UserData);
+        }
+      } else {
+        setUser(null);
+        setUserData(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -104,29 +72,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   }, [user, loading, pathname, router]);
 
-
   const signUp = async (email: string, pass: string, name: string, phone: string, referCode?: string) => {
-    const newUser = mockUser(email, name);
-    const newUserData = mockUserData(name, email, phone, referCode);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+    const newUser = userCredential.user;
+
+    const newUserData: UserData = {
+        name: name,
+        email: email,
+        phone: phone,
+        referralCode: referCode || `VB${newUser.uid.substring(0, 6).toUpperCase()}`,
+        membership: 'Basic',
+        rank: 'Bronze',
+        totalBalance: 0,
+        invested: 0,
+        earnings: 0,
+        projected: 0,
+        referralEarnings: 0,
+        bonusEarnings: 0,
+        investmentEarnings: 0,
+    };
+    
+    await setDoc(doc(db, 'users', newUser.uid), newUserData);
+    
     setUser(newUser);
     setUserData(newUserData);
-    return Promise.resolve(newUser);
+    return userCredential;
   }
 
   const logIn = async (email: string, pass: string) => {
-     // For mock purposes, any login is successful
-    const loggedInUser = mockUser(email, 'Test User');
-    const loggedInUserData = mockUserData('Test User', email, '123-456-7890');
-    setUser(loggedInUser);
-    setUserData(loggedInUserData);
-    return Promise.resolve(loggedInUser);
+     const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+     const loggedInUser = userCredential.user;
+     const userDoc = await getDoc(doc(db, 'users', loggedInUser.uid));
+     
+     setUser(loggedInUser);
+     if (userDoc.exists()) {
+        setUserData(userDoc.data() as UserData);
+     }
+     return userCredential;
   }
 
   const logOut = async () => {
+    await signOut(auth);
     setUser(null);
     setUserData(null);
     router.push('/login');
-    return Promise.resolve();
   }
   
   if (loading) {
