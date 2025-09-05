@@ -16,12 +16,16 @@ import { useAuth } from '@/contexts/auth-context';
 
 const Home: NextPage = () => {
   const [earnings, setEarnings] = useState(0);
-  const { userData } = useAuth();
+  const { userData, loading } = useAuth();
   const userName = userData?.name || 'User';
 
   const handleBonusClaim = (amount: number) => {
     setEarnings((prevEarnings) => prevEarnings + amount);
   };
+
+  if (loading) {
+      return null;
+  }
 
   return (
     <div className="bg-background min-h-full">

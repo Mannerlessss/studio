@@ -10,7 +10,6 @@ import {
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { useRouter, usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface AuthContextType {
@@ -36,8 +35,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -56,22 +53,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (loading) return;
-
-    const isAuthPage = pathname === '/login';
-
-    if (!user && !isAuthPage) {
-      router.push('/login');
-    }
-    
-    if (user && isAuthPage) {
-        router.push('/');
-    }
-
-  }, [user, loading, pathname, router]);
-
 
   const signUp = async (email: string, pass: string, name: string, phone: string, referCode?: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
@@ -102,9 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   if (loading) {
-    const isAuthPage = pathname === '/login';
-    if (!isAuthPage) {
-      return (
+    return (
         <div className="flex flex-col h-full items-center justify-center space-y-4 bg-background p-4">
             <Skeleton className="h-24 w-full max-w-md" />
             <div className="grid w-full max-w-md grid-cols-2 gap-4">
@@ -117,8 +96,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
              <Skeleton className="h-32 w-full max-w-md" />
         </div>
       );
-    }
   }
+
 
   return (
     <AuthContext.Provider value={{ user, loading, logIn, signUp, logOut, userData }}>
