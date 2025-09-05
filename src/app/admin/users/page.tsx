@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     AlertDialog,
   AlertDialogAction,
@@ -41,6 +41,8 @@ import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp } from 'lucide-
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { db } from '@/lib/firebase';
+import { collection, getDocs, doc, updateDoc, increment } from 'firebase/firestore';
 
 interface User {
     id: string;
@@ -53,56 +55,67 @@ interface User {
     investmentEarnings: number;
 }
 
-const mockUsers: User[] = [
-  {
-    id: 'USR-001',
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    membership: 'Basic',
-    totalBalance: 5000,
-    bonusEarnings: 150,
-    referralEarnings: 350,
-    investmentEarnings: 4500,
-  },
-  {
-    id: 'USR-002',
-    name: 'Jane Smith',
-    email: 'jane.smith@example.com',
-    membership: 'Pro',
-    totalBalance: 12500,
-    bonusEarnings: 500,
-    referralEarnings: 2000,
-    investmentEarnings: 10000,
-  },
-  {
-    id: 'USR-003',
-    name: 'Sam Wilson',
-    email: 'sam.wilson@example.com',
-    membership: 'Basic',
-    totalBalance: 800,
-    bonusEarnings: 50,
-    referralEarnings: 0,
-    investmentEarnings: 750,
-  },
-];
-
 export default function UsersPage() {
     const { toast } = useToast();
+    const [users, setUsers] = useState<User[]>([]);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [creditAmount, setCreditAmount] = useState('');
 
+    useEffect(() => {
+        const fetchUsers = async () => {
+            const usersCollection = collection(db, 'users');
+            const userSnapshot = await getDocs(usersCollection);
+            const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+            setUsers(userList);
+        };
 
-    const handleCredit = (userId: string) => {
+        fetchUsers();
+    }, []);
+
+    const handleCredit = async (userId: string) => {
+        const amount = Number(creditAmount);
+        if (isNaN(amount) || amount <= 0) {
+            toast({
+                variant: 'destructive',
+                title: 'Invalid Amount',
+                description: 'Please enter a valid amount to credit.',
+            });
+            return;
+        }
+
+        const userRef = doc(db, 'users', userId);
+        await updateDoc(userRef, {
+            totalBalance: increment(amount),
+            investmentEarnings: increment(amount),
+        });
+
         toast({
             title: `Investment Credited`,
-            description: `Investment has been credited for user ${userId}.`,
+            description: `${amount} Rs. has been credited for user ${userId}.`,
         });
+
+        // Refetch users to show updated data
+        const usersCollection = collection(db, 'users');
+        const userSnapshot = await getDocs(usersCollection);
+        const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+        setUsers(userList);
+        setCreditAmount('');
     }
 
-    const handleUpgrade = (userId: string) => {
+    const handleUpgrade = async (userId: string) => {
+         const userRef = doc(db, 'users', userId);
+         await updateDoc(userRef, {
+            membership: 'Pro',
+         });
         toast({
             title: `Upgraded to Pro`,
             description: `User ${userId} has been upgraded to the Pro plan.`,
         });
+        // Refetch users
+         const usersCollection = collection(db, 'users');
+        const userSnapshot = await getDocs(usersCollection);
+        const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+        setUsers(userList);
     }
 
   return (
@@ -125,7 +138,7 @@ export default function UsersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockUsers.map((user) => (
+            {users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell className="font-medium">{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>
@@ -155,7 +168,7 @@ export default function UsersPage() {
                             </AlertDialogHeader>
                             <div className="space-y-2">
                                 <Label htmlFor="credit-amount">Amount (in Rs.)</Label>
-                                <Input id="credit-amount" type="number" placeholder="e.g., 1000" />
+                                <Input id="credit-amount" type="number" placeholder="e.g., 1000" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} />
                             </div>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>

@@ -45,7 +45,7 @@ export default function LoginPage() {
       toast({
         variant: 'destructive',
         title: 'Signup Failed',
-        description: 'This is a mock-up. No actual signup occurred.',
+        description: error.message || 'Could not create account.',
       });
     } finally {
         setLoading(false);
@@ -66,7 +66,7 @@ export default function LoginPage() {
        toast({
         variant: 'destructive',
         title: 'Login Failed',
-        description: 'This is a mock-up. No actual login occurred.',
+        description: 'Invalid email or password.',
       });
     } finally {
         setLoading(false);

@@ -2,15 +2,10 @@
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Skeleton } from '@/components/ui/skeleton';
+import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, User } from 'firebase/auth';
+import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
+import { app, auth, db } from '@/lib/firebase';
 import { Gem } from 'lucide-react';
-
-// Mock User and Auth
-type User = {
-  uid: string;
-  email: string;
-  displayName: string;
-};
 
 interface AuthContextType {
   user: User | null;
@@ -28,72 +23,86 @@ interface UserData {
     referralCode?: string;
     membership: 'Basic' | 'Pro';
     rank: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+    totalBalance: number;
+    invested: number;
+    earnings: number;
+    projected: number;
+    referralEarnings: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const dummyUser: User = {
-    uid: '12345',
-    email: 'user@example.com',
-    displayName: 'Vault User'
-};
-
-const dummyUserData: UserData = {
-    name: 'Vault User',
-    email: 'user@example.com',
-    phone: '123-456-7890',
-    referralCode: 'DUMMYCODE',
-    membership: 'Pro',
-    rank: 'Gold',
-};
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true); 
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    // This is a mock auth state checker
-    const checkAuth = () => {
-        setLoading(true);
-        const isLoggedIn = !!user; // In a real app, you'd check a token
-        if (!isLoggedIn && pathname !== '/login') {
-            router.push('/login');
-        } else {
-            // If the user is somehow logged in, give them dummy data
-            if (!userData) {
-                setUser(dummyUser);
-                setUserData(dummyUserData);
-            }
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setLoading(true);
+      if (user) {
+        setUser(user);
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          setUserData(userDoc.data() as UserData);
         }
-        setLoading(false);
-    };
-    checkAuth();
-  }, [user, pathname, router, userData]);
+        if (pathname === '/login') {
+            router.push('/');
+        }
+      } else {
+        setUser(null);
+        setUserData(null);
+        if (pathname !== '/login') {
+          router.push('/login');
+        }
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [pathname, router]);
 
   const logIn = async (email: string, pass: string) => {
-    console.log('Mock login for', email);
-    const newUser = { ...dummyUser, email: email};
-    setUser(newUser);
-    setUserData({ ...dummyUserData, email: email });
-    return Promise.resolve();
+    return signInWithEmailAndPassword(auth, email, pass);
   };
 
   const signUp = async (email: string, pass: string, name: string, phone: string, referCode?: string) => {
-    console.log('Mock signup for', name);
-    const newUser = { ...dummyUser, email: email, displayName: name };
-    setUser(newUser);
-    setUserData({ ...dummyUserData, name, email, phone, referralCode: referCode });
-    return Promise.resolve();
+    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+    const user = userCredential.user;
+    
+    const ownReferralCode = 'VB' + Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    const newUser: UserData = {
+        name,
+        email,
+        phone,
+        referralCode: ownReferralCode,
+        membership: 'Basic',
+        rank: 'Bronze',
+        totalBalance: 0,
+        invested: 0,
+        earnings: 0,
+        projected: 0,
+        referralEarnings: 0
+    };
+
+    await setDoc(doc(db, "users", user.uid), newUser);
+    setUserData(newUser);
+
+    if (referCode) {
+        // Here you would add logic to handle the referral code, 
+        // e.g., credit the referrer.
+        console.log(`User signed up with referral code: ${referCode}`);
+    }
+
+    return userCredential;
   };
 
   const logOut = async () => {
-    console.log('Mock logout');
-    setUser(null);
-    setUserData(null);
-    return Promise.resolve();
+    return signOut(auth);
   };
   
   if (loading) {
