@@ -64,15 +64,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setUser(currentUser); // Set Firebase user immediately
             if (currentUser) {
-                // User is authenticated with Firebase, now get our custom user data
+                // If a user is logged in, fetch their data
                 await fetchUserData(currentUser);
             } else {
-                // No user, clear all states
-                setUser(null);
+                // No user, clear data and finish loading
                 setUserData(null);
+                setLoading(false);
             }
-            setLoading(false);
         });
 
         return () => unsubscribe();
@@ -102,15 +102,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (docSnap.exists()) {
                 const fetchedData = docSnap.data() as UserData;
                 setUserData(fetchedData);
-                setUser(firebaseUser); // Set the firebase user state
-                await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
             } else {
-                // This can happen if the user record wasn't created properly
-                // Or if this is the very first login after signup.
-                // We'll handle creation in handleSuccessfulLogin
-                console.log("User doc does not exist yet. It will be created on login.");
+                // This can happen if a user just signed up but their data isn't created yet.
+                // The handleSuccessfulLogin will take care of it.
                 setUserData(null);
-                setUser(firebaseUser); // Still set the base user
             }
         } catch (error) {
             console.error("Error fetching user data:", error);
@@ -119,9 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Session Error',
                 description: 'Could not verify your session. Please log in again.',
             });
-            await signOut(auth); // Sign out on error to prevent loops
-            setUser(null);
-            setUserData(null);
+            await signOut(auth);
         } finally {
             setLoading(false);
         }
@@ -130,12 +123,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
         setLoading(true);
         const userDocRef = doc(db, 'users', user.uid);
-        let finalUserData: UserData | null = null;
         
         try {
             const docSnap = await getDoc(userDocRef);
+            let finalUserData: UserData;
 
             if (!docSnap.exists()) {
+                // Create New User
                 let referredBy = null;
                 if (additionalData.referralCode) {
                     try {
@@ -174,21 +168,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 await setDoc(userDocRef, newUser);
                 finalUserData = newUser;
             } else {
+                // Existing User
                 await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
                 finalUserData = docSnap.data() as UserData;
             }
             
             setUser(user);
             setUserData(finalUserData);
+            router.push('/');
 
         } catch (error) {
              console.error("Error during handleSuccessfulLogin:", error);
              toast({ variant: 'destructive', title: 'Login Error', description: 'Could not initialize your account.' });
         } finally {
             setLoading(false);
-            if (finalUserData) {
-                router.push('/');
-            }
         }
     }
 
@@ -246,7 +239,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await signOut(auth);
             setUser(null);
             setUserData(null);
-            // The useEffect hook will handle the redirect to /login
+            router.push('/login');
         } catch (error: any) {
             toast({
                 variant: 'destructive',
