@@ -63,17 +63,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { toast } = useToast();
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                // Fetch data only if user is logged in, but don't block loading
-                const userDocRef = doc(db, 'users', currentUser.uid);
-                const docSnap = await getDoc(userDocRef);
-                 if (docSnap.exists()) {
-                    setUserData(docSnap.data() as UserData);
-                }
+                // Only fetch data if a user is confirmed.
+                fetchUserData(currentUser);
             } else {
-                 setUserData(null);
+                setUserData(null);
             }
             setLoading(false);
         });
@@ -92,70 +88,95 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!user && (protectedRoutes.includes(pathname) || isAdminRoute)) {
             router.push('/login');
         } else if (user && isAuthRoute) {
-            router.push('/');
+            // Only push to home if we have user data, otherwise wait.
+            if(userData) router.push('/');
         }
-    }, [user, loading, pathname, router]);
+    }, [user, userData, loading, pathname, router]);
 
     const fetchUserData = async (firebaseUser: User): Promise<UserData | null> => {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const docSnap = await getDoc(userDocRef);
-        if (docSnap.exists()) {
-            const fetchedData = docSnap.data() as UserData;
-            setUserData(fetchedData);
-            return fetchedData;
+        try {
+            const docSnap = await getDoc(userDocRef);
+            if (docSnap.exists()) {
+                const fetchedData = docSnap.data() as UserData;
+                setUserData(fetchedData);
+                return fetchedData;
+            } else {
+                 toast({ variant: 'destructive', title: 'Initialization Error', description: 'User profile not found in database.' });
+                 await logOut();
+                 return null;
+            }
+        } catch (error) {
+            console.error("Fetch User Data Error: ", error);
+            toast({ variant: 'destructive', title: 'Permissions Error', description: 'Could not fetch user profile.' });
+            await logOut();
+            return null;
         }
-        return null;
     };
-
+    
     const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
         const userDocRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(userDocRef);
-
-        let finalUserData: UserData;
-
-        if (!docSnap.exists()) {
-            let referredBy = null;
-            if (additionalData.referralCode) {
-                const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
-                const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
-                    referredBy = querySnapshot.docs[0].id;
-                } else {
-                     toast({ variant: 'destructive', title: 'Invalid Referral Code', description: 'The provided referral code does not exist.' });
+        let finalUserData: UserData | null = null;
+    
+        try {
+            const docSnap = await getDoc(userDocRef);
+    
+            if (!docSnap.exists()) {
+                let referredBy = null;
+                if (additionalData.referralCode) {
+                    const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
+                    const querySnapshot = await getDocs(q);
+                    if (!querySnapshot.empty) {
+                        referredBy = querySnapshot.docs[0].id;
+                    } else {
+                        toast({ variant: 'destructive', title: 'Invalid Referral Code', description: 'The provided referral code does not exist.' });
+                    }
                 }
+    
+                const newUser: UserData = {
+                    uid: user.uid,
+                    email: user.email || '',
+                    name: additionalData.name || user.displayName || 'Vault User',
+                    phone: additionalData.phone || '',
+                    referralCode: generateReferralCode(),
+                    usedReferralCode: referredBy ? additionalData.referralCode : undefined,
+                    referredBy: referredBy || undefined,
+                    membership: 'Basic',
+                    rank: 'Bronze',
+                    totalBalance: 0,
+                    invested: 0,
+                    earnings: 0,
+                    projected: 0,
+                    referralEarnings: 0,
+                    bonusEarnings: 0,
+                    investmentEarnings: 0,
+                    createdAt: serverTimestamp(),
+                    lastLogin: serverTimestamp(),
+                };
+                await setDoc(userDocRef, newUser);
+                finalUserData = newUser;
+            } else {
+                await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+                finalUserData = docSnap.data() as UserData;
             }
-
-            const newUser: UserData = {
-                uid: user.uid,
-                email: user.email || '',
-                name: additionalData.name || user.displayName || 'Vault User',
-                phone: additionalData.phone || '',
-                referralCode: generateReferralCode(),
-                usedReferralCode: referredBy ? additionalData.referralCode : undefined,
-                referredBy: referredBy || undefined,
-                membership: 'Basic',
-                rank: 'Bronze',
-                totalBalance: 0,
-                invested: 0,
-                earnings: 0,
-                projected: 0,
-                referralEarnings: 0,
-                bonusEarnings: 0,
-                investmentEarnings: 0,
-                createdAt: serverTimestamp(),
-                lastLogin: serverTimestamp(),
-            };
-            await setDoc(userDocRef, newUser);
-            finalUserData = newUser;
-        } else {
-            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-            finalUserData = docSnap.data() as UserData;
+    
+            setUser(user);
+            setUserData(finalUserData);
+            // The useEffect will handle the redirect
+    
+        } catch (error: any) {
+            console.error("Login/Signup Error: ", error);
+            toast({
+                variant: 'destructive',
+                title: 'Initialization Error',
+                description: 'Could not initialize your account.',
+            });
+            await signOut(auth); // Ensure user is logged out if db setup fails
+            setUser(null);
+            setUserData(null);
         }
-        
-        setUser(user);
-        setUserData(finalUserData);
-        router.push('/');
-    }
+    };
+    
 
     const signInWithGoogle = async () => {
         setLoading(true);
@@ -167,11 +188,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             toast({
                 variant: 'destructive',
                 title: 'Google Sign-In Failed',
-                description: "Could not initialize your account.",
+                description: "Could not complete Google sign-in.",
             });
              await signOut(auth);
         } finally {
-            setLoading(false);
+            // setLoading(false) is handled by the onAuthStateChanged listener
         }
     };
 
@@ -188,7 +209,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 description: error.message,
             });
         } finally {
-            setLoading(false);
+            // setLoading(false) is handled by the onAuthStateChanged listener
         }
     };
 
@@ -205,17 +226,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 description: "Invalid email or password.",
             });
         } finally {
-            setLoading(false);
+            // setLoading(false) is handled by the onAuthStateChanged listener
         }
     };
 
     const logOut = async () => {
-        setLoading(true);
         await signOut(auth);
         setUser(null);
         setUserData(null);
         router.push('/login');
-        setLoading(false);
     };
 
     const redeemReferralCode = async (code: string) => {
@@ -257,7 +276,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         await batch.commit();
         
-        // Refetch user data to update local state
         await fetchUserData(user);
     };
 
