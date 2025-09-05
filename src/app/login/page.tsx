@@ -71,7 +71,7 @@ export default function LoginPage() {
         <div className="flex flex-col items-center justify-center mb-6 space-y-4">
           <Gem className="w-12 h-12 text-primary" />
           <h1 className="text-2xl font-bold tracking-widest text-primary">
-            U P I V A U L T B O O S T
+            UPI VAULT BOOST
           </h1>
         </div>
         <TabsList className="grid w-full grid-cols-2">
