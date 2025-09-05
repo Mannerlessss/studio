@@ -1,12 +1,14 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Allow users to read the 'users' collection to verify referral codes,
+    // but only allow them to create/update/delete their own document.
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null && request.auth.uid == userId;
     }
-    // Allow reading of other users' referral codes for validation
-     match /users/{userId} {
-      allow get: if request.auth != null;
-    }
+
+    // You can add rules for other collections here in the future.
   }
 }
