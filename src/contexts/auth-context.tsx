@@ -1,3 +1,4 @@
+
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -64,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isAuthPage = pathname === '/login';
     const isAdminPage = pathname.startsWith('/admin');
 
-    if (!user && !isAuthPage && !isAdminPage) {
+    if (!user && !isAuth-page && !isAdminPage) {
       router.push('/login');
     } else if (user && isAuthPage) {
       router.push('/');
@@ -80,7 +81,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         name: name,
         email: email,
         phone: phone,
-        referralCode: referCode || `VB${newUser.uid.substring(0, 6).toUpperCase()}`,
+        referralCode: `VB${newUser.uid.substring(0, 6).toUpperCase()}`,
         membership: 'Basic',
         rank: 'Bronze',
         totalBalance: 0,
