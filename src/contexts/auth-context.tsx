@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, User } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, increment } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Gem } from 'lucide-react';
 
