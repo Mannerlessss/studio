@@ -1,11 +1,18 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow any authenticated user to read and write to the database.
-    // This is a temporary rule to unblock development and will be refined later.
+    // Users can only read and write to their own document.
+    // They can also create their own document upon signup.
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth.uid == userId;
+      allow update, delete: if request.auth.uid == userId;
+    }
+
+    // Allow admins full access to all collections for management.
+    // This is a placeholder for when you add admin roles.
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      // allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
   }
 }
