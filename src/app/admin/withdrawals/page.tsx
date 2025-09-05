@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Card,
@@ -25,7 +26,7 @@ const mockWithdrawals = [
     userName: 'John Doe',
     amount: 1500,
     method: 'UPI',
-    details: 'john.doe@upi',
+    details: { upiId: 'john.doe@upi' },
     date: '2024-09-05',
     status: 'Pending',
   },
@@ -34,7 +35,11 @@ const mockWithdrawals = [
     userName: 'Jane Smith',
     amount: 2500,
     method: 'Bank Transfer',
-    details: 'XXXXXXXX1234',
+    details: {
+      accountHolder: 'Jane Smith',
+      accountNumber: '123456789012',
+      ifsc: 'BANK0001234',
+    },
     date: '2024-09-04',
     status: 'Pending',
   },
@@ -43,7 +48,7 @@ const mockWithdrawals = [
     userName: 'Sam Wilson',
     amount: 1000,
     method: 'UPI',
-    details: 'sam.wilson@upi',
+    details: { upiId: 'sam.wilson@upi' },
     date: '2024-09-03',
     status: 'Approved',
   },
@@ -52,7 +57,11 @@ const mockWithdrawals = [
     userName: 'Lisa Ray',
     amount: 5000,
     method: 'Bank Transfer',
-    details: 'XXXXXXXX5678',
+    details: {
+        accountHolder: 'Lisa Ray',
+        accountNumber: '098765432109',
+        ifsc: 'BANK0005678',
+     },
     date: '2024-09-02',
     status: 'Rejected',
   },
@@ -104,7 +113,17 @@ export default function WithdrawalsPage() {
                 <TableCell className="font-medium">{withdrawal.userName}</TableCell>
                 <TableCell>{withdrawal.amount} Rs.</TableCell>
                 <TableCell>{withdrawal.method}</TableCell>
-                <TableCell className='font-mono text-xs'>{withdrawal.details}</TableCell>
+                <TableCell className='font-mono text-xs'>
+                   {withdrawal.method === 'UPI' ? (
+                        <span>{withdrawal.details.upiId}</span>
+                    ) : (
+                        <div className="flex flex-col gap-1">
+                            <span>{withdrawal.details.accountHolder}</span>
+                            <span>{withdrawal.details.accountNumber}</span>
+                            <span>{withdrawal.details.ifsc}</span>
+                        </div>
+                    )}
+                </TableCell>
                 <TableCell>{withdrawal.date}</TableCell>
                 <TableCell>
                   <Badge
