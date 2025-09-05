@@ -49,22 +49,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUser(user);
-        const userRef = doc(db, 'users', user.uid);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        const userRef = doc(db, 'users', currentUser.uid);
         const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
           setUserData(userSnap.data() as UserData);
         } else {
           // New user, create a document for them
-          const newUserReferralCode = generateReferralCode(user.displayName || 'USER');
+          const newUserReferralCode = generateReferralCode(currentUser.displayName || 'USER');
           const newUserData: UserData = {
-            uid: user.uid,
-            name: user.displayName || 'Vault User',
-            email: user.email || '',
-            phone: user.phoneNumber || '',
+            uid: currentUser.uid,
+            name: currentUser.displayName || 'Vault User',
+            email: currentUser.email || '',
+            phone: currentUser.phoneNumber || '',
             referralCode: newUserReferralCode,
             membership: 'Basic',
             rank: 'Bronze',
@@ -83,7 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setUserData(null);
       }
-      setLoading(false); 
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -97,14 +97,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isAuthPage = pathname === '/';
     const isAdminPage = pathname.startsWith('/admin');
 
-    if (userData && isAuthPage) {
+    if (user && isAuthPage) {
       router.push('/dashboard');
     }
     
     if (!user && !isAuthPage && !isAdminPage) {
       router.push('/');
     }
-  }, [user, userData, loading, pathname, router]);
+  }, [user, loading, pathname, router]);
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
@@ -112,6 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await signInWithPopup(auth, provider);
     } catch (error) {
       console.error("Error during Google sign-in:", error);
+      throw error;
     }
   };
 
