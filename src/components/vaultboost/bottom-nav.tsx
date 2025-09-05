@@ -17,10 +17,10 @@ export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-t-lg">
+    <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-t-lg z-20">
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => (
-          <Link href={item.href} key={item.label} className="flex-1">
+          <Link href={item.href} key={item.label} className="flex-1" id={`bottom-nav-${item.page}`}>
             <Button
               variant="ghost"
               className={`flex flex-col items-center justify-center h-full w-full rounded-none ${

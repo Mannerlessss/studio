@@ -12,6 +12,8 @@ import { WithdrawCard } from '@/components/vaultboost/withdraw-card';
 import { TransactionHistoryCard } from '@/components/vaultboost/transaction-history-card';
 import { Header } from '@/components/vaultboost/header';
 import { useAuth } from '@/contexts/auth-context';
+import { GuidedTour } from '@/components/vaultboost/guided-tour';
+import { ProfileCompletionCard } from '@/components/vaultboost/profile-completion-card';
 
 
 const Home: NextPage = () => {
@@ -30,9 +32,13 @@ const Home: NextPage = () => {
   return (
     <div className="bg-background min-h-full">
       <Header />
+      <GuidedTour />
       <div className="p-4 space-y-6">
-        <WelcomeCard name={userName} membership={userData?.membership ? `${userData.membership} Member` : 'Basic Member'} />
-        <div className="grid grid-cols-2 gap-4">
+        <div id="welcome-card">
+          <WelcomeCard name={userName} membership={userData?.membership ? `${userData.membership} Member` : 'Basic Member'} />
+        </div>
+        <ProfileCompletionCard />
+        <div className="grid grid-cols-2 gap-4" id="info-cards">
           <InfoCard
             title="Invested"
             value="0 Rs."
@@ -56,7 +62,9 @@ const Home: NextPage = () => {
           />
         </div>
         <DailyBonusCard onBonusClaim={handleBonusClaim} />
-        <WithdrawCard />
+        <div id="withdraw-card">
+            <WithdrawCard />
+        </div>
         <TransactionHistoryCard />
         <UpgradeCard userName={userName}/>
       </div>
@@ -66,3 +74,4 @@ const Home: NextPage = () => {
 };
 
 export default Home;
+
