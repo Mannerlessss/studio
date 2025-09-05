@@ -2,7 +2,6 @@
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Gem } from 'lucide-react';
 
 // Define a mock user data structure.
 interface UserData {
@@ -23,7 +22,7 @@ interface UserData {
 
 // Define the shape of the authentication context.
 interface AuthContextType {
-  user: object | null; // A generic object for the mock user
+  user: object | null;
   userData: UserData | null;
   loading: boolean;
   logIn: (email: string, pass: string) => Promise<void>;
@@ -52,79 +51,59 @@ const mockUserData: UserData = {
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<object | null>(null);
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true); // Let's keep this to manage initial state
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
-  // This effect runs once on initial load.
   useEffect(() => {
-    // Since there's no backend, we just stop the loading state.
-    // We can decide if we want to start "logged out" by default.
+    // Check for a user in session storage to persist login across reloads
     const sessionUser = sessionStorage.getItem('vaultboost-user');
-    if(sessionUser) {
-        setUser(JSON.parse(sessionUser));
-        setUserData(mockUserData);
+    if (sessionUser) {
+      setUser(JSON.parse(sessionUser));
     }
     setLoading(false);
   }, []);
 
-  // This effect handles redirection based on auth state.
   useEffect(() => {
-    // Don't redirect while loading
-    if (loading) {
-      return;
-    }
+    if (loading) return;
 
     const isAuthPage = pathname === '/login';
     const isAdminPage = pathname.startsWith('/admin');
 
-    // If there's no user, and we are not on the login page or an admin page, redirect to login.
     if (!user && !isAuthPage && !isAdminPage) {
       router.push('/login');
-    } 
-    // If a user is logged in and tries to go to the login page, redirect to the dashboard.
-    else if (user && isAuthPage) {
+    } else if (user && isAuthPage) {
       router.push('/');
     }
   }, [user, loading, pathname, router]);
 
-  // Mock login function
   const logIn = async (email: string, pass: string) => {
     console.log('Simulating login for:', email);
     const mockUser = { email };
     setUser(mockUser);
-    setUserData(mockUserData);
     sessionStorage.setItem('vaultboost-user', JSON.stringify(mockUser));
-    router.push('/');
   };
 
-  // Mock signup function
   const signUp = async (email: string, pass: string, name: string, phone: string) => {
     console.log('Simulating signup for:', name, email, phone);
     const mockUser = { email, name };
     setUser(mockUser);
-    setUserData({ ...mockUserData, name, email, phone });
     sessionStorage.setItem('vaultboost-user', JSON.stringify(mockUser));
-    router.push('/');
   };
 
-  // Mock logout function
   const logOut = async () => {
     console.log('Simulating logout');
     setUser(null);
-    setUserData(null);
     sessionStorage.removeItem('vaultboost-user');
     router.push('/login');
   };
-  
-  // Render nothing while checking initial state to prevent flash of wrong content
+
   if (loading) {
-      return null;
+    return null; // Return null or a minimal loader, but prevent app rendering
   }
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading: false, logIn, signUp, logOut }}>
+    <AuthContext.Provider value={{ user, userData: user ? mockUserData : null, loading, logIn, signUp, logOut }}>
       {children}
     </AuthContext.Provider>
   );

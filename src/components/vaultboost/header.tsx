@@ -1,4 +1,5 @@
 
+'use client';
 import type { FC } from 'react';
 import { Headset, Crown, Gem } from 'lucide-react';
 import { Button } from '@/components/ui/button';
