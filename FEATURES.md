@@ -1,0 +1,71 @@
+# VaultBoost Application Features
+
+This document provides a detailed breakdown of the features available in the User Panel, Admin Panel, and the Login/Authentication system based on the project's codebase.
+
+---
+
+### 1. Login & Authentication
+
+The authentication system is the entry point for your users, designed to be secure and straightforward.
+
+-   **Unified Login/Signup Page (`/app/login/page.tsx`):**
+    -   A single, user-friendly page featuring two tabs: **Login** and **Sign Up**.
+    -   **Login:** Existing users can securely log in using their email and password. The interface provides immediate feedback on success or failure.
+    -   **Sign Up:** New users can create an account by providing their Full Name, Email, Phone Number, and a Password. It also includes an optional field for a **Referral Code** to track user acquisition channels.
+
+-   **Authentication Context (`/src/contexts/auth-context.tsx`):**
+    -   This is the technical core of the user-facing application's authentication. It's built to manage the user's login state seamlessly using Firebase Authentication.
+    -   It is currently configured to use mock data, which allows developers to bypass the login screen and work on the application as if they were a logged-in user, speeding up development and testing.
+
+---
+
+### 2. User Panel
+
+This is the main, feature-rich interface for your users after they log in.
+
+-   **Dashboard (`/app/page.tsx`):**
+    -   **Welcome Card:** A personalized greeting for the user, displaying their name, membership tier (e.g., "Pro Member"), and current rank (e.g., "Gold").
+    -   **Financial Overview:** A set of four prominent cards showing key financial metrics at a glance: total amount invested, total earnings, projected future earnings, and total referral earnings.
+    -   **Daily Bonus:** An interactive card that allows users to claim a small, random monetary bonus once every 12 hours, encouraging daily engagement.
+    -   **Withdrawals:** A dedicated card where users can initiate withdrawal requests for their available earnings. It supports both **UPI** and **Bank Transfer** methods.
+    -   **Transaction History:** A comprehensive list of all financial activities (investments, earnings, bonuses, withdrawals). The list can be filtered by transaction type for easy tracking.
+    -   **Upgrade to PRO:** A visually distinct call-to-action card that encourages users on the basic plan to upgrade for higher returns.
+
+-   **Investment Page (`/app/investment/page.tsx`):**
+    -   Displays a clear list of all available investment plans. Each plan details the required investment amount, the daily return, and the total potential profit.
+    -   Each plan includes an "Invest Now" button, which conveniently directs the user to a pre-filled WhatsApp message to complete the purchase, streamlining the process.
+
+-   **Referral Page (`/app/refer/page.tsx`):**
+    -   **Referral Code & Sharing:** Prominently displays the user's unique referral code with a one-click copy button. It also includes integrated "Share on WhatsApp" and "Share Anywhere" buttons.
+    -   **Earnings Overview:** Provides a quick summary of referral performance, including the total number of users referred, how many have successfully invested, and the total earnings generated from referrals.
+    -   **Leaderboard:** A competitive weekly leaderboard that ranks the **Top Referrers** and **Top Investors**, fostering a sense of community and competition.
+    -   **How it Works:** A clear explanation of the referral program's rules and commission structure.
+
+-   **Settings Page (`/app/settings/page.tsx`):**
+    -   **Profile Management:** Users can update their personal information, such as their full name and phone number.
+    -   **Offer Code Redemption:** A dedicated field where users can enter promotional offer codes to receive bonus rewards.
+    -   **Account Security:** Displays the user's verified email address and their active referral code.
+    -   **Logout:** A secure logout button for the user to end their session.
+
+---
+
+### 3. Admin Panel
+
+A separate, secure area designed for administrators to manage the application, its users, and financial operations.
+
+-   **Admin Dashboard (`/app/admin/page.tsx`):**
+    -   A high-level dashboard providing a quick overview of the application's health with four key metrics: **Total Users**, **Pending Withdrawals**, **Active Offer Codes**, and **Total Investments**.
+
+-   **Users Page (`/app/admin/users/page.tsx`):**
+    -   **User Table:** Displays a comprehensive table of all registered users, including their name, email, and current membership status (Basic/Pro).
+    -   **Credit Investments:** Allows an admin to manually credit an investment amount directly to a user's account.
+    -   **Upgrade Users:** Admins have the ability to upgrade a user's membership from "Basic" to "Pro".
+    -   **View User Details:** An admin can click to view a detailed financial breakdown for any user, including their total balance and a split of earnings from investments, referrals, and bonuses.
+
+-   **Withdrawals Page (`/app/admin/withdrawals/page.tsx`):**
+    -   **Request Queue:** Shows a list of all pending and historical withdrawal requests. Each entry includes the user's name, requested amount, payment method (UPI/Bank), and their specific payment details.
+    -   **Approve/Reject:** Admins can easily approve or reject pending withdrawal requests with a single click, which updates the status in the system.
+
+-   **Offers Page (`/app/admin/offers/page.tsx`):**
+    -   **Create Offer Codes:** An admin can generate new promotional offer codes. They can configure the reward amount, set a maximum number of users who can claim it, and define an optional expiration duration.
+    -   **Manage Codes:** Displays a table of all existing offer codes with their current status (Active/Expired) and usage count. Admins can also copy a code for distribution or delete it from this table.
