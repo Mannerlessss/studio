@@ -66,6 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setLoading(true);
       if (user) {
         const userRef = doc(db, 'users', user.uid);
         const userSnap = await getDoc(userRef);
@@ -224,7 +225,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     redeemReferralCode,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  // Render children only when not loading and user is authenticated, or if on the login page.
+  const canRenderChildren = !loading && (user || pathname === '/login');
+
+  return <AuthContext.Provider value={value}>{canRenderChildren ? children : null}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {
