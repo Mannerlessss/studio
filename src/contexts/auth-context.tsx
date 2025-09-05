@@ -2,13 +2,17 @@
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, User } from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 
-// Define a mock user data structure.
 interface UserData {
+    uid: string;
     name: string;
     email: string;
     phone: string;
     referralCode?: string;
+    usedReferralCode?: boolean; // To track if user has used a code
     membership: 'Basic' | 'Pro';
     rank: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
     totalBalance: number;
@@ -20,48 +24,69 @@ interface UserData {
     investmentEarnings: number;
 }
 
-// Define the shape of the authentication context.
 interface AuthContextType {
-  user: object | null;
+  user: User | null;
   userData: UserData | null;
   loading: boolean;
-  logIn: (email: string, pass: string) => Promise<void>;
-  signUp: (email: string, pass: string, name: string, phone: string, referCode?: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   logOut: () => Promise<void>;
+  redeemReferralCode: (code: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// A predefined mock user to simulate a successful login.
-const mockUserData: UserData = {
-    name: 'Gagan Sharma',
-    email: 'gagansharma.gs107@gmail.com',
-    phone: '7888540806',
-    referralCode: 'VB788854',
-    membership: 'Pro',
-    rank: 'Gold',
-    totalBalance: 5000,
-    invested: 18300,
-    earnings: 4500,
-    projected: 9000,
-    referralEarnings: 1200,
-    bonusEarnings: 300,
-    investmentEarnings: 3000,
-};
+const generateReferralCode = (name: string) => {
+    const namePart = name.split(' ')[0].substring(0, 4).toUpperCase();
+    const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `VB${namePart}${randomPart}`;
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<object | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    // Check for a user in session storage to persist login across reloads
-    const sessionUser = sessionStorage.getItem('vaultboost-user');
-    if (sessionUser) {
-      setUser(JSON.parse(sessionUser));
-    }
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUser(user);
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+          setUserData(userSnap.data() as UserData);
+        } else {
+          // New user, create a document for them
+          const newUserReferralCode = generateReferralCode(user.displayName || 'USER');
+          const newUserData: UserData = {
+            uid: user.uid,
+            name: user.displayName || 'Vault User',
+            email: user.email || '',
+            phone: user.phoneNumber || '',
+            referralCode: newUserReferralCode,
+            membership: 'Basic',
+            rank: 'Bronze',
+            totalBalance: 0,
+            invested: 0,
+            earnings: 0,
+            projected: 0,
+            referralEarnings: 0,
+            bonusEarnings: 0,
+            investmentEarnings: 0,
+          };
+          await setDoc(userRef, newUserData);
+          setUserData(newUserData);
+        }
+      } else {
+        setUser(null);
+        setUserData(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -77,33 +102,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, loading, pathname, router]);
 
-  const logIn = async (email: string, pass: string) => {
-    console.log('Simulating login for:', email);
-    const mockUser = { email };
-    setUser(mockUser);
-    sessionStorage.setItem('vaultboost-user', JSON.stringify(mockUser));
-  };
-
-  const signUp = async (email: string, pass: string, name: string, phone: string) => {
-    console.log('Simulating signup for:', name, email, phone);
-    const mockUser = { email, name };
-    setUser(mockUser);
-    sessionStorage.setItem('vaultboost-user', JSON.stringify(mockUser));
+  const signInWithGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      // onAuthStateChanged will handle the rest
+    } catch (error) {
+      console.error("Error during Google sign-in:", error);
+      // Optionally show a toast message to the user
+    }
   };
 
   const logOut = async () => {
-    console.log('Simulating logout');
-    setUser(null);
-    sessionStorage.removeItem('vaultboost-user');
+    await signOut(auth);
     router.push('/login');
   };
 
-  if (loading) {
-    return null; // Return null or a minimal loader, but prevent app rendering
+  const redeemReferralCode = async (code: string) => {
+    if (!user || !userData || userData.usedReferralCode) {
+        throw new Error("Cannot redeem code.");
+    }
+    // Here you would typically validate the code against your backend
+    // For now, we assume any code is valid for demonstration.
+    console.log(`User ${user.uid} redeeming code ${code}`);
+
+    const userRef = doc(db, 'users', user.uid);
+    await updateDoc(userRef, {
+        usedReferralCode: true,
+        // You might add a temporary bonus or flag that converts to 75 Rs on first investment
+    });
+    setUserData({ ...userData, usedReferralCode: true });
   }
 
   return (
-    <AuthContext.Provider value={{ user, userData: user ? mockUserData : null, loading, logIn, signUp, logOut }}>
+    <AuthContext.Provider value={{ user, userData, loading, signInWithGoogle, logOut, redeemReferralCode }}>
       {children}
     </AuthContext.Provider>
   );

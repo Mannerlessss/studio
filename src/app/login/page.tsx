@@ -2,74 +2,37 @@
 'use client';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Gem, LogIn, UserPlus } from 'lucide-react';
+import { Gem } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
+const GoogleIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24px" height="24px">
+        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
+        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571l6.19,5.238C42.021,35.591,44,30.138,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+    </svg>
+);
+
+
 export default function LoginPage() {
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [signupName, setSignupName] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupPhone, setSignupPhone] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
-  const [signupReferCode, setSignupReferCode] = useState('');
-  const { signUp, logIn } = useAuth();
-  const router = useRouter();
+  const { signInWithGoogle } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      await signUp(signupEmail, signupPassword, signupName, signupPhone, signupReferCode);
-      toast({
-        title: 'Signup Successful!',
-        description: "You're now part of the vault.",
-      });
-      router.push('/');
+      await signInWithGoogle();
+      // The onAuthStateChanged listener in AuthProvider will handle navigation
     } catch (error: any) {
       toast({
         variant: 'destructive',
-        title: 'Signup Failed',
-        description: error.message || 'Could not create account.',
+        title: 'Sign-In Failed',
+        description: error.message || 'Could not sign in with Google.',
       });
-    } finally {
-        setLoading(false);
-    }
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await logIn(loginEmail, loginPassword);
-       toast({
-        title: 'Login Successful!',
-        description: "Welcome back to the vault.",
-      });
-      router.push('/');
-    } catch (error: any) {
-       toast({
-        variant: 'destructive',
-        title: 'Login Failed',
-        description: 'Invalid email or password.',
-      });
-    } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -80,74 +43,27 @@ export default function LoginPage() {
         <Gem className="w-10 h-10 text-primary" />
         <h1 className="text-4xl font-bold font-headline">VaultBoost</h1>
       </div>
-      <Tabs defaultValue="login" className="w-full max-w-md">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="login"><LogIn className='mr-2'/>Login</TabsTrigger>
-          <TabsTrigger value="signup"><UserPlus className='mr-2'/>Sign Up</TabsTrigger>
-        </TabsList>
-        <TabsContent value="login">
-          <Card>
-            <CardHeader>
-              <CardTitle>Welcome Back</CardTitle>
-              <CardDescription>
-                Enter your credentials to access your account.
-              </CardDescription>
-            </CardHeader>
-            <form onSubmit={handleLogin}>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
-                  <Input id="login-email" type="email" placeholder="m@example.com" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="login-password">Password</Label>
-                  <Input id="login-password" type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button type="submit" className="w-full" disabled={loading}>{loading ? 'Logging in...' : 'Login'}</Button>
-              </CardFooter>
-            </form>
-          </Card>
-        </TabsContent>
-        <TabsContent value="signup">
-          <Card>
-            <CardHeader>
-              <CardTitle>Create an Account</CardTitle>
-              <CardDescription>
-                Join the vault and start boosting your investments.
-              </CardDescription>
-            </CardHeader>
-             <form onSubmit={handleSignUp}>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-name">Full Name</Label>
-                  <Input id="signup-name" placeholder="John Doe" required value={signupName} onChange={(e) => setSignupName(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
-                  <Input id="signup-email" type="email" placeholder="m@example.com" required value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} />
-                </div>
-                 <div className="space-y-2">
-                  <Label htmlFor="signup-phone">Phone Number</Label>
-                  <Input id="signup-phone" type="tel" placeholder="+1234567890" required value={signupPhone} onChange={(e) => setSignupPhone(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
-                  <Input id="signup-password" type="password" required value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} />
-                </div>
-                 <div className="space-y-2">
-                  <Label htmlFor="signup-refer">Referral Code (Optional)</Label>
-                  <Input id="signup-refer" placeholder="REF12345" value={signupReferCode} onChange={(e) => setSignupReferCode(e.target.value)} />
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button type="submit" className="w-full" disabled={loading}>{loading ? 'Signing up...' : 'Sign Up'}</Button>
-              </CardFooter>
-            </form>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <div className="w-full max-w-sm text-center">
+         <p className='text-muted-foreground mb-6'>Welcome! Sign in to continue.</p>
+         <Button 
+            className="w-full h-12 text-base" 
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+          >
+             {loading ? (
+                'Signing in...'
+             ) : (
+                <>
+                    <GoogleIcon />
+                    Sign in with Google
+                </>
+             )}
+         </Button>
+         <p className="text-xs text-muted-foreground mt-8">
+            By signing in, you agree to our <a href="/terms" className="underline">Terms of Service</a> and <a href="/privacy" className="underline">Privacy Policy</a>.
+         </p>
+      </div>
     </div>
   );
 }
+

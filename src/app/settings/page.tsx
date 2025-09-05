@@ -1,5 +1,6 @@
 
 'use client';
+import { useState } from 'react';
 import type { NextPage } from 'next';
 import { Header } from '@/components/vaultboost/header';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
@@ -12,25 +13,55 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
 
 const SettingsPage: NextPage = () => {
-    const { userData, logOut } = useAuth();
+    const { userData, logOut, redeemReferralCode } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
+    const [referralCodeInput, setReferralCodeInput] = useState('');
+    const [showRedeemSuccess, setShowRedeemSuccess] = useState(false);
 
     const handleLogout = async () => {
         try {
             await logOut();
-            toast({
-                title: 'Logged Out',
-                description: 'You have been successfully logged out.',
-            });
-            router.push('/login');
         } catch (error: any) {
             toast({
                 variant: 'destructive',
                 title: 'Logout Failed',
                 description: error.message,
+            });
+        }
+    }
+
+    const handleRedeem = async () => {
+        if (!referralCodeInput) {
+            toast({
+                variant: 'destructive',
+                title: 'No Code Entered',
+                description: 'Please enter a referral code.',
+            });
+            return;
+        }
+
+        try {
+            await redeemReferralCode(referralCodeInput);
+            setShowRedeemSuccess(true);
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: 'Redemption Failed',
+                description: error.message || 'This code is invalid or has already been used.',
             });
         }
     }
@@ -52,10 +83,7 @@ const SettingsPage: NextPage = () => {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="full-name">Full Name</Label>
-              <div className="flex gap-2">
-                <Input id="full-name" defaultValue={userData?.name} />
-                <Button>Update</Button>
-              </div>
+               <Input id="full-name" defaultValue={userData?.name} readOnly />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone-number">Phone Number</Label>
@@ -71,19 +99,34 @@ const SettingsPage: NextPage = () => {
           <CardHeader>
             <div className="flex items-center gap-3">
               <Gift className="w-6 h-6 text-accent" />
-              <CardTitle>Offer Code</CardTitle>
+              <CardTitle>Redeem a Code</CardTitle>
             </div>
-            <CardDescription>Enter offer codes to get bonus rewards.</CardDescription>
+            <CardDescription>
+              {userData?.usedReferralCode 
+                ? "You have already redeemed a referral code." 
+                : "Enter a friend's referral code to get started."}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="offer-code">Offer Code</Label>
+              <Label htmlFor="offer-code">Referral Code</Label>
               <div className="flex gap-2">
-                <Input id="offer-code" placeholder="WELCOME50" />
-                <Button variant="secondary">Redeem</Button>
+                <Input 
+                  id="offer-code" 
+                  placeholder="FRIENDSCODE" 
+                  value={referralCodeInput}
+                  onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
+                  disabled={userData?.usedReferralCode}
+                />
+                <Button 
+                  variant="secondary"
+                  onClick={handleRedeem}
+                  disabled={userData?.usedReferralCode}
+                >
+                  Redeem
+                </Button>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">Follow our social media for daily offer codes and exclusive rewards!</p>
           </CardContent>
         </Card>
 
@@ -105,7 +148,7 @@ const SettingsPage: NextPage = () => {
             </div>
             <div className="flex justify-between items-center">
                  <div>
-                    <p className="text-sm text-muted-foreground">Referral Code</p>
+                    <p className="text-sm text-muted-foreground">Your Referral Code</p>
                     <p className="font-semibold">{userData?.referralCode || 'N/A'}</p>
                 </div>
                 {userData?.referralCode && <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 border-blue-500/20">Active</Badge>}
@@ -120,6 +163,24 @@ const SettingsPage: NextPage = () => {
 
       </div>
       <BottomNav activePage="settings" />
+
+      {/* Success Dialog */}
+       <AlertDialog open={showRedeemSuccess} onOpenChange={setShowRedeemSuccess}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Code Redeemed Successfully!</AlertDialogTitle>
+              <AlertDialogDescription>
+                That's a great start! Now, make your first investment to get your 75 Rs. welcome bonus.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => router.push('/investment')}>Invest Now</AlertDialogCancel>
+              <AlertDialogAction onClick={() => setShowRedeemSuccess(false)}>
+                Maybe Later
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
     </div>
   );
 };
