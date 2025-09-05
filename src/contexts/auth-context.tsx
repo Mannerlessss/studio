@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setLoading(true);
       if (user) {
         setUser(user);
         const userDocRef = doc(db, 'users', user.uid);
@@ -104,7 +105,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return signOut(auth);
   }
 
-  if (loading) {
+  const isAuthPage = pathname === '/login';
+  if (loading || (!user && !isAuthPage)) {
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-background">
             <Gem className="w-12 h-12 text-primary animate-pulse" />
