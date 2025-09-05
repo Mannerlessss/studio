@@ -64,12 +64,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setUser(currentUser);
             if (currentUser) {
                 await fetchUserData(currentUser.uid);
+                setUser(currentUser);
             } else {
+                setUser(null);
                 setUserData(null);
             }
+            // Defer setting loading to false until we are sure about auth state
             setLoading(false);
         });
 
@@ -93,6 +95,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [user, loading, pathname, router]);
     
     const fetchUserData = async (uid: string) => {
+        setLoading(true);
         try {
             const userDocRef = doc(db, 'users', uid);
             const docSnap = await getDoc(userDocRef);
@@ -101,17 +104,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUserData(fetchedData);
                 await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
             } else {
+                // This case should ideally be handled by handleSuccessfulLogin
                 console.log("User doc does not exist yet.");
                 setUserData(null);
             }
         } catch (error) {
             console.error("Error fetching user data:", error);
-            // This might happen due to permissions, log it but don't crash
+            // On permission error, sign out the user to avoid loops
+            await signOut(auth);
+            setUser(null);
             setUserData(null);
+            toast({
+                variant: 'destructive',
+                title: 'Session Error',
+                description: 'Could not verify your session. Please log in again.',
+            });
+        } finally {
+            setLoading(false);
         }
     };
 
     const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
+        setLoading(true);
         const userDocRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(userDocRef);
 
@@ -154,8 +168,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await setDoc(userDocRef, newUser);
             setUserData(newUser);
         } else {
+            // Data will be fetched by the onAuthStateChanged listener,
+            // but we can pre-emptively fetch it here too.
              await fetchUserData(user.uid);
         }
+        setUser(user);
         setLoading(false);
     }
 
@@ -208,6 +225,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const logOut = async () => {
+        setLoading(true);
         try {
             await signOut(auth);
             setUser(null);
@@ -219,6 +237,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Logout Failed',
                 description: error.message,
             });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -296,3 +316,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
