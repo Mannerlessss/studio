@@ -1,13 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /users/{document=**} {
+      allow read, write: if false;
+    }
+
     match /users/{userId} {
-      // A user can create their own document
-      allow create: if request.auth != null;
-      // A user can read any other user's document (for referral checks, etc.)
-      allow read: if request.auth != null;
-      // A user can only update or delete their own document
-      allow update, delete: if request.auth != null && request.auth.uid == userId;
+      // Allow authenticated users to read from the users collection.
+      // This is necessary for features like checking if a referral code exists.
+      allow get, list: if request.auth != null;
+
+      // Allow users to create, update, and delete their own document only.
+      allow create, update, delete: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
