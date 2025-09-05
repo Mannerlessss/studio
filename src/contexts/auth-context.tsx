@@ -64,11 +64,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setUser(currentUser);
             if (currentUser) {
-                setUser(currentUser);
                 await fetchUserData(currentUser.uid);
             } else {
-                setUser(null);
                 setUserData(null);
             }
             setLoading(false);
@@ -94,20 +93,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [user, loading, pathname, router]);
     
     const fetchUserData = async (uid: string) => {
-        const userDocRef = doc(db, 'users', uid);
-        const docSnap = await getDoc(userDocRef);
-        if (docSnap.exists()) {
-            const fetchedData = docSnap.data() as UserData;
-            setUserData(fetchedData);
-            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-        } else {
-            // This case might happen if user exists in Auth but not Firestore
-            // We can handle it by logging them out or creating a doc.
-            // For now, we log it and clear local state.
-            console.log("No such user document!");
+        try {
+            const userDocRef = doc(db, 'users', uid);
+            const docSnap = await getDoc(userDocRef);
+            if (docSnap.exists()) {
+                const fetchedData = docSnap.data() as UserData;
+                setUserData(fetchedData);
+                await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+            } else {
+                console.log("User doc does not exist yet.");
+                setUserData(null);
+            }
+        } catch (error) {
+            console.error("Error fetching user data:", error);
+            // This might happen due to permissions, log it but don't crash
             setUserData(null);
         }
-        return docSnap.data();
     };
 
     const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
@@ -151,8 +152,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 lastLogin: serverTimestamp(),
             };
             await setDoc(userDocRef, newUser);
+            setUserData(newUser);
+        } else {
+             await fetchUserData(user.uid);
         }
-        // onAuthStateChanged will handle setting user and fetching data
+        setLoading(false);
     }
 
     const signInWithGoogle = async () => {
@@ -191,8 +195,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         const { email, password } = details;
         try {
-            await signInWithEmailAndPassword(auth, email, password);
-            // onAuthStateChanged listener will handle fetching data and setting user state.
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            await handleSuccessfulLogin(userCredential.user);
         } catch (error: any) {
             toast({
                 variant: 'destructive',
