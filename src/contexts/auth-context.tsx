@@ -92,30 +92,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             router.push('/');
         }
     }, [user, loading, pathname, router]);
-
+    
     const fetchUserData = async (uid: string) => {
         const userDocRef = doc(db, 'users', uid);
         const docSnap = await getDoc(userDocRef);
         if (docSnap.exists()) {
-            setUserData(docSnap.data() as UserData);
+            const fetchedData = docSnap.data() as UserData;
+            setUserData(fetchedData);
+            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
         } else {
+            // This case might happen if user exists in Auth but not Firestore
+            // We can handle it by logging them out or creating a doc.
+            // For now, we log it and clear local state.
             console.log("No such user document!");
+            setUserData(null);
         }
+        return docSnap.data();
     };
-    
-    const createNewUser = async (user: User, additionalData: any = {}) => {
+
+    const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
         const userDocRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(userDocRef);
 
         if (!docSnap.exists()) {
-            let referredBy = null;
+             let referredBy = null;
             if (additionalData.referralCode) {
-                 const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
-                 const querySnapshot = await getDocs(q);
-                 if (!querySnapshot.empty) {
-                     referredBy = querySnapshot.docs[0].id;
-                 } else {
-                     toast({ variant: 'destructive', title: 'Invalid Referral Code' });
+                 try {
+                    const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
+                    const querySnapshot = await getDocs(q);
+                    if (!querySnapshot.empty) {
+                        referredBy = querySnapshot.docs[0].id;
+                    } else {
+                        toast({ variant: 'destructive', title: 'Invalid Referral Code' });
+                    }
+                 } catch (e) {
+                    console.error("Error validating referral code:", e);
                  }
             }
             
@@ -140,28 +151,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 lastLogin: serverTimestamp(),
             };
             await setDoc(userDocRef, newUser);
-            await fetchUserData(user.uid);
-        } else {
-            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-            await fetchUserData(user.uid);
         }
+        // onAuthStateChanged will handle setting user and fetching data
     }
-
 
     const signInWithGoogle = async () => {
         setLoading(true);
         const provider = new GoogleAuthProvider();
         try {
             const result = await signInWithPopup(auth, provider);
-            await createNewUser(result.user);
+            await handleSuccessfulLogin(result.user);
         } catch (error: any) {
             toast({
                 variant: 'destructive',
                 title: 'Google Sign-In Failed',
                 description: error.message,
             });
-        } finally {
-            // Loading is set to false in the onAuthStateChanged listener
+             setLoading(false);
         }
     };
 
@@ -170,7 +176,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { email, password, name, phone, referralCode } = details;
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            await createNewUser(userCredential.user, { name, phone, referralCode });
+            await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -186,7 +192,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { email, password } = details;
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            // The onAuthStateChanged listener will handle fetching data and setting user state.
+            // onAuthStateChanged listener will handle fetching data and setting user state.
         } catch (error: any) {
             toast({
                 variant: 'destructive',
@@ -200,7 +206,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logOut = async () => {
         try {
             await signOut(auth);
-            // The onAuthStateChanged listener will handle setting user to null.
+            setUser(null);
+            setUserData(null);
+            router.push('/login');
         } catch (error: any) {
             toast({
                 variant: 'destructive',
