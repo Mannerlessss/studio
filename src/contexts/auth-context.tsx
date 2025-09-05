@@ -64,7 +64,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isAuthPage = pathname === '/login';
     const isAdminPage = pathname.startsWith('/admin');
 
-    if (!user && !isAuthPage && !isAdminPage) {
+    if (isAdminPage) return;
+
+    if (!user && !isAuthPage) {
       router.push('/login');
     } else if (user && isAuthPage) {
       router.push('/');
