@@ -69,7 +69,7 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-background p-4">
       <Tabs defaultValue="login" className="w-full max-w-md">
         <div className="flex justify-center mb-6">
-            <Gem className="w-12 h-12 text-primary" />
+            <h1 className="text-3xl font-bold text-primary">UpiVaultBoost</h1>
         </div>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="login">Login</TabsTrigger>
