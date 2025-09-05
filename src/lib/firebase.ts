@@ -1,6 +1,6 @@
 
 import { initializeApp, getApp, getApps } from 'firebase/app';
-import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getAuth, initializeAuth, indexedDBLocalPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -14,12 +14,14 @@ const firebaseConfig = {
 };
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const db = getFirestore(app);
 
-// In a development environment, you might connect to emulators
-// if (process.env.NODE_ENV === 'development') {
-//   connectAuthEmulator(auth, "http://localhost:9099");
-// }
+// Explicitly initialize auth for the web environment to avoid issues in some contexts
+const auth = typeof window !== 'undefined' 
+  ? initializeAuth(app, {
+      persistence: indexedDBLocalPersistence
+    }) 
+  : getAuth(app);
+
+const db = getFirestore(app);
 
 export { app, auth, db };
