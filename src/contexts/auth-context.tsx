@@ -11,7 +11,7 @@ import {
     signInWithEmailAndPassword
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, query, where, getDocs, writeBatch, documentId } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Gem } from 'lucide-react';
@@ -64,13 +64,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setUser(currentUser);
             if (currentUser) {
-                await fetchUserData(currentUser);
+                // Fetch data only if user is logged in, but don't block loading
+                const userDocRef = doc(db, 'users', currentUser.uid);
+                const docSnap = await getDoc(userDocRef);
+                 if (docSnap.exists()) {
+                    setUserData(docSnap.data() as UserData);
+                }
             } else {
-                setUser(null);
-                setUserData(null);
-                setLoading(false);
+                 setUserData(null);
             }
+            setLoading(false);
         });
         return () => unsubscribe();
     }, []);
@@ -91,39 +96,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [user, loading, pathname, router]);
 
-    const fetchUserData = async (firebaseUser: User) => {
-        setLoading(true);
-        try {
-            const userDocRef = doc(db, 'users', firebaseUser.uid);
-            const docSnap = await getDoc(userDocRef);
-            if (docSnap.exists()) {
-                const fetchedData = docSnap.data() as UserData;
-                setUser(firebaseUser);
-                setUserData(fetchedData);
-            } else {
-                toast({
-                    variant: 'destructive',
-                    title: 'Sync Error',
-                    description: 'Could not find user profile. Please log in again.',
-                });
-                await signOut(auth);
-            }
-        } catch (error) {
-            console.error("Error fetching user data:", error);
-            toast({
-                variant: 'destructive',
-                title: 'Session Error',
-                description: 'Could not verify your session. Please log in again.',
-            });
-            await signOut(auth);
-        } finally {
-            setLoading(false);
+    const fetchUserData = async (firebaseUser: User): Promise<UserData | null> => {
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+            const fetchedData = docSnap.data() as UserData;
+            setUserData(fetchedData);
+            return fetchedData;
         }
+        return null;
     };
 
     const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
         const userDocRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(userDocRef);
+
+        let finalUserData: UserData;
 
         if (!docSnap.exists()) {
             let referredBy = null;
@@ -133,7 +121,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 if (!querySnapshot.empty) {
                     referredBy = querySnapshot.docs[0].id;
                 } else {
-                     toast({ variant: 'destructive', title: 'Invalid Referral Code' });
+                     toast({ variant: 'destructive', title: 'Invalid Referral Code', description: 'The provided referral code does not exist.' });
                 }
             }
 
@@ -158,13 +146,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 lastLogin: serverTimestamp(),
             };
             await setDoc(userDocRef, newUser);
-            setUserData(newUser);
+            finalUserData = newUser;
         } else {
             await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-            setUserData(docSnap.data() as UserData);
+            finalUserData = docSnap.data() as UserData;
         }
         
         setUser(user);
+        setUserData(finalUserData);
         router.push('/');
     }
 
@@ -180,6 +169,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Google Sign-In Failed',
                 description: "Could not initialize your account.",
             });
+             await signOut(auth);
         } finally {
             setLoading(false);
         }
@@ -243,30 +233,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const referrerDoc = querySnapshot.docs[0];
         const referrerId = referrerDoc.id;
+        
+        if (referrerId === user.uid) {
+            throw new Error("You cannot use your own referral code.");
+        }
 
         const batch = writeBatch(db);
 
-        // 1. Update the current user's profile
         const userDocRef = doc(db, 'users', user.uid);
         batch.update(userDocRef, {
             usedReferralCode: code,
             referredBy: referrerId,
         });
 
-        // 2. Create a record in the 'referrals' collection
         const referralDocRef = doc(collection(db, 'referrals'));
         batch.set(referralDocRef, {
             referrerId: referrerId,
             referredId: user.uid,
             code: code,
-            status: 'pending', // Becomes 'completed' after first investment
+            status: 'pending_investment',
             createdAt: serverTimestamp()
         });
 
-        // 3. Atomically commit both changes
         await batch.commit();
-
-        // 4. Update local state
+        
+        // Refetch user data to update local state
         await fetchUserData(user);
     };
 
