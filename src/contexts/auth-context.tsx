@@ -2,18 +2,18 @@
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { Gem } from 'lucide-react';
+import { doc, setDoc, getDoc, increment } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
+import { Gem } from 'lucide-react';
 
 interface AuthContextType {
   user: User | null;
-  loading: boolean;
+  userData: UserData | null;
+  loading: boolean; // Keep loading state for UI, but don't block rendering
   logIn: (email: string, pass: string) => Promise<any>;
   signUp: (email: string, pass: string, name: string, phone: string, referCode?: string) => Promise<any>;
   logOut: () => Promise<any>;
-  userData: UserData | null;
 }
 
 interface UserData {
@@ -43,10 +43,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true);
       if (user) {
-        setUser(user);
         const userDoc = await getDoc(doc(db, 'users', user.uid));
+        setUser(user);
         if (userDoc.exists()) {
             setUserData(userDoc.data() as UserData);
         }
@@ -61,8 +60,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (loading) return;
-    
+    if (loading) {
+      return; 
+    }
+
     const isAuthPage = pathname === '/login';
     const isAdminPage = pathname.startsWith('/admin');
 
@@ -71,7 +72,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else if (user && isAuthPage) {
       router.push('/');
     }
-
   }, [user, loading, pathname, router]);
 
   const signUp = async (email: string, pass: string, name: string, phone: string, referCode?: string) => {
@@ -117,11 +117,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await signOut(auth);
     setUser(null);
     setUserData(null);
-    router.push('/login');
+    // No need to push here, the effect will handle it.
   }
-
-  // Do not render a loading screen. Let the effect handle redirection.
-  // This prevents the app from getting stuck.
+  
+  // Conditionally render a loading screen ONLY if loading is true AND it's not the login page.
+  // This prevents the flash of content on protected pages.
   if (loading && pathname !== '/login') {
      return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-background">
@@ -130,12 +130,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         </div>
     );
   }
-  
-  return (
-    <AuthContext.Provider value={{ user, userData, loading, signUp, logIn, logOut }}>
-      {children}
-    </AuthContext.Provider>
-  );
+
+  // If it's the login page, render it immediately without waiting for the auth check.
+  if (pathname === '/login' && !user) {
+    return (
+        <AuthContext.Provider value={{ user, userData, loading, signUp, logIn, logOut }}>
+            {children}
+        </AuthContext.Provider>
+    );
+  }
+
+  // If user is loaded, or if loading is finished on a public page, show content.
+  if (!loading && user && pathname !== '/login') {
+     return (
+        <AuthContext.Provider value={{ user, userData, loading, signUp, logIn, logOut }}>
+        {children}
+        </AuthContext.Provider>
+    );
+  }
+
+  // Fallback for redirect logic to catch up
+  return null;
 };
 
 export const useAuth = () => {
