@@ -12,7 +12,7 @@ const firebaseConfig = {
   "storageBucket": "upi-boost-vault-f64fw.firebasestorage.app",
   "apiKey": "AIzaSyDLhmKP9BeoHGn_zz8UaVURix83lPfWSds",
   "authDomain": "upi-boost-vault-f64fw.firebaseapp.com",
-  "measurementId": "",
+  "measurementId": "G-C3ZQDSL5FM",
   "messagingSenderId": "1017948596718"
 };
 
