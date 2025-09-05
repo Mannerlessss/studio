@@ -6,7 +6,7 @@ import { WelcomeCard } from '@/components/vaultboost/welcome-card';
 import { InfoCard } from '@/components/vaultboost/info-card';
 import { DailyBonusCard } from '@/components/vaultboost/daily-bonus-card';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
-import { Wallet, TrendingUp, Users, Star } from 'lucide-react';
+import { Wallet, TrendingUp, Users, Star, PiggyBank } from 'lucide-react';
 import { UpgradeCard } from '@/components/vaultboost/upgrade-card';
 import { WithdrawCard } from '@/components/vaultboost/withdraw-card';
 import { TransactionHistoryCard } from '@/components/vaultboost/transaction-history-card';
@@ -49,16 +49,15 @@ const Home: NextPage = () => {
             value={`${earnings} Rs.`}
             icon={<TrendingUp className="h-6 w-6 text-primary" />}
           />
+           <InfoCard
+            title="Projected"
+            value="0 Rs."
+            icon={<PiggyBank className="h-6 w-6 text-primary" />}
+          />
           <InfoCard
             title="Referral"
             value="0 Rs."
             icon={<Users className="h-6 w-6 text-primary" />}
-          />
-          <InfoCard
-            title="Status"
-            value={userData?.membership || 'Basic'}
-            icon={<Star className="h-6 w-6 text-primary" />}
-            isStatus
           />
         </div>
         <DailyBonusCard onBonusClaim={handleBonusClaim} />
@@ -74,4 +73,5 @@ const Home: NextPage = () => {
 };
 
 export default Home;
+
 
