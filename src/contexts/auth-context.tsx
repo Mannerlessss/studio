@@ -1,4 +1,3 @@
-
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -92,13 +91,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (loading) return;
 
-    const isAuthPage = pathname === '/login';
+    const isAuthPage = pathname === '/';
     const isAdminPage = pathname.startsWith('/admin');
 
     if (!user && !isAuthPage && !isAdminPage) {
-      router.push('/login');
-    } else if (user && isAuthPage) {
       router.push('/');
+    } else if (user && isAuthPage) {
+      router.push('/dashboard');
     }
   }, [user, loading, pathname, router]);
 
@@ -115,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logOut = async () => {
     await signOut(auth);
-    router.push('/login');
+    router.push('/');
   };
 
   const redeemReferralCode = async (code: string) => {
