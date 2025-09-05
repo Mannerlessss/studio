@@ -43,7 +43,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true);
       if (user) {
         setUser(user);
         const userDocRef = doc(db, 'users', user.uid);
@@ -65,11 +64,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (loading) return;
 
     const isAuthPage = pathname === '/login';
+    const isAdminPage = pathname.startsWith('/admin');
 
-    if (!user && !isAuthPage) {
+    if (!user && !isAuthPage && !isAdminPage) {
         router.push('/login');
-    } else if (user && isAuthPage) {
-        router.push('/');
     }
   }, [loading, user, pathname, router]);
 
@@ -105,8 +103,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return signOut(auth);
   }
 
-  const isAuthPage = pathname === '/login';
-  if (loading || (!user && !isAuthPage)) {
+  if (loading) {
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-background">
             <Gem className="w-12 h-12 text-primary animate-pulse" />
