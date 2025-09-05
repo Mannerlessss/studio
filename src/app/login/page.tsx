@@ -45,7 +45,7 @@ export default function LoginPage() {
       toast({
         variant: 'destructive',
         title: 'Signup Failed',
-        description: error.message,
+        description: 'This is a mock-up. No actual signup occurred.',
       });
     } finally {
         setLoading(false);
@@ -66,7 +66,7 @@ export default function LoginPage() {
        toast({
         variant: 'destructive',
         title: 'Login Failed',
-        description: error.message,
+        description: 'This is a mock-up. No actual login occurred.',
       });
     } finally {
         setLoading(false);
