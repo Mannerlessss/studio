@@ -11,7 +11,7 @@ import {
     signInWithEmailAndPassword
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, query, where, getDocs, writeBatch, documentId } from "firebase/firestore";
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Gem } from 'lucide-react';
@@ -64,16 +64,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setUser(currentUser);
             if (currentUser) {
-                // Fetch data only if there's a user, but don't block loading
-                fetchUserData(currentUser);
+                await fetchUserData(currentUser);
             } else {
+                setUser(null);
                 setUserData(null);
                 setLoading(false);
             }
         });
-
         return () => unsubscribe();
     }, []);
 
@@ -100,15 +98,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const docSnap = await getDoc(userDocRef);
             if (docSnap.exists()) {
                 const fetchedData = docSnap.data() as UserData;
+                setUser(firebaseUser);
                 setUserData(fetchedData);
             } else {
-                // This case should ideally be handled by handleSuccessfulLogin
-                // but as a fallback, we'll clear user data.
-                setUserData(null);
-                 toast({
+                toast({
                     variant: 'destructive',
                     title: 'Sync Error',
-                    description: 'Could not find user profile. Please try logging in again.',
+                    description: 'Could not find user profile. Please log in again.',
                 });
                 await signOut(auth);
             }
@@ -126,68 +122,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
-        setLoading(true);
         const userDocRef = doc(db, 'users', user.uid);
-        
-        try {
-            const docSnap = await getDoc(userDocRef);
-            let finalUserData: UserData;
+        const docSnap = await getDoc(userDocRef);
 
-            if (!docSnap.exists()) {
-                // Create New User
-                let referredBy = null;
-                if (additionalData.referralCode) {
-                    try {
-                        const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
-                        const querySnapshot = await getDocs(q);
-                        if (!querySnapshot.empty) {
-                            referredBy = querySnapshot.docs[0].id;
-                        } else {
-                            toast({ variant: 'destructive', title: 'Invalid Referral Code' });
-                        }
-                    } catch (e) {
-                        console.error("Error validating referral code:", e);
-                    }
+        if (!docSnap.exists()) {
+            let referredBy = null;
+            if (additionalData.referralCode) {
+                const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    referredBy = querySnapshot.docs[0].id;
+                } else {
+                     toast({ variant: 'destructive', title: 'Invalid Referral Code' });
                 }
-                
-                const newUser: UserData = {
-                    uid: user.uid,
-                    email: user.email || '',
-                    name: additionalData.name || user.displayName || 'Vault User',
-                    phone: additionalData.phone || '',
-                    referralCode: generateReferralCode(),
-                    usedReferralCode: referredBy ? additionalData.referralCode : undefined,
-                    referredBy: referredBy || undefined,
-                    membership: 'Basic',
-                    rank: 'Bronze',
-                    totalBalance: 0,
-                    invested: 0,
-                    earnings: 0,
-                    projected: 0,
-                    referralEarnings: 0,
-                    bonusEarnings: 0,
-                    investmentEarnings: 0,
-                    createdAt: serverTimestamp(),
-                    lastLogin: serverTimestamp(),
-                };
-                await setDoc(userDocRef, newUser);
-                finalUserData = newUser;
-            } else {
-                // Existing User
-                await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-                finalUserData = docSnap.data() as UserData;
             }
-            
-            setUser(user);
-            setUserData(finalUserData);
-            router.push('/');
 
-        } catch (error) {
-             console.error("Error during handleSuccessfulLogin:", error);
-             toast({ variant: 'destructive', title: 'Login Error', description: 'Could not initialize your account.' });
-        } finally {
-            setLoading(false);
+            const newUser: UserData = {
+                uid: user.uid,
+                email: user.email || '',
+                name: additionalData.name || user.displayName || 'Vault User',
+                phone: additionalData.phone || '',
+                referralCode: generateReferralCode(),
+                usedReferralCode: referredBy ? additionalData.referralCode : undefined,
+                referredBy: referredBy || undefined,
+                membership: 'Basic',
+                rank: 'Bronze',
+                totalBalance: 0,
+                invested: 0,
+                earnings: 0,
+                projected: 0,
+                referralEarnings: 0,
+                bonusEarnings: 0,
+                investmentEarnings: 0,
+                createdAt: serverTimestamp(),
+                lastLogin: serverTimestamp(),
+            };
+            await setDoc(userDocRef, newUser);
+            setUserData(newUser);
+        } else {
+            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+            setUserData(docSnap.data() as UserData);
         }
+        
+        setUser(user);
+        router.push('/');
     }
 
     const signInWithGoogle = async () => {
@@ -200,9 +178,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             toast({
                 variant: 'destructive',
                 title: 'Google Sign-In Failed',
-                description: error.message,
+                description: "Could not initialize your account.",
             });
-             setLoading(false);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -218,6 +197,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-Up Failed',
                 description: error.message,
             });
+        } finally {
             setLoading(false);
         }
     };
@@ -234,66 +214,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-In Failed',
                 description: "Invalid email or password.",
             });
+        } finally {
             setLoading(false);
         }
     };
 
     const logOut = async () => {
         setLoading(true);
-        try {
-            await signOut(auth);
-            setUser(null);
-            setUserData(null);
-            router.push('/login');
-        } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Logout Failed',
-                description: error.message,
-            });
-        } finally {
-            setLoading(false);
-        }
+        await signOut(auth);
+        setUser(null);
+        setUserData(null);
+        router.push('/login');
+        setLoading(false);
     };
 
     const redeemReferralCode = async (code: string) => {
-        if (!user || !userData) {
-            throw new Error("You must be logged in.");
-        }
-        if (userData.usedReferralCode) {
-            throw new Error("You have already redeemed a code.");
-        }
-        if (code === userData.referralCode) {
-             throw new Error("You cannot use your own referral code.");
-        }
+        if (!user || !userData) throw new Error("You must be logged in.");
+        if (userData.usedReferralCode) throw new Error("You have already redeemed a code.");
+        if (code === userData.referralCode) throw new Error("You cannot use your own referral code.");
 
-        const q = query(collection(db, "users"), where("referralCode", "==", code));
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("referralCode", "==", code));
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
             throw new Error("Invalid referral code.");
         }
-        
-        const referredBy = querySnapshot.docs[0].id;
+
+        const referrerDoc = querySnapshot.docs[0];
+        const referrerId = referrerDoc.id;
+
+        const batch = writeBatch(db);
+
+        // 1. Update the current user's profile
         const userDocRef = doc(db, 'users', user.uid);
-        await updateDoc(userDocRef, {
+        batch.update(userDocRef, {
             usedReferralCode: code,
-            referredBy: referredBy,
+            referredBy: referrerId,
         });
 
-        // Add 75 to the bonus of the user who referred
-        const referredByUserDocRef = doc(db, 'users', referredBy);
-        const referredByUserDoc = await getDoc(referredByUserDocRef);
-        if (referredByUserDoc.exists()) {
-            const data = referredByUserDoc.data();
-            const newReferralEarnings = (data.referralEarnings || 0) + 75;
-            const newTotalBalance = (data.totalBalance || 0) + 75;
-            await updateDoc(referredByUserDocRef, {
-                referralEarnings: newReferralEarnings,
-                totalBalance: newTotalBalance,
-            });
-        }
+        // 2. Create a record in the 'referrals' collection
+        const referralDocRef = doc(collection(db, 'referrals'));
+        batch.set(referralDocRef, {
+            referrerId: referrerId,
+            referredId: user.uid,
+            code: code,
+            status: 'pending', // Becomes 'completed' after first investment
+            createdAt: serverTimestamp()
+        });
 
+        // 3. Atomically commit both changes
+        await batch.commit();
+
+        // 4. Update local state
         await fetchUserData(user);
     };
 
