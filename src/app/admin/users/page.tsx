@@ -1,5 +1,6 @@
 
 'use client';
+import { useState } from 'react';
 import {
     AlertDialog,
   AlertDialogAction,
@@ -11,6 +12,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
 import {
   Card,
   CardContent,
@@ -28,34 +37,59 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DollarSign, Crown } from 'lucide-react';
+import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
-const mockUsers = [
+interface User {
+    id: string;
+    name: string;
+    email: string;
+    membership: 'Basic' | 'Pro';
+    totalBalance: number;
+    bonusEarnings: number;
+    referralEarnings: number;
+    investmentEarnings: number;
+}
+
+const mockUsers: User[] = [
   {
     id: 'USR-001',
     name: 'John Doe',
     email: 'john.doe@example.com',
     membership: 'Basic',
+    totalBalance: 5000,
+    bonusEarnings: 150,
+    referralEarnings: 350,
+    investmentEarnings: 4500,
   },
   {
     id: 'USR-002',
     name: 'Jane Smith',
     email: 'jane.smith@example.com',
     membership: 'Pro',
+    totalBalance: 12500,
+    bonusEarnings: 500,
+    referralEarnings: 2000,
+    investmentEarnings: 10000,
   },
   {
     id: 'USR-003',
     name: 'Sam Wilson',
     email: 'sam.wilson@example.com',
     membership: 'Basic',
+    totalBalance: 800,
+    bonusEarnings: 50,
+    referralEarnings: 0,
+    investmentEarnings: 750,
   },
 ];
 
 export default function UsersPage() {
     const { toast } = useToast();
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
 
     const handleCredit = (userId: string) => {
         toast({
@@ -72,6 +106,7 @@ export default function UsersPage() {
     }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle>Users</CardTitle>
@@ -101,10 +136,14 @@ export default function UsersPage() {
                 </TableCell>
                 <TableCell className="text-right">
                     <div className='flex gap-2 justify-end'>
+                        <Button variant="ghost" size="icon" onClick={() => setSelectedUser(user)}>
+                            <Eye className='w-4 h-4' />
+                            <span className="sr-only">View Details</span>
+                        </Button>
                        <AlertDialog>
                           <AlertDialogTrigger asChild>
                              <Button variant="outline" size="sm">
-                                <DollarSign className='w-4 h-4 mr-1' /> Credit Investment
+                                <DollarSign className='w-4 h-4 mr-1' /> Credit
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
@@ -128,7 +167,7 @@ export default function UsersPage() {
                         </AlertDialog>
                         {user.membership !== 'Pro' && (
                             <Button size="sm" onClick={() => handleUpgrade(user.id)}>
-                                <Crown className='w-4 h-4 mr-1' /> Upgrade to Pro
+                                <Crown className='w-4 h-4 mr-1' /> Upgrade
                             </Button>
                         )}
                     </div>
@@ -139,5 +178,50 @@ export default function UsersPage() {
         </Table>
       </CardContent>
     </Card>
+     {selectedUser && (
+        <Dialog open={!!selectedUser} onOpenChange={(isOpen) => !isOpen && setSelectedUser(null)}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>User Details: {selectedUser.name}</DialogTitle>
+                    <DialogDescription>
+                        Financial overview for {selectedUser.email}.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
+                        <div className="flex items-center gap-3">
+                            <Wallet className="w-5 h-5 text-primary" />
+                            <span className="font-semibold">Total Balance</span>
+                        </div>
+                        <span className="font-bold text-lg">{selectedUser.totalBalance} Rs.</span>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                       <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                                <TrendingUp className="w-4 h-4" />
+                                <span>Investment Earnings</span>
+                            </div>
+                            <span>{selectedUser.investmentEarnings} Rs.</span>
+                       </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                                <Users className="w-4 h-4" />
+                                <span>Referral Earnings</span>
+                            </div>
+                            <span>{selectedUser.referralEarnings} Rs.</span>
+                       </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                                <Gift className="w-4 h-4" />
+                                <span>Bonus Earnings</span>
+                            </div>
+                            <span>{selectedUser.bonusEarnings} Rs.</span>
+                       </div>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    )}
+    </>
   );
 }
