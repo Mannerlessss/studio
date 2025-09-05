@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Gem } from 'lucide-react';
 
 // Mock User and Auth
 type User = {
@@ -34,7 +35,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const dummyUser: User = {
     uid: '12345',
     email: 'user@example.com',
-    displayName: 'Dummy User'
+    displayName: 'Vault User'
 };
 
 const dummyUserData: UserData = {
@@ -47,21 +48,44 @@ const dummyUserData: UserData = {
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(dummyUser);
-  const [userData, setUserData] = useState<UserData | null>(dummyUserData);
-  const [loading, setLoading] = useState(false); // Not really loading anymore
+  const [user, setUser] = useState<User | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true); 
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    // This is a mock auth state checker
+    const checkAuth = () => {
+        setLoading(true);
+        const isLoggedIn = !!user; // In a real app, you'd check a token
+        if (!isLoggedIn && pathname !== '/login') {
+            router.push('/login');
+        } else {
+            // If the user is somehow logged in, give them dummy data
+            if (!userData) {
+                setUser(dummyUser);
+                setUserData(dummyUserData);
+            }
+        }
+        setLoading(false);
+    };
+    checkAuth();
+  }, [user, pathname, router, userData]);
 
   const logIn = async (email: string, pass: string) => {
     console.log('Mock login for', email);
-    setUser(dummyUser);
-    setUserData(dummyUserData);
+    const newUser = { ...dummyUser, email: email};
+    setUser(newUser);
+    setUserData({ ...dummyUserData, email: email });
     return Promise.resolve();
   };
 
   const signUp = async (email: string, pass: string, name: string, phone: string, referCode?: string) => {
     console.log('Mock signup for', name);
-    setUser(dummyUser);
-    setUserData({ ...dummyUserData, name, email, phone });
+    const newUser = { ...dummyUser, email: email, displayName: name };
+    setUser(newUser);
+    setUserData({ ...dummyUserData, name, email, phone, referralCode: referCode });
     return Promise.resolve();
   };
 
@@ -71,6 +95,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUserData(null);
     return Promise.resolve();
   };
+  
+  if (loading) {
+      return (
+          <div className="flex items-center justify-center h-screen">
+              <Gem className="w-10 h-10 text-primary animate-pulse" />
+          </div>
+      )
+  }
 
   return (
     <AuthContext.Provider value={{ user, loading, logIn, signUp, logOut, userData }}>
