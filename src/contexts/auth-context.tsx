@@ -1,4 +1,3 @@
-
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -50,6 +49,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setLoading(true);
       if (currentUser) {
         setUser(currentUser);
         const userRef = doc(db, 'users', currentUser.uid);
@@ -90,35 +90,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (loading) {
-      return;
-    }
+    if (loading) return;
 
-    const isAuthPage = pathname === '/';
+    const isAuthPage = pathname === '/login';
     const isAdminPage = pathname.startsWith('/admin');
+    const isPublicPage = ['/terms', '/privacy'].includes(pathname);
 
+    // If user is logged in, and on the login page, redirect to home
     if (user && isAuthPage) {
-      router.push('/dashboard');
-    }
-    
-    if (!user && !isAuthPage && !isAdminPage) {
       router.push('/');
     }
+    
+    // If user is not logged in, and not on a public/auth/admin page, redirect to login
+    if (!user && !isAuthPage && !isAdminPage && !isPublicPage) {
+      router.push('/login');
+    }
+
   }, [user, loading, pathname, router]);
 
   const signInWithGoogle = async () => {
+    setLoading(true);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
+      // onAuthStateChanged will handle the rest
     } catch (error) {
       console.error("Error during Google sign-in:", error);
+      setLoading(false);
       throw error;
     }
   };
 
   const logOut = async () => {
     await signOut(auth);
-    router.push('/');
+    router.push('/login');
   };
 
   const redeemReferralCode = async (code: string) => {
