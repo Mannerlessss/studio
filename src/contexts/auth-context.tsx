@@ -50,7 +50,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true); // Set loading to true when auth state changes
       if (user) {
         setUser(user);
         const userRef = doc(db, 'users', user.uid);
@@ -84,14 +83,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setUserData(null);
       }
-      setLoading(false); // Set loading to false after handling auth state
+      setLoading(false); 
     });
 
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    // Don't run logic until loading is complete
     if (loading) {
       return;
     }
@@ -99,12 +97,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isAuthPage = pathname === '/';
     const isAdminPage = pathname.startsWith('/admin');
 
-    // If user data is loaded and they are on the login page, redirect to dashboard.
     if (userData && isAuthPage) {
       router.push('/dashboard');
     }
     
-    // If there is no user and they are on a protected page, redirect to login.
     if (!user && !isAuthPage && !isAdminPage) {
       router.push('/');
     }
@@ -114,7 +110,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-      // onAuthStateChanged will handle the rest.
     } catch (error) {
       console.error("Error during Google sign-in:", error);
     }
@@ -129,14 +124,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user || !userData || userData.usedReferralCode) {
         throw new Error("Cannot redeem code.");
     }
-    // Here you would typically validate the code against your backend
-    // For now, we assume any code is valid for demonstration.
     console.log(`User ${user.uid} redeeming code ${code}`);
 
     const userRef = doc(db, 'users', user.uid);
     await updateDoc(userRef, {
         usedReferralCode: true,
-        // You might add a temporary bonus or flag that converts to 75 Rs on first investment
     });
     setUserData({ ...userData, usedReferralCode: true });
   }
