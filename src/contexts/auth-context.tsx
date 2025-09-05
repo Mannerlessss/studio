@@ -1,3 +1,4 @@
+
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -49,6 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setLoading(true);
       if (user) {
         setUser(user);
         const userRef = doc(db, 'users', user.uid);
@@ -94,10 +96,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isAuthPage = pathname === '/';
     const isAdminPage = pathname.startsWith('/admin');
 
+    // If the user is logged in and on the login page, redirect to dashboard
+    if (user && isAuthPage) {
+      router.push('/dashboard');
+    }
+    
+    // If the user is not logged in and not on the login/admin page, redirect to login
     if (!user && !isAuthPage && !isAdminPage) {
       router.push('/');
-    } else if (user && isAuthPage) {
-      router.push('/dashboard');
     }
   }, [user, loading, pathname, router]);
 
@@ -105,10 +111,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-      // onAuthStateChanged will handle the rest
+      // onAuthStateChanged will handle the rest, and the useEffect above will redirect.
     } catch (error) {
       console.error("Error during Google sign-in:", error);
-      // Optionally show a toast message to the user
     }
   };
 
