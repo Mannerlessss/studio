@@ -64,12 +64,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setUser(currentUser); // Set Firebase user immediately
+            setUser(currentUser);
             if (currentUser) {
-                // If a user is logged in, fetch their data
-                await fetchUserData(currentUser);
+                // Fetch data only if there's a user, but don't block loading
+                fetchUserData(currentUser);
             } else {
-                // No user, clear data and finish loading
                 setUserData(null);
                 setLoading(false);
             }
@@ -78,7 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return () => unsubscribe();
     }, []);
 
-    useEffect(() => {
+     useEffect(() => {
         if (loading) {
             return;
         }
@@ -93,7 +92,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             router.push('/');
         }
     }, [user, loading, pathname, router]);
-    
+
     const fetchUserData = async (firebaseUser: User) => {
         setLoading(true);
         try {
@@ -103,9 +102,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const fetchedData = docSnap.data() as UserData;
                 setUserData(fetchedData);
             } else {
-                // This can happen if a user just signed up but their data isn't created yet.
-                // The handleSuccessfulLogin will take care of it.
+                // This case should ideally be handled by handleSuccessfulLogin
+                // but as a fallback, we'll clear user data.
                 setUserData(null);
+                 toast({
+                    variant: 'destructive',
+                    title: 'Sync Error',
+                    description: 'Could not find user profile. Please try logging in again.',
+                });
+                await signOut(auth);
             }
         } catch (error) {
             console.error("Error fetching user data:", error);
