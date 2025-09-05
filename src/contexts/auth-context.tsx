@@ -91,27 +91,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (loading) return;
+    // Don't run logic until loading is complete
+    if (loading) {
+      return;
+    }
 
     const isAuthPage = pathname === '/';
     const isAdminPage = pathname.startsWith('/admin');
 
-    // If the user is logged in and on the login page, redirect to dashboard
-    if (user && isAuthPage) {
+    // If user data is loaded and they are on the login page, redirect to dashboard.
+    if (userData && isAuthPage) {
       router.push('/dashboard');
     }
     
-    // If the user is not logged in and not on the login/admin page, redirect to login
+    // If there is no user and they are on a protected page, redirect to login.
     if (!user && !isAuthPage && !isAdminPage) {
       router.push('/');
     }
-  }, [user, loading, pathname, router]);
+  }, [user, userData, loading, pathname, router]);
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-      // onAuthStateChanged will handle the rest, and the useEffect above will redirect.
+      // onAuthStateChanged will handle the rest.
     } catch (error) {
       console.error("Error during Google sign-in:", error);
     }

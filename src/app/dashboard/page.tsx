@@ -1,3 +1,4 @@
+
 'use client';
 import type { NextPage } from 'next';
 import { WelcomeCard } from '@/components/vaultboost/welcome-card';
@@ -18,7 +19,11 @@ const Home: NextPage = () => {
   const { userData, loading } = useAuth();
 
   if (loading || !userData) {
-      return null;
+      return (
+        <div className="flex justify-center items-center min-h-screen">
+            <p>Loading...</p>
+        </div>
+      );
   }
   
   const handleBonusClaim = (amount: number) => {
@@ -70,3 +75,4 @@ const Home: NextPage = () => {
 };
 
 export default Home;
+
