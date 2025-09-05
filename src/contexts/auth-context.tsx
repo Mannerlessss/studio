@@ -28,6 +28,8 @@ interface UserData {
     earnings: number;
     projected: number;
     referralEarnings: number;
+    bonusEarnings: number;
+    investmentEarnings: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,7 +43,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true);
       if (user) {
         setUser(user);
         const userDocRef = doc(db, 'users', user.uid);
@@ -49,78 +50,77 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userDoc.exists()) {
           setUserData(userDoc.data() as UserData);
         }
-        if (pathname === '/login') {
-            router.push('/');
-        }
       } else {
         setUser(null);
         setUserData(null);
-        if (pathname !== '/login') {
-          router.push('/login');
-        }
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [pathname, router]);
+  }, []);
 
-  const logIn = async (email: string, pass: string) => {
-    return signInWithEmailAndPassword(auth, email, pass);
-  };
+  useEffect(() => {
+    if (loading) return;
+
+    const isAuthPage = pathname === '/login';
+
+    if (!user && !isAuthPage) {
+        router.push('/login');
+    } else if (user && isAuthPage) {
+        router.push('/');
+    }
+  }, [loading, user, pathname, router]);
 
   const signUp = async (email: string, pass: string, name: string, phone: string, referCode?: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
     const user = userCredential.user;
-    
-    const ownReferralCode = 'VB' + Math.random().toString(36).substring(2, 8).toUpperCase();
-
+    const referralCode = `REF-${user.uid.substring(0, 6).toUpperCase()}`;
     const newUser: UserData = {
         name,
         email,
         phone,
-        referralCode: ownReferralCode,
+        referralCode,
         membership: 'Basic',
         rank: 'Bronze',
         totalBalance: 0,
         invested: 0,
         earnings: 0,
         projected: 0,
-        referralEarnings: 0
+        referralEarnings: 0,
+        bonusEarnings: 0,
+        investmentEarnings: 0,
     };
-
     await setDoc(doc(db, "users", user.uid), newUser);
     setUserData(newUser);
-
-    if (referCode) {
-        // Here you would add logic to handle the referral code, 
-        // e.g., credit the referrer.
-        console.log(`User signed up with referral code: ${referCode}`);
-    }
-
     return userCredential;
-  };
+  }
 
-  const logOut = async () => {
+  const logIn = (email: string, pass: string) => {
+    return signInWithEmailAndPassword(auth, email, pass);
+  }
+
+  const logOut = () => {
     return signOut(auth);
-  };
-  
+  }
+
   if (loading) {
-      return (
-          <div className="flex items-center justify-center h-screen">
-              <Gem className="w-10 h-10 text-primary animate-pulse" />
-          </div>
-      )
+    return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-background">
+            <Gem className="w-12 h-12 text-primary animate-pulse" />
+            <p className="mt-4 text-muted-foreground">Loading Vault...</p>
+        </div>
+    );
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, logIn, signUp, logOut, userData }}>
+    <AuthContext.Provider value={{ user, userData, loading, signUp, logIn, logOut }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = (): AuthContextType => {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
