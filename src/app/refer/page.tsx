@@ -9,6 +9,7 @@ import { Copy, Gift, Users, Star, Share2, MessageCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
+import { LeaderboardCard } from '@/components/vaultboost/leaderboard-card';
 
 const ReferPage: NextPage = () => {
     const { toast } = useToast();
@@ -124,6 +125,9 @@ const ReferPage: NextPage = () => {
                 </div>
             </CardContent>
         </Card>
+        
+        <LeaderboardCard />
+
          <Card className="text-left shadow-lg">
             <CardHeader>
                 <CardTitle>How The Magic Happens</CardTitle>
