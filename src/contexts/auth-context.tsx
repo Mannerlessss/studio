@@ -92,18 +92,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (loading) return;
 
-    const isAuthPage = pathname === '/login';
-    const isAdminPage = pathname.startsWith('/admin');
-    const isPublicPage = ['/terms', '/privacy'].includes(pathname);
+    const isAuthPage = pathname === '/';
+    const isDashboard = pathname.startsWith('/dashboard');
+    const isPublicPage = ['/terms', '/privacy'].includes(pathname) || pathname.startsWith('/admin');
 
-    // If user is logged in, and on the login page, redirect to home
+    // If user is logged in, and on the login page, redirect to dashboard
     if (user && isAuthPage) {
-      router.push('/');
+      router.push('/dashboard');
     }
     
-    // If user is not logged in, and not on a public/auth/admin page, redirect to login
-    if (!user && !isAuthPage && !isAdminPage && !isPublicPage) {
-      router.push('/login');
+    // If user is not logged in, and not on a public page, redirect to login
+    if (!user && !isAuthPage && !isPublicPage) {
+      router.push('/');
     }
 
   }, [user, loading, pathname, router]);
@@ -123,7 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logOut = async () => {
     await signOut(auth);
-    router.push('/login');
+    router.push('/');
   };
 
   const redeemReferralCode = async (code: string) => {
