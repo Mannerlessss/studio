@@ -63,11 +63,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { toast } = useToast();
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            setLoading(true);
-            if (user) {
-                setUser(user);
-                await fetchUserData(user.uid);
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                setUser(currentUser);
+                await fetchUserData(currentUser.uid);
             } else {
                 setUser(null);
                 setUserData(null);
@@ -79,16 +78,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     useEffect(() => {
+        if (loading) {
+            return;
+        }
+
         const protectedRoutes = ['/', '/investment', '/refer', '/settings', '/support', '/pro'];
         const isAdminRoute = pathname.startsWith('/admin');
         const isAuthRoute = pathname === '/login';
 
-        if (!loading) {
-            if (!user && (protectedRoutes.includes(pathname) || isAdminRoute)) {
-                router.push('/login');
-            } else if (user && isAuthRoute) {
-                router.push('/');
-            }
+        if (!user && (protectedRoutes.includes(pathname) || isAdminRoute)) {
+            router.push('/login');
+        } else if (user && isAuthRoute) {
+            router.push('/');
         }
     }, [user, loading, pathname, router]);
 
@@ -160,7 +161,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 description: error.message,
             });
         } finally {
-            setLoading(false);
+            // Loading is set to false in the onAuthStateChanged listener
         }
     };
 
@@ -171,12 +172,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await createNewUser(userCredential.user, { name, phone, referralCode });
         } catch (error: any) {
-            toast({
+             toast({
                 variant: 'destructive',
                 title: 'Sign-Up Failed',
                 description: error.message,
             });
-        } finally {
             setLoading(false);
         }
     };
@@ -185,17 +185,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         const { email, password } = details;
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const userDocRef = doc(db, 'users', userCredential.user.uid);
-            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-            await fetchUserData(userCredential.user.uid);
+            await signInWithEmailAndPassword(auth, email, password);
+            // The onAuthStateChanged listener will handle fetching data and setting user state.
         } catch (error: any) {
             toast({
                 variant: 'destructive',
                 title: 'Sign-In Failed',
                 description: "Invalid email or password.",
             });
-        } finally {
             setLoading(false);
         }
     };
@@ -203,9 +200,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logOut = async () => {
         try {
             await signOut(auth);
-            setUser(null);
-            setUserData(null);
-            router.push('/login');
+            // The onAuthStateChanged listener will handle setting user to null.
         } catch (error: any) {
             toast({
                 variant: 'destructive',
