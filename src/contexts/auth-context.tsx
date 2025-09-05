@@ -26,6 +26,7 @@ interface UserData {
     phone: string;
     referralCode?: string;
     membership: 'Basic' | 'Pro';
+    rank: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,7 +42,8 @@ const dummyUserData: UserData = {
     email: 'user@example.com',
     phone: '123-456-7890',
     referralCode: 'DUMMYCODE',
-    membership: 'Pro'
+    membership: 'Pro',
+    rank: 'Gold',
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {

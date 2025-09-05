@@ -1,5 +1,6 @@
 import type { FC } from 'react';
-import { Crown } from 'lucide-react';
+import { Crown, ShieldCheck } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
 
 interface WelcomeCardProps {
   name: string;
@@ -7,6 +8,8 @@ interface WelcomeCardProps {
 }
 
 export const WelcomeCard: FC<WelcomeCardProps> = ({ name, membership }) => {
+  const { userData } = useAuth();
+  
   return (
     <div className="rounded-xl bg-gradient-to-br from-yellow-500 to-orange-400 p-6 text-black shadow-lg">
       <div className="flex items-center gap-4">
@@ -15,8 +18,16 @@ export const WelcomeCard: FC<WelcomeCardProps> = ({ name, membership }) => {
         </div>
         <div>
           <h1 className="text-2xl font-bold">Welcome, {name}!</h1>
-          <p className="text-sm opacity-90">
-            {membership} • The treasure awaits
+          <p className="text-sm opacity-90 flex items-center gap-2">
+            <span>{membership}</span>
+            {userData?.rank && (
+                <>
+                <span>•</span>
+                <span className="flex items-center gap-1 font-semibold">
+                    <ShieldCheck className='w-4 h-4'/> {userData.rank} Rank
+                </span>
+                </>
+            )}
           </p>
         </div>
       </div>
