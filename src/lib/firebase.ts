@@ -7,13 +7,13 @@ import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  "projectId": "upi-boost-vault-f64fw",
-  "appId": "1:1017948596718:web:b25de6f4ed5d179b5046ff",
-  "storageBucket": "upi-boost-vault-f64fw.firebasestorage.app",
-  "apiKey": "AIzaSyDLhmKP9BeoHGn_zz8UaVURix83lPfWSds",
-  "authDomain": "upi-boost-vault-f64fw.firebaseapp.com",
-  "measurementId": "G-C3ZQDSL5FM",
-  "messagingSenderId": "1017948596718"
+  apiKey: "AIzaSyDi9cWXekgmJSlmj4rrEB0TYiRXdmGfeOo",
+  authDomain: "gagan-backend.firebaseapp.com",
+  projectId: "gagan-backend",
+  storageBucket: "gagan-backend.firebasestorage.app",
+  messagingSenderId: "759910620254",
+  appId: "1:759910620254:web:c0344b4c737be830a4e8cf",
+  measurementId: "G-ZV6RTKWNLN"
 };
 
 // Initialize Firebase
