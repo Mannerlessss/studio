@@ -1,27 +1,45 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can only read and write to their own document.
-    // This prevents users from accessing or modifying other users' data.
-    match /users/{userId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
+
+    // Helper function to check if a user is an admin.
+    // Looks for a document in the 'admins' collection with the user's UID.
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    // Allow authenticated users to query the users collection.
-    // This is necessary for features like checking if a referral code exists.
-    match /users/{document=**} {
+    // Rules for the 'users' collection.
+    match /users/{userId} {
+      // Admins can perform any action on any user document.
+      allow read, write: if isAdmin();
+      
+      // A non-admin user can only:
+      // - Get their own document.
+      // - Update their own document.
+      // - List users if they are authenticated (needed for referral code checks).
+      allow get, update: if request.auth.uid == userId;
       allow list: if request.auth != null;
+      
+      // No user should be able to create or delete their own account directly
+      // through a client-side request after it has been created.
+      // Creation is handled by Firebase Auth triggers or secure backend functions.
+      allow create, delete: if false;
     }
     
-    // Referrals can be created by any authenticated user.
-    // They cannot be read, updated or deleted by clients to protect privacy.
-    // This logic should be handled by secure backend functions.
-    match /referrals/{referralId} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if false;
+    // Rules for the 'admins' collection.
+    // Only existing admins can read the list of admins.
+    // No one can write to this collection from the client-side to prevent privilege escalation.
+    match /admins/{userId} {
+      allow read: if isAdmin();
+      allow write: if false; // Prevent client-side writes
+    }
+    
+    // Rules for all other collections.
+    // By default, only admins can access other collections like withdrawals,
+    // offers, and referrals. This provides a secure baseline.
+    match /{collection}/{docId} {
+        allow read, write: if isAdmin();
     }
   }
 }
