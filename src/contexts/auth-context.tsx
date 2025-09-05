@@ -42,29 +42,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
       if (currentUser) {
-        setUser(currentUser);
         const userDocRef = doc(db, 'users', currentUser.uid);
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
           setUserData(userDoc.data() as UserData);
         }
-        setLoading(false);
       } else {
-        setUser(null);
         setUserData(null);
-        setLoading(false);
-        const isAuthPage = pathname === '/login';
-        const isAdminPage = pathname.startsWith('/admin');
-        if (!isAuthPage && !isAdminPage) {
-          router.push('/login');
-        }
       }
+      setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [pathname, router]);
+  }, []);
 
+  useEffect(() => {
+    if (loading) return;
+
+    const isAuthPage = pathname === '/login';
+    const isAdminPage = pathname.startsWith('/admin');
+
+    if (!user && !isAuthPage && !isAdminPage) {
+      router.push('/login');
+    } else if (user && isAuthPage) {
+      router.push('/');
+    }
+  }, [user, loading, pathname, router]);
 
   const signUp = async (email: string, pass: string, name: string, phone: string, referCode?: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
