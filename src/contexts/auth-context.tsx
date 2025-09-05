@@ -65,10 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
-            if (currentUser) {
-                // Only fetch data if a user is confirmed.
-                fetchUserData(currentUser);
-            } else {
+            if (!currentUser) {
                 setUserData(null);
             }
             setLoading(false);
@@ -76,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return () => unsubscribe();
     }, []);
 
-     useEffect(() => {
+    useEffect(() => {
         if (loading) {
             return;
         }
@@ -88,8 +85,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!user && (protectedRoutes.includes(pathname) || isAdminRoute)) {
             router.push('/login');
         } else if (user && isAuthRoute) {
-            // Only push to home if we have user data, otherwise wait.
-            if(userData) router.push('/');
+            if (userData) { // Only redirect if we have data
+                router.push('/');
+            }
         }
     }, [user, userData, loading, pathname, router]);
 
@@ -102,25 +100,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUserData(fetchedData);
                 return fetchedData;
             } else {
-                 toast({ variant: 'destructive', title: 'Initialization Error', description: 'User profile not found in database.' });
-                 await logOut();
-                 return null;
+                return null;
             }
         } catch (error) {
             console.error("Fetch User Data Error: ", error);
-            toast({ variant: 'destructive', title: 'Permissions Error', description: 'Could not fetch user profile.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch user profile.' });
             await logOut();
             return null;
         }
     };
-    
+
     const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
         const userDocRef = doc(db, 'users', user.uid);
-        let finalUserData: UserData | null = null;
-    
         try {
             const docSnap = await getDoc(userDocRef);
-    
+            let finalUserData: UserData;
+
             if (!docSnap.exists()) {
                 let referredBy = null;
                 if (additionalData.referralCode) {
@@ -132,7 +127,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         toast({ variant: 'destructive', title: 'Invalid Referral Code', description: 'The provided referral code does not exist.' });
                     }
                 }
-    
+
                 const newUser: UserData = {
                     uid: user.uid,
                     email: user.email || '',
@@ -159,24 +154,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
                 finalUserData = docSnap.data() as UserData;
             }
-    
+            
             setUser(user);
             setUserData(finalUserData);
-            // The useEffect will handle the redirect
-    
         } catch (error: any) {
             console.error("Login/Signup Error: ", error);
             toast({
                 variant: 'destructive',
                 title: 'Initialization Error',
-                description: 'Could not initialize your account.',
+                description: "Could not initialize your account.",
             });
-            await signOut(auth); // Ensure user is logged out if db setup fails
+            await signOut(auth);
             setUser(null);
             setUserData(null);
         }
     };
-    
 
     const signInWithGoogle = async () => {
         setLoading(true);
@@ -190,9 +182,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Google Sign-In Failed',
                 description: "Could not complete Google sign-in.",
             });
-             await signOut(auth);
-        } finally {
-            // setLoading(false) is handled by the onAuthStateChanged listener
+            setLoading(false);
         }
     };
 
@@ -208,8 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-Up Failed',
                 description: error.message,
             });
-        } finally {
-            // setLoading(false) is handled by the onAuthStateChanged listener
+            setLoading(false);
         }
     };
 
@@ -225,8 +214,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-In Failed',
                 description: "Invalid email or password.",
             });
-        } finally {
-            // setLoading(false) is handled by the onAuthStateChanged listener
+            setLoading(false);
         }
     };
 
@@ -275,10 +263,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
 
         await batch.commit();
-        
         await fetchUserData(user);
     };
-
 
     const value: AuthContextType = {
         user,
@@ -299,7 +285,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     <p className="text-lg text-muted-foreground">Loading VaultBoost...</p>
                 </div>
             </div>
-        )
+        );
     }
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
