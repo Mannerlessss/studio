@@ -75,43 +75,64 @@ const mockUserData: UserData = {
     lastLogin: new Date().toISOString(),
 };
 
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const [user, setUser] = useState<User | null>(mockUser);
-    const [userData, setUserData] = useState<UserData | null>(mockUserData);
-    const [loading, setLoading] = useState(false);
+    const [user, setUser] = useState<User | null>(null);
+    const [userData, setUserData] = useState<UserData | null>(null);
+    const [loading, setLoading] = useState(true);
     const router = useRouter();
     const pathname = usePathname();
     const { toast } = useToast();
 
+    useEffect(() => {
+        // This effect simulates checking for a user session
+        const protectedRoutes = ['/', '/investment', '/refer', '/settings', '/support', '/pro'];
+        const isAdminRoute = pathname.startsWith('/admin');
+
+        if (!user && (protectedRoutes.includes(pathname) || isAdminRoute)) {
+            router.push('/login');
+        } else if (user && pathname === '/login') {
+            router.push('/');
+        }
+        setLoading(false);
+    }, [user, pathname, router]);
+
+
     const signInWithGoogle = async () => {
+        setLoading(true);
         toast({ title: 'Logged in with Google (Mock)' });
         setUser(mockUser);
         setUserData(mockUserData);
         router.push('/');
+        setLoading(false);
     };
 
     const signUpWithEmail = async (details: any) => {
+        setLoading(true);
         console.log('Signing up with:', details);
         toast({ title: 'Signed up (Mock)' });
         setUser(mockUser);
         setUserData(mockUserData);
         router.push('/');
+        setLoading(false);
     };
 
     const signInWithEmail = async (details: any) => {
+        setLoading(true);
         console.log('Signing in with:', details);
         toast({ title: 'Signed in (Mock)' });
         setUser(mockUser);
         setUserData(mockUserData);
         router.push('/');
+        setLoading(false);
     };
 
     const logOut = async () => {
+        setLoading(true);
         toast({ title: 'Logged Out (Mock)' });
         setUser(null);
         setUserData(null);
         router.push('/login');
+        setLoading(false);
     };
 
     const redeemReferralCode = async (code: string) => {
