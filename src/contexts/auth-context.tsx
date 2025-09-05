@@ -1,7 +1,17 @@
 
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import type { User } from 'firebase/auth';
+import { 
+    User, 
+    onAuthStateChanged, 
+    signOut,
+    GoogleAuthProvider,
+    signInWithPopup,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword
+} from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Gem } from 'lucide-react';
@@ -40,40 +50,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const mockUser: User = {
-    uid: 'mock-user-123',
-    email: 'test@example.com',
-    emailVerified: true,
-    displayName: 'Mock User',
-    isAnonymous: false,
-    photoURL: '',
-    providerData: [],
-    getIdToken: async () => 'mock-token',
-    getIdTokenResult: async () => ({ token: 'mock-token', claims: {}, authTime: '', issuedAtTime: '', expirationTime: '', signInProvider: null, signInSecondFactor: null }),
-    reload: async () => {},
-    delete: async () => {},
-    toJSON: () => ({}),
-    providerId: 'password'
-};
-
-const mockUserData: UserData = {
-    uid: 'mock-user-123',
-    name: 'VaultBoost User',
-    email: 'user@vaultboost.app',
-    phone: '+91 98765 43210',
-    referralCode: 'BOOST123',
-    membership: 'Pro',
-    rank: 'Gold',
-    totalBalance: 7500,
-    invested: 5000,
-    earnings: 2500,
-    projected: 9000,
-    referralEarnings: 1200,
-    bonusEarnings: 300,
-    investmentEarnings: 1000,
-    createdAt: new Date().toISOString(),
-    lastLogin: new Date().toISOString(),
-};
+const generateReferralCode = () => {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -84,66 +63,199 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { toast } = useToast();
 
     useEffect(() => {
-        // This effect simulates checking for a user session
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            setLoading(true);
+            if (user) {
+                setUser(user);
+                await fetchUserData(user.uid);
+            } else {
+                setUser(null);
+                setUserData(null);
+            }
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
         const protectedRoutes = ['/', '/investment', '/refer', '/settings', '/support', '/pro'];
         const isAdminRoute = pathname.startsWith('/admin');
+        const isAuthRoute = pathname === '/login';
 
-        if (!user && (protectedRoutes.includes(pathname) || isAdminRoute)) {
-            router.push('/login');
-        } else if (user && pathname === '/login') {
-            router.push('/');
+        if (!loading) {
+            if (!user && (protectedRoutes.includes(pathname) || isAdminRoute)) {
+                router.push('/login');
+            } else if (user && isAuthRoute) {
+                router.push('/');
+            }
         }
-        setLoading(false);
-    }, [user, pathname, router]);
+    }, [user, loading, pathname, router]);
+
+    const fetchUserData = async (uid: string) => {
+        const userDocRef = doc(db, 'users', uid);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+            setUserData(docSnap.data() as UserData);
+        } else {
+            console.log("No such user document!");
+        }
+    };
+    
+    const createNewUser = async (user: User, additionalData: any = {}) => {
+        const userDocRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(userDocRef);
+
+        if (!docSnap.exists()) {
+            let referredBy = null;
+            if (additionalData.referralCode) {
+                 const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
+                 const querySnapshot = await getDocs(q);
+                 if (!querySnapshot.empty) {
+                     referredBy = querySnapshot.docs[0].id;
+                 } else {
+                     toast({ variant: 'destructive', title: 'Invalid Referral Code' });
+                 }
+            }
+            
+            const newUser: UserData = {
+                uid: user.uid,
+                email: user.email || '',
+                name: additionalData.name || user.displayName || 'Vault User',
+                phone: additionalData.phone || '',
+                referralCode: generateReferralCode(),
+                usedReferralCode: referredBy ? additionalData.referralCode : undefined,
+                referredBy: referredBy || undefined,
+                membership: 'Basic',
+                rank: 'Bronze',
+                totalBalance: 0,
+                invested: 0,
+                earnings: 0,
+                projected: 0,
+                referralEarnings: 0,
+                bonusEarnings: 0,
+                investmentEarnings: 0,
+                createdAt: serverTimestamp(),
+                lastLogin: serverTimestamp(),
+            };
+            await setDoc(userDocRef, newUser);
+            await fetchUserData(user.uid);
+        } else {
+            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+            await fetchUserData(user.uid);
+        }
+    }
 
 
     const signInWithGoogle = async () => {
         setLoading(true);
-        toast({ title: 'Logged in with Google (Mock)' });
-        setUser(mockUser);
-        setUserData(mockUserData);
-        router.push('/');
-        setLoading(false);
+        const provider = new GoogleAuthProvider();
+        try {
+            const result = await signInWithPopup(auth, provider);
+            await createNewUser(result.user);
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Google Sign-In Failed',
+                description: error.message,
+            });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const signUpWithEmail = async (details: any) => {
         setLoading(true);
-        console.log('Signing up with:', details);
-        toast({ title: 'Signed up (Mock)' });
-        setUser(mockUser);
-        setUserData(mockUserData);
-        router.push('/');
-        setLoading(false);
+        const { email, password, name, phone, referralCode } = details;
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            await createNewUser(userCredential.user, { name, phone, referralCode });
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Sign-Up Failed',
+                description: error.message,
+            });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const signInWithEmail = async (details: any) => {
         setLoading(true);
-        console.log('Signing in with:', details);
-        toast({ title: 'Signed in (Mock)' });
-        setUser(mockUser);
-        setUserData(mockUserData);
-        router.push('/');
-        setLoading(false);
+        const { email, password } = details;
+        try {
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const userDocRef = doc(db, 'users', userCredential.user.uid);
+            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+            await fetchUserData(userCredential.user.uid);
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Sign-In Failed',
+                description: "Invalid email or password.",
+            });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const logOut = async () => {
-        setLoading(true);
-        toast({ title: 'Logged Out (Mock)' });
-        setUser(null);
-        setUserData(null);
-        router.push('/login');
-        setLoading(false);
+        try {
+            await signOut(auth);
+            setUser(null);
+            setUserData(null);
+            router.push('/login');
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Logout Failed',
+                description: error.message,
+            });
+        }
     };
 
     const redeemReferralCode = async (code: string) => {
-        if (userData?.usedReferralCode) {
-            toast({ variant: 'destructive', title: 'Code already used (Mock)' });
-            throw new Error("You have already used a referral code.");
+        if (!user || !userData) {
+            throw new Error("You must be logged in.");
         }
-        console.log(`Redeeming code ${code} (Mock)`);
-        toast({ title: `Code ${code} redeemed! (Mock)`});
-        setUserData(prev => prev ? { ...prev, usedReferralCode: code } : null);
+        if (userData.usedReferralCode) {
+            throw new Error("You have already redeemed a code.");
+        }
+        if (code === userData.referralCode) {
+             throw new Error("You cannot use your own referral code.");
+        }
+
+        const q = query(collection(db, "users"), where("referralCode", "==", code));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            throw new Error("Invalid referral code.");
+        }
+        
+        const referredBy = querySnapshot.docs[0].id;
+        const userDocRef = doc(db, 'users', user.uid);
+        await updateDoc(userDocRef, {
+            usedReferralCode: code,
+            referredBy: referredBy,
+        });
+
+        // Add 75 to the bonus of the user who referred
+        const referredByUserDocRef = doc(db, 'users', referredBy);
+        const referredByUserDoc = await getDoc(referredByUserDocRef);
+        if (referredByUserDoc.exists()) {
+            const data = referredByUserDoc.data();
+            const newReferralEarnings = (data.referralEarnings || 0) + 75;
+            const newTotalBalance = (data.totalBalance || 0) + 75;
+            await updateDoc(referredByUserDocRef, {
+                referralEarnings: newReferralEarnings,
+                totalBalance: newTotalBalance,
+            });
+        }
+
+        await fetchUserData(user.uid);
     };
+
 
     const value: AuthContextType = {
         user,
