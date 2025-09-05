@@ -1,8 +1,10 @@
 
+'use client';
 import type { FC } from 'react';
 import Link from 'next/link';
 import { LayoutDashboard, TrendingUp, Users, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface BottomNavProps {
   activePage: 'dashboard' | 'investment' | 'refer' | 'settings' | 'support';
@@ -10,7 +12,7 @@ interface BottomNavProps {
 
 export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {
   const navItems = [
-    { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard' },
+    { href: '/', icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard' },
     { href: '/investment', icon: TrendingUp, label: 'Investment', page: 'investment' },
     { href: '/refer', icon: Users, label: 'Refer', page: 'refer' },
     { href: '/settings', icon: Settings, label: 'Settings', page: 'settings' },
@@ -23,11 +25,12 @@ export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {
           <Link href={item.href} key={item.label} className="flex-1" id={`bottom-nav-${item.page}`}>
             <Button
               variant="ghost"
-              className={`flex flex-col items-center justify-center h-full w-full rounded-none ${
+              className={cn(
+                'flex flex-col items-center justify-center h-full w-full rounded-none',
                 activePage === item.page
                   ? 'text-primary bg-primary/10'
                   : 'text-muted-foreground'
-              }`}
+              )}
             >
               <item.icon className="h-6 w-6 mb-1" />
               <span className="text-xs">{item.label}</span>
