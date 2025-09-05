@@ -65,9 +65,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isAuthPage = pathname === '/login';
     const isAdminPage = pathname.startsWith('/admin');
 
-    if (!user && !isAuth-page && !isAdminPage) {
+    // If there is no user, and they are not on an auth page or admin page, redirect to login
+    if (!user && !isAuthPage && !isAdminPage) {
       router.push('/login');
-    } else if (user && isAuthPage) {
+    } 
+    // If there is a user, and they are on the login page, redirect to the dashboard
+    else if (user && isAuthPage) {
       router.push('/');
     }
 
@@ -116,10 +119,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await signOut(auth);
     setUser(null);
     setUserData(null);
-    router.push('/login');
+    // No need to push here, the useEffect hook will handle it.
   }
   
-  if (loading) {
+  const isAuthPage = pathname === '/login';
+  if (loading || (!user && !isAuthPage)) {
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-background">
             <Gem className="w-12 h-12 text-primary animate-pulse" />
