@@ -41,8 +41,6 @@ import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp } from 'lucide-
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, updateDoc, increment } from 'firebase/firestore';
 
 interface User {
     id: string;
@@ -55,22 +53,18 @@ interface User {
     investmentEarnings: number;
 }
 
+const mockUsers: User[] = [
+    { id: 'usr-001', name: 'John Doe', email: 'john@example.com', membership: 'Pro', totalBalance: 5500, investmentEarnings: 4000, referralEarnings: 1200, bonusEarnings: 300 },
+    { id: 'usr-002', name: 'Jane Smith', email: 'jane@example.com', membership: 'Basic', totalBalance: 1200, investmentEarnings: 1000, referralEarnings: 150, bonusEarnings: 50 },
+    { id: 'usr-003', name: 'Sam Wilson', email: 'sam@example.com', membership: 'Basic', totalBalance: 800, investmentEarnings: 800, referralEarnings: 0, bonusEarnings: 0 },
+];
+
+
 export default function UsersPage() {
     const { toast } = useToast();
-    const [users, setUsers] = useState<User[]>([]);
+    const [users, setUsers] = useState<User[]>(mockUsers);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [creditAmount, setCreditAmount] = useState('');
-
-    useEffect(() => {
-        const fetchUsers = async () => {
-            const usersCollection = collection(db, 'users');
-            const userSnapshot = await getDocs(usersCollection);
-            const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-            setUsers(userList);
-        };
-
-        fetchUsers();
-    }, []);
 
     const handleCredit = async (userId: string) => {
         const amount = Number(creditAmount);
@@ -83,39 +77,30 @@ export default function UsersPage() {
             return;
         }
 
-        const userRef = doc(db, 'users', userId);
-        await updateDoc(userRef, {
-            totalBalance: increment(amount),
-            investmentEarnings: increment(amount),
-        });
+        setUsers(users.map(u => 
+            u.id === userId 
+            ? { ...u, totalBalance: u.totalBalance + amount, investmentEarnings: u.investmentEarnings + amount }
+            : u
+        ));
 
         toast({
-            title: `Investment Credited`,
+            title: `Investment Credited (Mock)`,
             description: `${amount} Rs. has been credited for user ${userId}.`,
         });
-
-        // Refetch users to show updated data
-        const usersCollection = collection(db, 'users');
-        const userSnapshot = await getDocs(usersCollection);
-        const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-        setUsers(userList);
+        
         setCreditAmount('');
     }
 
     const handleUpgrade = async (userId: string) => {
-         const userRef = doc(db, 'users', userId);
-         await updateDoc(userRef, {
-            membership: 'Pro',
-         });
+         setUsers(users.map(u => 
+            u.id === userId 
+            ? { ...u, membership: 'Pro' }
+            : u
+        ));
         toast({
-            title: `Upgraded to Pro`,
+            title: `Upgraded to Pro (Mock)`,
             description: `User ${userId} has been upgraded to the Pro plan.`,
         });
-        // Refetch users
-         const usersCollection = collection(db, 'users');
-        const userSnapshot = await getDocs(usersCollection);
-        const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-        setUsers(userList);
     }
 
   return (
