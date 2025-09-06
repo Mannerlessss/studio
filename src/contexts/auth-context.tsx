@@ -63,12 +63,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { toast } = useToast();
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                await fetchUserData(currentUser);
+                // We will fetch user data only after explicit login
+                setLoading(false);
+            } else {
+                setLoading(false);
             }
-            setLoading(false);
         });
         return () => unsubscribe();
     }, []);
@@ -98,13 +100,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUserData(fetchedData);
                 return fetchedData;
             } else {
-                 // This case will be handled by handleSuccessfulLogin for new users
                 return null;
             }
         } catch (error) {
             console.error("Fetch User Data Error: ", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch user profile.' });
-            await logOut();
             return null;
         }
     };
@@ -114,7 +114,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const docSnap = await getDoc(userDocRef);
 
-            if (!docSnap.exists()) {
+            if (docSnap.exists()) {
+                // Existing user
+                await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+                const fetchedData = docSnap.data() as UserData;
+                setUserData(fetchedData);
+            } else {
+                // New user
                 let referredBy = null;
                 if (additionalData.referralCode) {
                     const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
@@ -148,13 +154,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 };
                 await setDoc(userDocRef, newUser);
                 setUserData(newUser);
-            } else {
-                await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-                // We already fetched data on auth state change, no need to set it again here
-                // unless it was a new user.
-                if (userData === null) {
-                    await fetchUserData(user);
-                }
             }
         } catch (error: any) {
             console.error("Login/Signup Error: ", error);
@@ -173,12 +172,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const provider = new GoogleAuthProvider();
         try {
             const result = await signInWithPopup(auth, provider);
+            setUser(result.user);
             await handleSuccessfulLogin(result.user);
         } catch (error: any) {
             toast({
                 variant: 'destructive',
                 title: 'Google Sign-In Failed',
-                description: "Could not complete Google sign-in.",
+                description: error.code || "Could not complete Google sign-in.",
             });
         } finally {
             setLoading(false);
@@ -190,6 +190,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { email, password, name, phone, referralCode } = details;
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            setUser(userCredential.user);
             await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
         } catch (error: any) {
              toast({
@@ -207,6 +208,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { email, password } = details;
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            setUser(userCredential.user);
             await handleSuccessfulLogin(userCredential.user);
         } catch (error: any) {
             toast({
@@ -252,15 +254,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         batch.update(userDocRef, {
             usedReferralCode: code,
             referredBy: referrerId,
-        });
-
-        const referralDocRef = doc(collection(db, 'referrals'));
-        batch.set(referralDocRef, {
-            referrerId: referrerId,
-            referredId: user.uid,
-            code: code,
-            status: 'pending_investment',
-            createdAt: serverTimestamp()
         });
 
         await batch.commit();
