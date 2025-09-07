@@ -64,11 +64,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setUser(currentUser);
             if (currentUser) {
                 await fetchUserData(currentUser);
-                setUser(currentUser);
             } else {
-                setUser(null);
                 setUserData(null);
             }
             setLoading(false);
@@ -87,10 +86,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!user && (protectedRoutes.includes(pathname) || isAdminRoute)) {
             router.push('/login');
-        } else if (user && isAuthRoute) {
+        } else if (user && userData && isAuthRoute) {
              router.push('/');
         }
-    }, [user, loading, pathname, router]);
+    }, [user, userData, loading, pathname, router]);
 
     const fetchUserData = async (firebaseUser: User): Promise<UserData | null> => {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -101,6 +100,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUserData(fetchedData);
                 return fetchedData;
             } else {
+                // This case handles a new user signing up.
+                // We'll create their profile in handleSuccessfulLogin.
                 return null;
             }
         } catch (error) {
@@ -167,20 +168,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-
     const signInWithGoogle = async () => {
         setLoading(true);
         const provider = new GoogleAuthProvider();
         try {
             const result = await signInWithPopup(auth, provider);
-            setUser(result.user); // This will trigger the onAuthStateChanged listener
+            await handleSuccessfulLogin(result.user);
         } catch (error: any) {
             toast({
                 variant: 'destructive',
                 title: 'Google Sign-In Failed',
                 description: error.code || "Could not complete Google sign-in.",
             });
-             setLoading(false);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -190,7 +191,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
-            setUser(userCredential.user);
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -207,7 +207,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { email, password } = details;
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            setUser(userCredential.user);
             await fetchUserData(userCredential.user);
         } catch (error: any) {
             toast({
@@ -221,11 +220,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const logOut = async () => {
+        setLoading(true);
         await signOut(auth);
-        setUserData(null);
         setUser(null);
-        setLoading(false);
+        setUserData(null);
         router.push('/login');
+        setLoading(false);
     };
 
     const redeemReferralCode = async (code: string) => {
@@ -271,7 +271,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         redeemReferralCode,
     };
 
-    if (loading) {
+    if (loading && !pathname.startsWith('/_next/static')) {
         return (
             <div className="flex items-center justify-center h-screen bg-background">
                 <div className="text-center">
