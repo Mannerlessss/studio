@@ -100,8 +100,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUserData(fetchedData);
                 return fetchedData;
             } else {
-                // This case handles a new user signing up.
-                // We'll create their profile in handleSuccessfulLogin.
                 return null;
             }
         } catch (error) {
@@ -113,6 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
         const userDocRef = doc(db, 'users', user.uid);
+        setLoading(true);
         try {
             const docSnap = await getDoc(userDocRef);
 
@@ -165,23 +164,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 description: "Could not initialize your account.",
             });
             await signOut(auth);
+        } finally {
+            setLoading(false);
         }
     };
 
     const signInWithGoogle = async () => {
-        setLoading(true);
         const provider = new GoogleAuthProvider();
         try {
             const result = await signInWithPopup(auth, provider);
             await handleSuccessfulLogin(result.user);
         } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Google Sign-In Failed',
-                description: error.code || "Could not complete Google sign-in.",
-            });
-        } finally {
-            setLoading(false);
+            if (error.code !== 'auth/popup-closed-by-user') {
+                toast({
+                    variant: 'destructive',
+                    title: 'Google Sign-In Failed',
+                    description: error.code || "Could not complete Google sign-in.",
+                });
+            }
         }
     };
 
@@ -207,7 +207,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { email, password } = details;
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            await fetchUserData(userCredential.user);
+            await handleSuccessfulLogin(userCredential.user);
         } catch (error: any) {
             toast({
                 variant: 'destructive',
