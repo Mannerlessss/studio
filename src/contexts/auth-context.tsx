@@ -64,6 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setLoading(true);
             if (currentUser) {
                 await fetchUserData(currentUser);
                 setUser(currentUser);
@@ -102,8 +103,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUserData(fetchedData);
                 return fetchedData;
             } else {
-                // This case handles a user who is authenticated but doesn't have a DB record yet
-                // It can happen during the first moments of sign-up
                 return null;
             }
         } catch (error) {
@@ -114,34 +113,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
-        setLoading(true);
         const userDocRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(userDocRef);
 
         if (docSnap.exists()) {
-            // Existing user
             await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
         } else {
-            // New user
-            let referredBy = null;
-            if (additionalData.referralCode) {
-                const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
-                const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
-                    referredBy = querySnapshot.docs[0].id;
-                } else {
-                     toast({ variant: 'destructive', title: 'Invalid Referral Code', description: 'The provided referral code does not exist.' });
-                }
-            }
-
-            const newUser: UserData = {
+            const newUser: Omit<UserData, 'uid'> & {uid: string} = {
                 uid: user.uid,
                 email: user.email || '',
                 name: additionalData.name || user.displayName || 'Vault User',
                 phone: additionalData.phone || user.phoneNumber || '',
                 referralCode: generateReferralCode(),
-                usedReferralCode: referredBy ? additionalData.referralCode : undefined,
-                referredBy: referredBy || undefined,
                 membership: 'Basic',
                 rank: 'Bronze',
                 totalBalance: 0,
@@ -154,12 +137,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
             };
+
+            if (additionalData.referralCode) {
+                const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    const referrerDoc = querySnapshot.docs[0];
+                    newUser.referredBy = referrerDoc.id;
+                    newUser.usedReferralCode = additionalData.referralCode;
+                } else {
+                     toast({ variant: 'destructive', title: 'Invalid Referral Code', description: 'The provided referral code does not exist.' });
+                }
+            }
             await setDoc(userDocRef, newUser);
         }
-        // After DB operations, fetch the latest data and update state
         await fetchUserData(user);
         setUser(user);
-        setLoading(false);
     };
 
     const signInWithGoogle = async () => {
@@ -168,7 +161,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const result = await signInWithPopup(auth, provider);
             await handleSuccessfulLogin(result.user);
         } catch (error: any) {
-            // Gracefully handle popup closed by user
             if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
                 toast({
                     variant: 'destructive',
@@ -180,6 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const signUpWithEmail = async (details: any) => {
+        setLoading(true);
         const { email, password, name, phone, referralCode } = details;
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -190,10 +183,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-Up Failed',
                 description: error.message,
             });
+        } finally {
+            setLoading(false);
         }
     };
 
     const signInWithEmail = async (details: any) => {
+        setLoading(true);
         const { email, password } = details;
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -204,6 +200,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-In Failed',
                 description: "Invalid email or password.",
             });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -212,7 +210,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await signOut(auth);
         setUser(null);
         setUserData(null);
-        // The useEffect hook will handle the redirection to /login
         setLoading(false);
     };
 
