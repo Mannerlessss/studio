@@ -63,14 +63,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { toast } = useToast();
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
-                // We will fetch user data only after explicit login
-                setLoading(false);
+                await fetchUserData(currentUser);
+                setUser(currentUser);
             } else {
-                setLoading(false);
+                setUser(null);
+                setUserData(null);
             }
+            setLoading(false);
         });
         return () => unsubscribe();
     }, []);
@@ -172,16 +173,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const provider = new GoogleAuthProvider();
         try {
             const result = await signInWithPopup(auth, provider);
-            setUser(result.user);
-            await handleSuccessfulLogin(result.user);
+            setUser(result.user); // This will trigger the onAuthStateChanged listener
         } catch (error: any) {
             toast({
                 variant: 'destructive',
                 title: 'Google Sign-In Failed',
                 description: error.code || "Could not complete Google sign-in.",
             });
-        } finally {
-            setLoading(false);
+             setLoading(false);
         }
     };
 
@@ -190,8 +189,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { email, password, name, phone, referralCode } = details;
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            setUser(userCredential.user);
             await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
+            setUser(userCredential.user);
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -209,7 +208,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             setUser(userCredential.user);
-            await handleSuccessfulLogin(userCredential.user);
+            await fetchUserData(userCredential.user);
         } catch (error: any) {
             toast({
                 variant: 'destructive',
@@ -225,6 +224,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await signOut(auth);
         setUserData(null);
         setUser(null);
+        setLoading(false);
         router.push('/login');
     };
 
