@@ -167,10 +167,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const result = await signInWithPopup(auth, provider);
             setLoading(true);
             await handleSuccessfulLogin(result.user);
-            // The useEffect hook will handle redirection
         } catch (error: any) {
-            console.error("Google Sign-In Error: ", error);
-            if (error.code !== 'auth/cancelled-popup-request' && error.code !== 'auth/popup-closed-by-user') {
+            // Gracefully handle popup closed by user
+            if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
                 toast({
                     variant: 'destructive',
                     title: 'Google Sign-In Failed',
