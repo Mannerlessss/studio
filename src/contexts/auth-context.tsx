@@ -63,16 +63,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { toast } = useToast();
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
-                fetchUserData(currentUser).finally(() => setLoading(false));
+                if (!userData || userData.uid !== currentUser.uid) {
+                    await fetchUserData(currentUser);
+                }
+                setUser(currentUser);
             } else {
+                setUser(null);
                 setUserData(null);
-                setLoading(false);
             }
+            setLoading(false);
         });
         return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -86,10 +90,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!user && (protectedRoutes.includes(pathname) || isAdminRoute)) {
             router.push('/login');
-        } else if (user && userData && isAuthRoute) {
+        } else if (user && isAuthRoute) {
              router.push('/');
         }
-    }, [user, userData, loading, pathname, router]);
+    }, [user, loading, pathname, router]);
 
     const fetchUserData = async (firebaseUser: User): Promise<UserData | null> => {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -100,8 +104,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUserData(fetchedData);
                 return fetchedData;
             } else {
-                // This case handles a logged-in user who doesn't have a DB record yet
-                // It will be created by handleSuccessfulLogin
                 return null;
             }
         } catch (error) {
@@ -156,6 +158,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await setDoc(userDocRef, newUser);
             setUserData(newUser);
         }
+        setUser(user);
     };
 
     const signInWithGoogle = async () => {
@@ -164,7 +167,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const result = await signInWithPopup(auth, provider);
             setLoading(true);
             await handleSuccessfulLogin(result.user);
-            router.push('/');
+            // The useEffect hook will handle redirection
         } catch (error: any) {
             console.error("Google Sign-In Error: ", error);
             if (error.code !== 'auth/cancelled-popup-request' && error.code !== 'auth/popup-closed-by-user') {
@@ -185,7 +188,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
-             router.push('/');
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -203,7 +205,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(userCredential.user);
-            router.push('/');
         } catch (error: any) {
             toast({
                 variant: 'destructive',
@@ -216,8 +217,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const logOut = async () => {
-        setLoading(true);
         await signOut(auth);
+        setLoading(true);
         setUser(null);
         setUserData(null);
         router.push('/login');
@@ -267,7 +268,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         redeemReferralCode,
     };
 
-    if (loading) {
+    if (loading && !user) {
         return (
             <div className="flex items-center justify-center h-screen bg-background">
                 <div className="text-center">
