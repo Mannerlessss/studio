@@ -63,14 +63,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { toast } = useToast();
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                await fetchUserData(currentUser);
+                fetchUserData(currentUser).finally(() => setLoading(false));
             } else {
                 setUserData(null);
+                setLoading(false);
             }
-            setLoading(false);
         });
         return () => unsubscribe();
     }, []);
@@ -100,6 +100,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUserData(fetchedData);
                 return fetchedData;
             } else {
+                // This case handles a logged-in user who doesn't have a DB record yet
+                // It will be created by handleSuccessfulLogin
                 return null;
             }
         } catch (error) {
@@ -111,61 +113,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
         const userDocRef = doc(db, 'users', user.uid);
-        setLoading(true);
-        try {
-            const docSnap = await getDoc(userDocRef);
+        const docSnap = await getDoc(userDocRef);
 
-            if (docSnap.exists()) {
-                // Existing user
-                await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-                const fetchedData = docSnap.data() as UserData;
-                setUserData(fetchedData);
-            } else {
-                // New user
-                let referredBy = null;
-                if (additionalData.referralCode) {
-                    const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
-                    const querySnapshot = await getDocs(q);
-                    if (!querySnapshot.empty) {
-                        referredBy = querySnapshot.docs[0].id;
-                    } else {
-                        toast({ variant: 'destructive', title: 'Invalid Referral Code', description: 'The provided referral code does not exist.' });
-                    }
+        if (docSnap.exists()) {
+            // Existing user
+            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+            const fetchedData = docSnap.data() as UserData;
+            setUserData(fetchedData);
+        } else {
+            // New user
+            let referredBy = null;
+            if (additionalData.referralCode) {
+                const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    referredBy = querySnapshot.docs[0].id;
+                } else {
+                    toast({ variant: 'destructive', title: 'Invalid Referral Code', description: 'The provided referral code does not exist.' });
                 }
-
-                const newUser: UserData = {
-                    uid: user.uid,
-                    email: user.email || '',
-                    name: additionalData.name || user.displayName || 'Vault User',
-                    phone: additionalData.phone || '',
-                    referralCode: generateReferralCode(),
-                    usedReferralCode: referredBy ? additionalData.referralCode : undefined,
-                    referredBy: referredBy || undefined,
-                    membership: 'Basic',
-                    rank: 'Bronze',
-                    totalBalance: 0,
-                    invested: 0,
-                    earnings: 0,
-                    projected: 0,
-                    referralEarnings: 0,
-                    bonusEarnings: 0,
-                    investmentEarnings: 0,
-                    createdAt: serverTimestamp(),
-                    lastLogin: serverTimestamp(),
-                };
-                await setDoc(userDocRef, newUser);
-                setUserData(newUser);
             }
-        } catch (error: any) {
-            console.error("Login/Signup Error: ", error);
-            toast({
-                variant: 'destructive',
-                title: 'Initialization Error',
-                description: "Could not initialize your account.",
-            });
-            await signOut(auth);
-        } finally {
-            setLoading(false);
+
+            const newUser: UserData = {
+                uid: user.uid,
+                email: user.email || '',
+                name: additionalData.name || user.displayName || 'Vault User',
+                phone: additionalData.phone || user.phoneNumber || '',
+                referralCode: generateReferralCode(),
+                usedReferralCode: referredBy ? additionalData.referralCode : undefined,
+                referredBy: referredBy || undefined,
+                membership: 'Basic',
+                rank: 'Bronze',
+                totalBalance: 0,
+                invested: 0,
+                earnings: 0,
+                projected: 0,
+                referralEarnings: 0,
+                bonusEarnings: 0,
+                investmentEarnings: 0,
+                createdAt: serverTimestamp(),
+                lastLogin: serverTimestamp(),
+            };
+            await setDoc(userDocRef, newUser);
+            setUserData(newUser);
         }
     };
 
@@ -173,15 +162,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const provider = new GoogleAuthProvider();
         try {
             const result = await signInWithPopup(auth, provider);
+            setLoading(true);
             await handleSuccessfulLogin(result.user);
+            router.push('/');
         } catch (error: any) {
-            if (error.code !== 'auth/popup-closed-by-user') {
+            console.error("Google Sign-In Error: ", error);
+            if (error.code !== 'auth/cancelled-popup-request' && error.code !== 'auth/popup-closed-by-user') {
                 toast({
                     variant: 'destructive',
                     title: 'Google Sign-In Failed',
-                    description: error.code || "Could not complete Google sign-in.",
+                    description: error.message || "Could not complete Google sign-in.",
                 });
             }
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -191,6 +185,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
+             router.push('/');
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -208,6 +203,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(userCredential.user);
+            router.push('/');
         } catch (error: any) {
             toast({
                 variant: 'destructive',
@@ -271,7 +267,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         redeemReferralCode,
     };
 
-    if (loading && !pathname.startsWith('/_next/static')) {
+    if (loading) {
         return (
             <div className="flex items-center justify-center h-screen bg-background">
                 <div className="text-center">
