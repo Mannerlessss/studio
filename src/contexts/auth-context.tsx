@@ -1,19 +1,8 @@
 
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { 
-    User, 
-    onAuthStateChanged, 
-    signOut,
-    GoogleAuthProvider,
-    signInWithPopup,
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword
-} from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
+import { User } from 'firebase/auth'; // Keep User type for compatibility
 import { useRouter, usePathname } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast';
 import { Gem } from 'lucide-react';
 
 interface UserData {
@@ -50,9 +39,38 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const generateReferralCode = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
+// --- MOCK DATA ---
+const mockUser: User = {
+    uid: 'mock-user-123',
+    email: 'mock.user@example.com',
+    displayName: 'Mock User',
+    phoneNumber: '123-456-7890',
+    photoURL: null,
+    providerId: 'password',
+    emailVerified: true,
+    // Add other properties with mock values as needed
+} as User;
+
+const mockUserData: UserData = {
+    uid: 'mock-user-123',
+    name: 'Gagan Sharma',
+    email: 'gagansharma.gs107@gmail.com',
+    phone: '+91 7888540806',
+    membership: 'Pro',
+    rank: 'Gold',
+    totalBalance: 7500,
+    invested: 5000,
+    earnings: 2500,
+    projected: 9000,
+    referralEarnings: 1500,
+    bonusEarnings: 200,
+    investmentEarnings: 800,
+    referralCode: 'GAGANPRO',
+    usedReferralCode: 'FRIENDLY',
+    createdAt: new Date(),
+    lastLogin: new Date(),
+};
+// --- END MOCK DATA ---
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -60,189 +78,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [loading, setLoading] = useState(true);
     const router = useRouter();
     const pathname = usePathname();
-    const { toast } = useToast();
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setLoading(true);
-            if (currentUser) {
-                await fetchUserData(currentUser);
-                setUser(currentUser);
-            } else {
-                setUser(null);
-                setUserData(null);
-            }
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Immediately set mock user and data
+        setUser(mockUser);
+        setUserData(mockUserData);
+        setLoading(false);
+
+        // No need for Firebase listener anymore
     }, []);
 
-    useEffect(() => {
-        if (loading) {
-            return;
-        }
 
-        const protectedRoutes = ['/', '/investment', '/refer', '/settings', '/support', '/pro'];
-        const isAdminRoute = pathname.startsWith('/admin');
-        const isAuthRoute = pathname === '/login';
-
-        if (!user && (protectedRoutes.includes(pathname) || isAdminRoute)) {
-            router.push('/login');
-        } else if (user && isAuthRoute) {
-             router.push('/');
-        }
-    }, [user, loading, pathname, router]);
-
-    const fetchUserData = async (firebaseUser: User): Promise<UserData | null> => {
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        try {
-            const docSnap = await getDoc(userDocRef);
-            if (docSnap.exists()) {
-                const fetchedData = docSnap.data() as UserData;
-                setUserData(fetchedData);
-                return fetchedData;
-            } else {
-                return null;
-            }
-        } catch (error) {
-            console.error("Fetch User Data Error: ", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch user profile.' });
-            return null;
-        }
-    };
-    
-    const handleSuccessfulLogin = async (user: User, additionalData: any = {}) => {
-        const userDocRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(userDocRef);
-
-        if (docSnap.exists()) {
-            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-        } else {
-            const newUser: Omit<UserData, 'uid'> & {uid: string} = {
-                uid: user.uid,
-                email: user.email || '',
-                name: additionalData.name || user.displayName || 'Vault User',
-                phone: additionalData.phone || user.phoneNumber || '',
-                referralCode: generateReferralCode(),
-                membership: 'Basic',
-                rank: 'Bronze',
-                totalBalance: 0,
-                invested: 0,
-                earnings: 0,
-                projected: 0,
-                referralEarnings: 0,
-                bonusEarnings: 0,
-                investmentEarnings: 0,
-                createdAt: serverTimestamp(),
-                lastLogin: serverTimestamp(),
-            };
-
-            if (additionalData.referralCode) {
-                const q = query(collection(db, "users"), where("referralCode", "==", additionalData.referralCode));
-                const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
-                    const referrerDoc = querySnapshot.docs[0];
-                    newUser.referredBy = referrerDoc.id;
-                    newUser.usedReferralCode = additionalData.referralCode;
-                } else {
-                     toast({ variant: 'destructive', title: 'Invalid Referral Code', description: 'The provided referral code does not exist.' });
-                }
-            }
-            await setDoc(userDocRef, newUser);
-        }
-        await fetchUserData(user);
-        setUser(user);
-    };
-
+    // --- Mock Functions ---
     const signInWithGoogle = async () => {
-        const provider = new GoogleAuthProvider();
-        try {
-            const result = await signInWithPopup(auth, provider);
-            await handleSuccessfulLogin(result.user);
-        } catch (error: any) {
-            if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
-                toast({
-                    variant: 'destructive',
-                    title: 'Google Sign-In Failed',
-                    description: error.message || "Could not complete Google sign-in.",
-                });
-            }
-        }
+        console.log("Mock sign in with Google");
+        setLoading(true);
+        setUser(mockUser);
+        setUserData(mockUserData);
+        router.push('/');
+        setLoading(false);
     };
 
     const signUpWithEmail = async (details: any) => {
+        console.log("Mock sign up with email", details);
         setLoading(true);
-        const { email, password, name, phone, referralCode } = details;
-        try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
-        } catch (error: any) {
-             toast({
-                variant: 'destructive',
-                title: 'Sign-Up Failed',
-                description: error.message,
-            });
-        } finally {
-            setLoading(false);
-        }
+        setUser(mockUser);
+        setUserData(mockUserData);
+        router.push('/');
+        setLoading(false);
     };
 
     const signInWithEmail = async (details: any) => {
+        console.log("Mock sign in with email", details);
         setLoading(true);
-        const { email, password } = details;
-        try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            await handleSuccessfulLogin(userCredential.user);
-        } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Sign-In Failed',
-                description: "Invalid email or password.",
-            });
-        } finally {
-            setLoading(false);
-        }
+        setUser(mockUser);
+        setUserData(mockUserData);
+        router.push('/');
+        setLoading(false);
     };
 
     const logOut = async () => {
+        console.log("Mock log out");
         setLoading(true);
-        await signOut(auth);
         setUser(null);
         setUserData(null);
+        router.push('/login');
         setLoading(false);
     };
 
     const redeemReferralCode = async (code: string) => {
-        if (!user || !userData) throw new Error("You must be logged in.");
-        if (userData.usedReferralCode) throw new Error("You have already redeemed a code.");
-        if (code === userData.referralCode) throw new Error("You cannot use your own referral code.");
-
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("referralCode", "==", code));
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-            throw new Error("Invalid referral code.");
-        }
-
-        const referrerDoc = querySnapshot.docs[0];
-        const referrerId = referrerDoc.id;
-        
-        if (referrerId === user.uid) {
-            throw new Error("You cannot use your own referral code.");
-        }
-
-        const batch = writeBatch(db);
-
-        const userDocRef = doc(db, 'users', user.uid);
-        batch.update(userDocRef, {
-            usedReferralCode: code,
-            referredBy: referrerId,
-        });
-
-        await batch.commit();
-        await fetchUserData(user);
+        console.log(`Mock redeeming code: ${code}`);
+        if (!userData) return;
+        setUserData({ ...userData, usedReferralCode: code });
+        alert(`Successfully redeemed code: ${code}`);
     };
 
     const value: AuthContextType = {
@@ -255,16 +143,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         logOut,
         redeemReferralCode,
     };
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-background">
-                <div className="text-center">
-                    <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
-                    <p className="text-lg text-muted-foreground">Loading VaultBoost...</p>
-                </div>
-            </div>
-        );
+    
+    if (pathname === '/login' && !loading && user) {
+        router.push('/');
+        return null;
     }
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
