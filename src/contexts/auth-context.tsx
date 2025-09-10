@@ -8,7 +8,8 @@ import {
     signInWithEmailAndPassword, 
     onAuthStateChanged,
     signOut,
-    User
+    User,
+    sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, addDoc } from 'firebase/firestore';
@@ -48,6 +49,7 @@ interface AuthContextType {
   redeemReferralCode: (code: string) => Promise<void>;
   updateUserPhone: (phone: string) => Promise<void>;
   claimDailyBonus: (amount: number) => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -63,14 +65,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setLoading(true);
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
+                    const dbData = userDocSnap.data() as UserData;
                     setUser(currentUser);
-                    setUserData(userDocSnap.data() as UserData);
+                    setUserData(dbData);
                 } else {
-                    // This case can happen if user is deleted from db but not from auth
+                    // This can happen if user is deleted from db but not from auth
                     await signOut(auth);
                     setUser(null);
                     setUserData(null);
@@ -155,6 +159,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signInWithGoogle = async () => {
         const provider = new GoogleAuthProvider();
         try {
+            setLoading(true);
             const result = await signInWithPopup(auth, provider);
             await handleSuccessfulLogin(result.user);
         } catch (error: any) {
@@ -165,6 +170,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     description: error.message,
                 });
             }
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -309,6 +316,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
         }
     }
+    
+    const sendPasswordReset = async (email: string) => {
+        try {
+            await sendPasswordResetEmail(auth, email);
+            toast({
+                title: 'Password Reset Email Sent',
+                description: `A reset link has been sent to ${email}.`,
+            });
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Reset Failed',
+                description: error.message,
+            });
+        }
+    };
 
     const value: AuthContextType = {
         user,
@@ -321,6 +344,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         redeemReferralCode,
         updateUserPhone,
         claimDailyBonus,
+        sendPasswordReset,
     };
     
     if (loading) {
