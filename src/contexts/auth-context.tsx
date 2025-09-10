@@ -150,7 +150,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             finalUserData = newUser;
         }
         
-        // After setting user data, let onAuthStateChanged handle redirection
+        // After setting user data, onAuthStateChanged will handle redirection
         setUserData(finalUserData);
         setUser(loggedInUser);
         router.push('/');
@@ -346,10 +346,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     if (loading) {
          return (
-            <div className="flex items-center justify-center h-screen bg-background">
+            <div className="flex flex-col items-center justify-center h-screen bg-background">
                 <div className="text-center">
-                    <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
-                    <p className="text-lg text-muted-foreground">Loading VaultBoost...</p>
+                    <Gem className="w-16 h-16 text-primary animate-spin-y mb-6" />
+                    <h1 className="text-2xl font-bold tracking-widest text-primary">
+                        VAULTBOOST
+                    </h1>
+                    <p className="text-lg text-muted-foreground mt-2">Loading...</p>
                 </div>
             </div>
         );

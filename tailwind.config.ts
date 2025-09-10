@@ -1,3 +1,4 @@
+
 import type {Config} from 'tailwindcss';
 
 export default {
@@ -86,6 +87,10 @@ export default {
            '0%, 100%': { transform: 'translateX(0)' },
            '10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-5px) rotate(-2deg)' },
            '20%, 40%, 60%, 80%': { transform: 'translateX(5px) rotate(2deg)' },
+        },
+         'spin-y': {
+            'from': { transform: 'rotateY(0deg)' },
+            'to': { transform: 'rotateY(360deg)' },
         }
       },
       animation: {
@@ -93,6 +98,7 @@ export default {
         'accordion-up': 'accordion-up 0.2s ease-out',
         'open-suitcase': 'open-suitcase 1s ease-in-out forwards',
         'shake': 'shake 0.5s ease-in-out',
+        'spin-y': 'spin-y 2s linear infinite',
       },
       perspective: {
         '1000': '1000px',
