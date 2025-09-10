@@ -28,7 +28,7 @@ export function WithdrawCard() {
       <CardContent>
         {!showWithdrawForm ? (
           <div className='space-y-4'>
-            <Button className="w-full" onClick={handleRequestWithdrawal} disabled={(userData?.totalBalance || 0) < 1000}>
+            <Button className="w-full" onClick={handleRequestWithdrawal}>
                 <Banknote className="mr-2" /> Request Withdrawal
             </Button>
           </div>
@@ -83,7 +83,7 @@ export function WithdrawCard() {
                 </div>
               </div>
             )}
-            <Button className="w-full">Submit Request</Button>
+            <Button className="w-full" disabled={(userData?.totalBalance || 0) < 1000}>Submit Request</Button>
           </div>
         )}
       </CardContent>

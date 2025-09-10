@@ -1,14 +1,26 @@
+
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Clock, Gift, TrendingUp, Banknote, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
+import { useAuth } from '@/contexts/auth-context';
+import { db } from '@/lib/firebase';
+import { collection, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
+import { Skeleton } from '../ui/skeleton';
 
 type TransactionType = 'bonus' | 'investment' | 'earning' | 'withdrawal';
 
-const mockTransactions: any[] = [];
+interface Transaction {
+    id: string;
+    type: TransactionType;
+    amount: number;
+    description: string;
+    status: 'Completed' | 'Pending' | 'Rejected';
+    date: Date;
+}
 
 const getTransactionIcon = (type: string) => {
     switch(type) {
@@ -41,8 +53,40 @@ const getStatusBadgeVariant = (status: string) => {
 
 export function TransactionHistoryCard() {
   const [filter, setFilter] = useState<'all' | TransactionType>('all');
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
-  const filteredTransactions = mockTransactions.filter(transaction => 
+  useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    };
+
+    const transactionsColRef = collection(db, `users/${user.uid}/transactions`);
+    const q = query(transactionsColRef, orderBy('date', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const fetchedTransactions: Transaction[] = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                date: (data.date as Timestamp)?.toDate(),
+            } as Transaction;
+        });
+        setTransactions(fetchedTransactions);
+        setLoading(false);
+    }, (error) => {
+        console.error("Error fetching transactions: ", error);
+        setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+
+  const filteredTransactions = transactions.filter(transaction => 
     filter === 'all' || transaction.type === filter
   );
 
@@ -69,7 +113,13 @@ export function TransactionHistoryCard() {
             ))}
         </div>
         <div className="space-y-2">
-            {filteredTransactions.length > 0 ? (
+            {loading ? (
+                <div className="space-y-2">
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                </div>
+            ) : filteredTransactions.length > 0 ? (
                 filteredTransactions.map((transaction) => (
                     <div key={transaction.id} className="flex items-center justify-between p-3 rounded-lg bg-card border">
                         <div className="flex items-center gap-4">
@@ -78,7 +128,9 @@ export function TransactionHistoryCard() {
                             </div>
                             <div>
                                 <p className="font-semibold">{transaction.description}</p>
-                                <p className="text-xs text-muted-foreground">{transaction.date}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {transaction.date ? new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(transaction.date) : '...'}
+                                </p>
                             </div>
                         </div>
                         <div className='text-right'>

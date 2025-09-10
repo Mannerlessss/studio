@@ -11,7 +11,7 @@ import {
     User
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, addDoc } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Gem } from 'lucide-react';
@@ -47,7 +47,7 @@ interface AuthContextType {
   logOut: () => Promise<void>;
   redeemReferralCode: (code: string) => Promise<void>;
   updateUserPhone: (phone: string) => Promise<void>;
-  claimDailyBonus: (amount: number) => void;
+  claimDailyBonus: (amount: number) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,6 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     setUser(currentUser);
                     setUserData(userDocSnap.data() as UserData);
                 } else {
+                    // This case can happen if user is deleted from db but not from auth
                     await signOut(auth);
                     setUser(null);
                     setUserData(null);
@@ -258,22 +259,55 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
     
-    const claimDailyBonus = (amount: number) => {
-        if (!userData) return;
+    const claimDailyBonus = async (amount: number) => {
+        if (!user || !userData) return;
         
-        // This is a local update for the mock scenario.
-        // For a real app, this would be an update to Firestore.
-        const newUserData = {
-            ...userData,
-            earnings: userData.earnings + amount,
-            bonusEarnings: userData.bonusEarnings + amount,
-            totalBalance: userData.totalBalance + amount,
-        };
-        setUserData(newUserData);
-        toast({
-            title: 'Bonus Claimed!',
-            description: `You've received ${amount} Rs.`,
-        });
+        try {
+            const userDocRef = doc(db, 'users', user.uid);
+            const newBalance = userData.totalBalance + amount;
+            const newBonusEarnings = userData.bonusEarnings + amount;
+            const newEarnings = userData.earnings + amount;
+
+            const batch = writeBatch(db);
+            
+            // Update user's balance
+            batch.update(userDocRef, {
+                totalBalance: newBalance,
+                bonusEarnings: newBonusEarnings,
+                earnings: newEarnings,
+            });
+            
+            // Create a new transaction record
+            const transactionsColRef = collection(db, `users/${user.uid}/transactions`);
+            batch.set(doc(transactionsColRef), {
+                type: 'bonus',
+                amount: amount,
+                description: 'Daily Bonus Claim',
+                status: 'Completed',
+                date: serverTimestamp(),
+            });
+
+            await batch.commit();
+
+            // Update local state
+            setUserData({ 
+                ...userData,
+                totalBalance: newBalance,
+                bonusEarnings: newBonusEarnings,
+                earnings: newEarnings,
+            });
+
+            toast({
+                title: 'Bonus Claimed!',
+                description: `You've received ${amount} Rs.`,
+            });
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: 'Claim Failed',
+                description: 'Could not update your balance. Please try again.',
+            });
+        }
     }
 
     const value: AuthContextType = {
