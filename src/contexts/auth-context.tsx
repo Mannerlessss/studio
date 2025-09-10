@@ -60,47 +60,57 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { toast } = useToast();
 
      useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                const userDocRef = doc(db, 'users', user.uid);
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
+                    setUser(currentUser);
                     setUserData(userDocSnap.data() as UserData);
-                }
-                setUser(user);
-                 if (pathname === '/login') {
-                    router.push('/');
+                } else {
+                    // Handle case where user exists in auth but not in db
+                    setUser(null);
+                    setUserData(null);
                 }
             } else {
                 setUser(null);
                 setUserData(null);
-                router.push('/login');
             }
             setLoading(false);
         });
 
         return () => unsubscribe();
-    }, [router, pathname]);
+    }, []);
 
-    const handleSuccessfulLogin = async (user: User, referredByCode?: string) => {
-        const userDocRef = doc(db, 'users', user.uid);
+    useEffect(() => {
+        if (!loading) {
+            if (user && (pathname === '/login' || pathname === '/signup')) {
+                router.push('/');
+            } else if (!user && pathname !== '/login' && pathname !== '/signup') {
+                router.push('/login');
+            }
+        }
+    }, [user, loading, pathname, router]);
+
+    const handleSuccessfulLogin = async (loggedInUser: User, extraData?: { name?: string, phone?: string, referralCode?: string }) => {
+        const userDocRef = doc(db, 'users', loggedInUser.uid);
         const userDocSnap = await getDoc(userDocRef);
 
+        let finalUserData: UserData;
+
         if (userDocSnap.exists()) {
-            // User exists, update last login
             await updateDoc(userDocRef, {
                 lastLogin: serverTimestamp(),
             });
-            setUserData(userDocSnap.data() as UserData);
+            finalUserData = userDocSnap.data() as UserData;
         } else {
-            // New user, create document
-            const referralCode = `${(user.displayName || user.email?.split('@')[0] || 'USER').slice(0, 5).toUpperCase()}${Math.random().toString(36).substring(2, 6)}`;
+            const referralCode = `${(extraData?.name || loggedInUser.displayName || loggedInUser.email?.split('@')[0] || 'USER').slice(0, 5).toUpperCase()}${Math.random().toString(36).substring(2, 6)}`;
             
             const newUser: UserData = {
-                uid: user.uid,
-                name: user.displayName || 'Vault User',
-                email: user.email || '',
-                phone: user.phoneNumber || '',
+                uid: loggedInUser.uid,
+                name: extraData?.name || loggedInUser.displayName || 'Vault User',
+                email: loggedInUser.email || '',
+                phone: extraData?.phone || loggedInUser.phoneNumber || '',
                 referralCode,
                 membership: 'Basic',
                 rank: 'Bronze',
@@ -114,26 +124,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
             };
-
-            if (referredByCode) {
-                 const q = query(collection(db, "users"), where("referralCode", "==", referredByCode));
+            
+            if (extraData?.referralCode) {
+                 const q = query(collection(db, "users"), where("referralCode", "==", extraData.referralCode));
                  const querySnapshot = await getDocs(q);
                  if (!querySnapshot.empty) {
                      const referrerDoc = querySnapshot.docs[0];
                      newUser.referredBy = referrerDoc.id;
-                     newUser.usedReferralCode = referredByCode;
+                     newUser.usedReferralCode = extraData.referralCode;
                  } else {
                     toast({
                         variant: 'destructive',
                         title: 'Invalid Referral Code',
-                        description: `The code "${referredByCode}" is not valid.`,
+                        description: `The code "${extraData.referralCode}" is not valid.`,
                     });
                  }
             }
-
             await setDoc(userDocRef, newUser);
-            setUserData(newUser);
+            finalUserData = newUser;
         }
+        
+        setUser(loggedInUser);
+        setUserData(finalUserData);
         router.push('/');
     }
 
@@ -156,16 +168,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signUpWithEmail = async ({ name, email, password, phone, referralCode }: any) => {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
-            
-            const profileDetails = {
-                ...user,
-                displayName: name,
-                phoneNumber: phone
-            }
-
-            await handleSuccessfulLogin(profileDetails, referralCode);
-
+            await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
         } catch (error: any) {
             toast({
                 variant: 'destructive',
