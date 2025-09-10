@@ -91,6 +91,10 @@ export default {
          'spin-y': {
             'from': { transform: 'rotateY(0deg)' },
             'to': { transform: 'rotateY(360deg)' },
+        },
+        'sparkle': {
+            '0%, 100%': { opacity: '1', transform: 'scale(1)' },
+            '50%': { opacity: '0.5', transform: 'scale(1.2)' },
         }
       },
       animation: {
@@ -99,6 +103,7 @@ export default {
         'open-suitcase': 'open-suitcase 1s ease-in-out forwards',
         'shake': 'shake 0.5s ease-in-out',
         'spin-y': 'spin-y 2s linear infinite',
+        'sparkle': 'sparkle 1.5s ease-in-out infinite',
       },
       perspective: {
         '1000': '1000px',
@@ -131,3 +136,5 @@ export default {
     }
   ],
 } satisfies Config;
+
+    

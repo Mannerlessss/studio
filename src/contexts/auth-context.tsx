@@ -66,6 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setLoading(true);
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
@@ -352,13 +353,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return (
             <div className="flex flex-col items-center justify-center h-screen bg-background">
                 <div className="text-center p-4">
-                    <Gem className="w-16 h-16 text-primary animate-spin-y mb-6 mx-auto" />
                     <h1 className="text-3xl font-bold tracking-widest text-primary">
                         UPI BOOST VAULT
                     </h1>
                     <p className="text-md text-muted-foreground mt-4">
                         Your partner❤️ takes time to respond you so our dashboard is 😉
                     </p>
+                    <div className="relative w-16 h-16 mx-auto mt-6">
+                        <Gem className="w-16 h-16 text-primary animate-sparkle" />
+                    </div>
                 </div>
             </div>
         );
@@ -378,3 +381,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
