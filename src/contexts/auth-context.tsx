@@ -92,8 +92,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setIsInitialising(true);
             if (currentUser) {
+                setUser(currentUser);
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const unsubDoc = onSnapshot(userDocRef, async (userDocSnap) => {
                     if (userDocSnap.exists()) {
@@ -106,15 +106,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         await setDoc(userDocRef, newUser);
                         setUserData(newUser);
                     }
+                    setIsInitialising(false); // Stop loading once data is set/created
                 });
-                setUser(currentUser);
-                // Detach listener on cleanup
-                return () => unsubDoc();
+                 return () => unsubDoc();
             } else {
                 setUser(null);
                 setUserData(null);
+                setIsInitialising(false); // Stop loading if no user
             }
-            setIsInitialising(false);
         });
 
         return () => unsubscribe();
@@ -354,7 +353,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     if (isInitialising) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-background">
+             <div className="flex items-center justify-center min-h-screen bg-background">
                 <div className="text-center">
                     <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
                     <p className="text-lg text-muted-foreground">Loading VaultBoost...</p>
@@ -377,5 +376,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
