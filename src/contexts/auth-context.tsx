@@ -15,7 +15,6 @@ import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, addDoc } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { Gem } from 'lucide-react';
 
 interface UserData {
     uid: string;
@@ -58,7 +57,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [userData, setUserData] = useState<UserData | null>(null);
-    const [isInitialising, setIsInitialising] = useState(true);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
     const pathname = usePathname();
@@ -66,17 +64,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (isInitialising) setLoading(true);
+            setLoading(true);
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     const dbData = userDocSnap.data() as UserData;
                     setUserData(dbData);
-                    if(isInitialising) { // Only update login time on first load, not every data refresh
-                        await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-                    }
+                    await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
                 } else {
+                    // This case might happen if a user is in auth but not in DB.
+                    // For this app's logic, we log them out to force a clean profile creation.
                     await signOut(auth);
                 }
                 setUser(currentUser);
@@ -84,18 +82,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(null);
                 setUserData(null);
             }
-            if (isInitialising) {
-                setIsInitialising(false);
-            }
             setLoading(false);
         });
 
         return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
-        if (isInitialising) return;
+        if (loading) return;
 
         const isAuthPage = pathname.startsWith('/login');
         const isAdminPage = pathname.startsWith('/admin');
@@ -108,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (user && isAuthPage) {
             router.push('/');
         }
-    }, [user, isInitialising, pathname, router]);
+    }, [user, loading, pathname, router]);
 
 
     const handleSuccessfulLogin = async (loggedInUser: User, extraData?: { name?: string, phone?: string, referralCode?: string }) => {
@@ -159,7 +153,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             await setDoc(userDocRef, newUser);
         }
-        // State will be set by onAuthStateChanged
     }
 
     const signInWithGoogle = async () => {
@@ -338,7 +331,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const value: AuthContextType = {
         user,
         userData,
-        loading: isInitialising || loading,
+        loading: loading,
         signInWithGoogle,
         signUpWithEmail,
         signInWithEmail,
@@ -349,7 +342,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    if (isInitialising) {
+    if (loading) {
         return (
             <div className="flex flex-col items-center justify-center h-screen bg-background">
                 <div className="text-center p-4">
@@ -359,7 +352,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     <p className="text-md text-muted-foreground mt-4">
                         Your partner❤️ takes time to respond you so our dashboard is 😉
                     </p>
-                    <Gem className="w-16 h-16 text-primary animate-sparkle mx-auto mt-6" />
                 </div>
             </div>
         );
@@ -367,19 +359,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return (
         <AuthContext.Provider value={value}>
-            {loading ? (
-                 <div className="flex flex-col items-center justify-center h-screen bg-background">
-                    <div className="text-center p-4">
-                        <h1 className="text-3xl font-bold tracking-widest text-primary">
-                            UPI BOOST VAULT
-                        </h1>
-                        <p className="text-md text-muted-foreground mt-4">
-                            Your partner❤️ takes time to respond you so our dashboard is 😉
-                        </p>
-                        <Gem className="w-16 h-16 text-primary animate-sparkle mx-auto mt-6" />
-                    </div>
-                </div>
-            ) : children}
+            {children}
         </AuthContext.Provider>
     );
 };
