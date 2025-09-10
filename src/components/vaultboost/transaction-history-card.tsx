@@ -8,48 +8,7 @@ import { Button } from '../ui/button';
 
 type TransactionType = 'bonus' | 'investment' | 'earning' | 'withdrawal';
 
-const mockTransactions = [
-    {
-        id: 1,
-        type: 'bonus' as TransactionType,
-        description: 'Daily Bonus Claim',
-        date: '2024-09-05 10:30',
-        amount: 5,
-        status: 'Completed'
-    },
-    {
-        id: 2,
-        type: 'investment' as TransactionType,
-        description: 'Invested in Plan 300',
-        date: '2024-09-04 15:00',
-        amount: -300,
-        status: 'Completed'
-    },
-    {
-        id: 3,
-        type: 'earning' as TransactionType,
-        description: 'Daily Earning from Plan 300',
-        date: '2024-09-05 08:00',
-        amount: 30,
-        status: 'Completed'
-    },
-     {
-        id: 4,
-        type: 'withdrawal' as TransactionType,
-        description: 'Withdrawal Request',
-        date: '2024-09-03 11:00',
-        amount: -1200,
-        status: 'Pending'
-    },
-    {
-        id: 5,
-        type: 'earning' as TransactionType,
-        description: 'Daily Earning from Plan 1000',
-        date: '2024-09-06 08:00',
-        amount: 100,
-        status: 'Completed'
-    },
-];
+const mockTransactions: any[] = [];
 
 const getTransactionIcon = (type: string) => {
     switch(type) {
