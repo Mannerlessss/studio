@@ -65,6 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setLoading(true);
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
@@ -72,6 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const dbData = userDocSnap.data() as UserData;
                     setUserData(dbData);
                     setUser(currentUser);
+                    await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
                 } else {
                     // This can happen if user is deleted from db but not from auth
                     await signOut(auth);
@@ -90,15 +92,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     useEffect(() => {
-        if (!loading) {
-            const isAuthPage = pathname.startsWith('/login');
-            const isAdminPage = pathname.startsWith('/admin');
+        if (loading) return;
 
-            if (!user && !isAuthPage && !isAdminPage) {
-                router.push('/login');
-            } else if (user && isAuthPage) {
-                router.push('/');
-            }
+        const isAuthPage = pathname.startsWith('/login');
+        const isAdminPage = pathname.startsWith('/admin');
+        const isPublicPage = ['/terms', '/privacy'].includes(pathname);
+
+        if (isPublicPage || isAdminPage) return;
+
+        if (!user && !isAuthPage) {
+            router.push('/login');
+        } else if (user && isAuthPage) {
+            router.push('/');
         }
     }, [user, loading, pathname, router]);
 
@@ -108,13 +113,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, 'users', loggedInUser.uid);
         const userDocSnap = await getDoc(userDocRef);
 
-        let finalUserData: UserData;
-
         if (userDocSnap.exists()) {
-            await updateDoc(userDocRef, {
+             // Data will be fetched by onAuthStateChanged, just update last login
+             await updateDoc(userDocRef, {
                 lastLogin: serverTimestamp(),
             });
-            finalUserData = userDocSnap.data() as UserData;
         } else {
              const referralCode = `${(extraData?.name || loggedInUser.displayName || loggedInUser.email?.split('@')[0] || 'USER').slice(0, 5).toUpperCase()}${Math.random().toString(36).substring(2, 6)}`;
             
@@ -153,19 +156,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                  }
             }
             await setDoc(userDocRef, newUser);
-            finalUserData = newUser;
         }
-        
-        setUserData(finalUserData);
-        setUser(loggedInUser);
-        // setLoading will be handled by the onAuthStateChanged listener's flow
+        // onAuthStateChanged will handle setting state and loading
     }
 
     const signInWithGoogle = async () => {
+        setLoading(true);
         const provider = new GoogleAuthProvider();
         try {
             const result = await signInWithPopup(auth, provider);
             await handleSuccessfulLogin(result.user);
+            // No redirect here, onAuthStateChanged handles it
         } catch (error: any) {
             if (error.code !== 'auth/popup-closed-by-user') {
                 toast({
@@ -174,10 +175,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     description: error.message,
                 });
             }
+            setLoading(false);
         }
     };
 
     const signUpWithEmail = async ({ name, email, password, phone, referralCode }: any) => {
+        setLoading(true);
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
@@ -187,10 +190,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-Up Failed',
                 description: error.message,
             });
+            setLoading(false);
         }
     };
 
     const signInWithEmail = async ({ email, password }: any) => {
+        setLoading(true);
         try {
             const result = await signInWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(result.user);
@@ -200,19 +205,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Login Failed',
                 description: error.message,
             });
+            setLoading(false);
         }
     };
 
     const logOut = async () => {
+        setLoading(true);
         try {
             await signOut(auth);
-            // onAuthStateChanged will handle state updates and redirection
         } catch (error: any) {
              toast({
                 variant: 'destructive',
                 title: 'Logout Failed',
                 description: error.message,
             });
+        } finally {
+            // State updates will be triggered by onAuthStateChanged
         }
     };
 
@@ -371,3 +379,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
