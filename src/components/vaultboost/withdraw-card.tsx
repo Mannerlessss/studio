@@ -28,18 +28,18 @@ export function WithdrawCard() {
       <CardContent>
         {!showWithdrawForm ? (
           <div className='space-y-4'>
-            <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                    Minimum withdrawal is 1000 Rs. Withdrawal will be transferred within 24 to 48 hours.
-                </AlertDescription>
-            </Alert>
             <Button className="w-full" onClick={handleRequestWithdrawal} disabled={(userData?.totalBalance || 0) < 1000}>
                 <Banknote className="mr-2" /> Request Withdrawal
             </Button>
           </div>
         ) : (
           <div className="space-y-6">
+             <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                    Minimum withdrawal is 1000 Rs. Withdrawal will be transferred within 24 to 48 hours.
+                </AlertDescription>
+            </Alert>
              {userData?.name && (
                 <Alert variant="default" className="border-green-500/50 text-green-700 dark:text-green-400">
                     <ShieldCheck className="h-4 w-4 !text-green-500" />
