@@ -1,4 +1,5 @@
 
+'use client';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { CircleUser, Gem, Search } from 'lucide-react';
@@ -13,8 +14,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { AdminBottomNav } from '@/components/vaultboost/admin-bottom-nav';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
+  const { logOut } = useAuth();
+
   return (
     <div className="flex min-h-screen w-full flex-col">
       <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 z-10">
@@ -51,7 +55,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <DropdownMenuItem>Settings</DropdownMenuItem>
               <DropdownMenuItem>Support</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Logout</DropdownMenuItem>
+              <DropdownMenuItem onClick={logOut}>Logout</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
