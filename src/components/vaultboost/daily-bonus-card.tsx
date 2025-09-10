@@ -3,7 +3,7 @@
 import { FC, useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Briefcase, Gift } from 'lucide-react';
+import { Briefcase, Gift, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -34,6 +34,7 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
   const [gameState, setGameState] = useState<'ready' | 'picked' | 'revealed'>('ready');
   const [userChoiceIndex, setUserChoiceIndex] = useState<number | null>(null);
   const [prizes, setPrizes] = useState<number[]>([]);
+  const [isCollecting, setIsCollecting] = useState(false);
 
   const wonAmount = useMemo(() => {
     if (userChoiceIndex !== null) {
@@ -86,6 +87,7 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
     setPrizes(shuffle([...prizeAmounts]));
     setGameState('ready');
     setUserChoiceIndex(null);
+    setIsCollecting(false);
   };
   
   const handleSuitcasePick = (index: number) => {
@@ -100,8 +102,9 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
   };
 
   const handleCollect = () => {
-    if (gameState !== 'revealed' || wonAmount === null) return;
+    if (gameState !== 'revealed' || wonAmount === null || isCollecting) return;
     
+    setIsCollecting(true);
     onBonusClaim(wonAmount);
     setBonusAvailable(false); // UI will update via useEffect on next render
   }
@@ -138,7 +141,7 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
                       onClick={() => handleSuitcasePick(index)}
                       disabled={gameState !== 'ready'}
                       className={cn(
-                        "w-full h-20 preserve-3d transition-transform duration-1000",
+                        "w-full h-16 md:h-20 preserve-3d transition-transform duration-1000",
                         isRevealed ? 'rotate-y-180' : ''
                       )}
                     >
@@ -164,8 +167,8 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
             </div>
             
             {gameState === 'revealed' && (
-              <Button onClick={handleCollect} size="lg" className="animate-bounce mt-6">
-                Collect {wonAmount} Rs.
+              <Button onClick={handleCollect} size="lg" className="animate-bounce mt-6" disabled={isCollecting}>
+                {isCollecting ? <Loader2 className="animate-spin" /> : `Collect ${wonAmount} Rs.`}
               </Button>
             )}
           </>
