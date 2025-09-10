@@ -20,8 +20,11 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [bonusAvailable, setBonusAvailable] = useState<boolean>(false);
   const [claimedAmount, setClaimedAmount] = useState<number | null>(null);
-  const [isSpinning, setIsSpinning] = useState(false);
+  
+  const [gameState, setGameState] = useState<'ready' | 'spinning' | 'spun' | 'collected'>('ready');
   const [spinResult, setSpinResult] = useState(0);
+  const [prize, setPrize] = useState<number | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
     // Timer reset: The line below is commented out to always show the game for testing.
@@ -30,16 +33,18 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
     const storedClaimedAmount = localStorage.getItem('lastClaimedAmount');
     if (storedLastClaim) {
       setLastClaim(Number(storedLastClaim));
+      setGameState('collected');
       if(storedClaimedAmount) {
         setClaimedAmount(Number(storedClaimedAmount));
       }
     } else {
       setBonusAvailable(true);
+      setGameState('ready');
     }
   }, []);
 
   useEffect(() => {
-    if (lastClaim === null) return;
+    if (gameState !== 'collected' || lastClaim === null) return;
 
     const interval = setInterval(() => {
       const now = Date.now();
@@ -50,6 +55,8 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
         setBonusAvailable(true);
         setTimeRemaining('');
         setClaimedAmount(null);
+        setGameState('ready');
+        setPrize(null);
         localStorage.removeItem('lastClaimedAmount');
         clearInterval(interval);
       } else {
@@ -67,59 +74,102 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [lastClaim]);
+  }, [gameState, lastClaim]);
 
   const handleSpin = () => {
-    if (!bonusAvailable || isSpinning) return;
+    if (gameState !== 'ready') return;
 
-    setIsSpinning(true);
+    setGameState('spinning');
     const randomIndex = Math.floor(Math.random() * prizes.length);
     const prizeAmount = prizes[randomIndex];
     
-    // Calculate rotation: 360 * fullSpins + segmentAngle
     const fullSpins = 5;
     const segmentAngle = 360 / prizes.length;
     const prizeAngle = randomIndex * segmentAngle;
-    const randomOffset = Math.random() * segmentAngle * 0.8 - (segmentAngle * 0.4); // Add some randomness within the segment
+    const randomOffset = Math.random() * segmentAngle * 0.8 - (segmentAngle * 0.4);
     const totalRotation = (360 * fullSpins) + prizeAngle + randomOffset;
 
     setSpinResult(totalRotation);
 
     setTimeout(() => {
-      onBonusClaim(prizeAmount);
-      const now = Date.now();
-      setLastClaim(now);
-      localStorage.setItem('lastBonusClaim', String(now));
-      localStorage.setItem('lastClaimedAmount', String(prizeAmount));
-      setBonusAvailable(false);
-      setClaimedAmount(prizeAmount);
-      setIsSpinning(false);
+      setPrize(prizeAmount);
+      setGameState('spun');
     }, 4000); // Corresponds to the animation duration
   };
 
+  const handleCollect = () => {
+    if (gameState !== 'spun' || prize === null) return;
+    
+    setShowConfetti(true);
+
+    setTimeout(() => {
+      onBonusClaim(prize);
+      const now = Date.now();
+      setLastClaim(now);
+      localStorage.setItem('lastBonusClaim', String(now));
+      localStorage.setItem('lastClaimedAmount', String(prize));
+      
+      setClaimedAmount(prize);
+      setBonusAvailable(false);
+      setGameState('collected');
+      setShowConfetti(false);
+    }, 1500); // Confetti animation duration
+  }
+
+  const Confetti = () => (
+    <div className="absolute inset-0 pointer-events-none">
+      {[...Array(50)].map((_, i) => (
+        <div 
+          key={i}
+          className="absolute w-2 h-2 bg-yellow-400 rounded-full animate-confetti"
+          style={{
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * -50}%`,
+            animationDelay: `${Math.random() * 1.5}s`,
+            backgroundColor: ['#fde047', '#f97316', '#22c55e', '#3b82f6'][i % 4]
+          }}
+        />
+      ))}
+    </div>
+  );
+
   return (
-    <Card className="shadow-md">
+    <Card className="shadow-md overflow-hidden">
       <CardHeader>
         <div className="flex items-center gap-3">
           <Gift className="w-6 h-6 text-accent" />
           <CardTitle className="text-lg font-semibold">Daily Bonus Game</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="text-center flex flex-col items-center justify-center space-y-4">
-        {bonusAvailable ? (
+      <CardContent className="text-center flex flex-col items-center justify-center space-y-4 relative">
+        {showConfetti && <Confetti />}
+
+        {gameState === 'collected' ? (
+           <>
+            {claimedAmount !== null && (
+              <p className="text-lg font-semibold text-accent mb-2">
+                You won {claimedAmount} Rs!
+              </p>
+            )}
+             <p className="text-muted-foreground">
+              Come back in <span className="font-semibold text-primary">{timeRemaining}</span> for another spin.
+            </p>
+          </>
+        ) : (
           <>
             <div className="relative w-64 h-64 flex items-center justify-center mb-4">
-              {/* Pointer */}
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20" style={{ filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))' }}>
                  <div className="w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-[16px] border-t-white"></div>
               </div>
               
-              {/* Wheel */}
               <div
-                className="relative w-60 h-60 rounded-full border-4 border-primary/50 shadow-inner overflow-hidden transition-transform duration-[4000ms] ease-out"
+                className={cn(
+                  "relative w-60 h-60 rounded-full border-4 border-primary/50 shadow-inner overflow-hidden",
+                  gameState === 'spinning' && "transition-transform duration-[4000ms] ease-out"
+                )}
                 style={{ transform: `rotate(${spinResult}deg)` }}
               >
-                {prizes.map((prize, index) => (
+                {prizes.map((p, index) => (
                   <div
                     key={index}
                     className={cn(
@@ -132,37 +182,34 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
                     }}
                   >
                     <span
-                      className="text-white font-bold text-lg -rotate-45 translate-y-2"
+                      className="text-white font-bold text-lg"
                       style={{ transform: `rotate(${(360/prizes.length)/2 - 90}deg) translate(40px, 0px)` }}
                     >
-                      {prize}
+                      {p}
                     </span>
                   </div>
                 ))}
               </div>
-               {/* Center Circle */}
               <div className="absolute w-16 h-16 rounded-full bg-card border-4 border-primary flex items-center justify-center text-primary z-10">
                 <Zap className="w-8 h-8" />
               </div>
             </div>
 
-            <p className="text-muted-foreground">
-              Click the button to spin the wheel for your daily bonus!
-            </p>
-            <Button onClick={handleSpin} disabled={isSpinning}>
-              {isSpinning ? 'Spinning...' : 'Spin Now'}
-            </Button>
-          </>
-        ) : (
-          <>
-            {claimedAmount !== null && (
-              <p className="text-lg font-semibold text-accent mb-2">
-                You won {claimedAmount} Rs!
-              </p>
+            {gameState === 'ready' && (
+              <>
+              <p className="text-muted-foreground">Click the button to spin the wheel for your daily bonus!</p>
+              <Button onClick={handleSpin}>Spin Now</Button>
+              </>
             )}
-             <p className="text-muted-foreground">
-              Come back in <span className="font-semibold text-primary">{timeRemaining}</span> for another spin.
-            </p>
+            {gameState === 'spinning' && (
+              <p className="text-muted-foreground animate-pulse">Spinning for a prize...</p>
+            )}
+            {gameState === 'spun' && prize !== null && (
+              <>
+                <p className="text-muted-foreground">Congratulations! You won:</p>
+                <Button onClick={handleCollect} size="lg" className='animate-bounce'>Collect {prize} Rs.</Button>
+              </>
+            )}
           </>
         )}
       </CardContent>
