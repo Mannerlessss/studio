@@ -18,8 +18,9 @@ import { ProfileCompletionCard } from '@/components/vaultboost/profile-completio
 const Dashboard: NextPage = () => {
   const { userData, loading, claimDailyBonus } = useAuth();
 
+  // The AuthProvider now handles redirection, so this check is for graceful UI rendering.
   if (loading || !userData) {
-      return null; // AuthProvider handles redirection, so we just wait.
+      return null;
   }
   
   const handleBonusClaim = (amount: number) => {
@@ -70,3 +71,5 @@ const Dashboard: NextPage = () => {
 };
 
 export default Dashboard;
+
+    

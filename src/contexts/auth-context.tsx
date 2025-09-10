@@ -65,7 +65,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setLoading(true); // Start loading whenever auth state changes
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
@@ -86,10 +85,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             } else {
                 setUser(null);
                 setUserData(null);
-                if (pathname !== '/login') {
+                if (pathname !== '/login' && !pathname.startsWith('/admin')) {
                     router.push('/login');
                 }
             }
+            // Set loading to false only after all async operations are done
             setLoading(false);
         });
 
@@ -150,9 +150,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             finalUserData = newUser;
         }
         
-        setUserData(finalUserData);
-        setUser(loggedInUser);
-        router.push('/');
+        // onAuthStateChanged will handle setting state and routing
     }
 
     const signInWithGoogle = async () => {
@@ -161,6 +159,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(true);
             const result = await signInWithPopup(auth, provider);
             await handleSuccessfulLogin(result.user);
+            // No redirect here, onAuthStateChanged will handle it
         } catch (error: any) {
             if (error.code !== 'auth/popup-closed-by-user') {
                 toast({
@@ -178,6 +177,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(true);
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
+             // No redirect here, onAuthStateChanged will handle it
         } catch (error: any) {
             toast({
                 variant: 'destructive',
@@ -193,8 +193,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(true);
             const result = await signInWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(result.user);
+            // No redirect here, onAuthStateChanged will handle it
         } catch (error: any) {
-             toast({
+            toast({
                 variant: 'destructive',
                 title: 'Login Failed',
                 description: error.message,
@@ -206,9 +207,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logOut = async () => {
         try {
             await signOut(auth);
-            setUser(null);
-            setUserData(null);
-            router.push('/login');
+            // onAuthStateChanged will handle state updates and redirection
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -345,8 +344,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    // The loading screen is now more robust. It will only show children when loading is false.
-    // The redirection logic is handled by the onAuthStateChanged listener.
     if (loading) {
          return (
             <div className="flex items-center justify-center h-screen bg-background">
@@ -358,12 +355,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
     }
 
-    // Don't render children if we're on the login page, as the logic there is self-contained.
-    // Also, don't render children if we are loading, as that will be the loading screen.
-    // This prevents components from trying to access user data that doesn't exist yet.
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 };
