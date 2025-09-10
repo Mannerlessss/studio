@@ -12,7 +12,7 @@ import {
     sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, Timestamp, onSnapshot, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, Timestamp, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Gem } from 'lucide-react';
@@ -67,7 +67,6 @@ const createNewUserData = (user: User, extraData?: { name?: string, phone?: stri
     email: user.email || '',
     phone: extraData?.phone || user.phoneNumber || '',
     referralCode: generateReferralCode(extraData?.name || user.displayName || 'USER'),
-    usedReferralCode: extraData?.referralCode || '',
     membership: 'Basic',
     rank: 'Bronze',
     totalBalance: 0,
@@ -93,31 +92,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { toast } = useToast();
 
      useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        let unsubscribeDoc: Unsubscribe | undefined;
+
+        const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+            if (unsubscribeDoc) {
+                unsubscribeDoc();
+            }
+
             if (currentUser) {
                 setUser(currentUser);
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 
-                const unsubDoc = onSnapshot(userDocRef, async (userDocSnap) => {
+                unsubscribeDoc = onSnapshot(userDocRef, async (userDocSnap) => {
                     if (userDocSnap.exists()) {
                         const dbData = userDocSnap.data() as UserData;
                         setUserData(dbData);
-                         if (dbData.lastLogin) { // Only update if not the first login
-                            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-                        }
                     } else {
-                        // This case handles sign-in where a user exists in Auth but not Firestore.
-                        // For example, Google Sign in for the first time.
-                        const newUser = createNewUserData(currentUser);
-                        await setDoc(userDocRef, newUser);
-                        setUserData(newUser); 
+                        // This case is for when the doc doesn't exist, which happens during signup
+                        // The user data will be created by the signup function.
+                        // We set it to null initially.
+                        setUserData(null);
                     }
                     setIsInitialising(false);
                 }, (error) => {
                     console.error("Auth Snapshot Error:", error);
                     setIsInitialising(false);
                 });
-                 return () => unsubDoc();
             } else {
                 setUser(null);
                 setUserData(null);
@@ -125,7 +125,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
-        return () => unsubscribe();
+        return () => {
+            unsubscribeAuth();
+            if (unsubscribeDoc) {
+                unsubscribeDoc();
+            }
+        };
     }, []);
 
     useEffect(() => {
@@ -138,6 +143,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (isPublicPage) return;
 
         if (user) {
+            // Update last login timestamp only if userData is loaded
+            if (userData) {
+                 const userDocRef = doc(db, 'users', user.uid);
+                 updateDoc(userDocRef, { lastLogin: serverTimestamp() }).catch(err => console.error("Failed to update last login", err));
+            }
+
             if (user.email === ADMIN_EMAIL) {
                 if (!isAdminPage) router.push('/admin');
             } else {
@@ -155,15 +166,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, 'users', loggedInUser.uid);
         const newUser = createNewUserData(loggedInUser, extraData);
         
-        // The referral code is now just stored, not validated here.
-        // Validation happens when the user *redeems* a code on the settings page.
         if (extraData.referralCode) {
             newUser.usedReferralCode = extraData.referralCode.toUpperCase();
         }
 
         await setDoc(userDocRef, newUser);
-        setUser(loggedInUser);
-        // The onSnapshot listener will pick up the new user data.
     }
 
     const signInWithGoogle = async () => {
@@ -171,7 +178,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             await signInWithPopup(auth, provider);
-            // onAuthStateChanged will handle data creation/update
         } catch (error: any) {
             if (error.code !== 'auth/popup-closed-by-user') {
                 toast({
@@ -252,8 +258,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             referredBy: referrerDoc.id,
         });
         
-        const referrerReferralsRef = collection(db, 'users', referrerDoc.id, 'referrals');
-        batch.set(doc(referrerReferralsRef), {
+        const referrerReferralsRef = doc(collection(db, 'users', referrerDoc.id, 'referrals', user.uid));
+        batch.set(referrerReferralsRef, {
             userId: user.uid,
             name: userData.name,
             email: userData.email,
@@ -388,5 +394,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    

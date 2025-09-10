@@ -1,3 +1,5 @@
+
+'use client';
 import type { FC } from 'react';
 import { Crown, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
