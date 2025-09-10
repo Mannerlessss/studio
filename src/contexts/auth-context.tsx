@@ -65,7 +65,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setLoading(true);
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
@@ -178,8 +177,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     description: error.message,
                 });
             }
-        } finally {
-            setLoading(false);
+            setLoading(false); // ensure loading is false on error
         }
     };
 
@@ -194,8 +192,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-Up Failed',
                 description: error.message,
             });
-        } finally {
-            setLoading(false);
+            setLoading(false); // ensure loading is false on error
         }
     };
 
@@ -210,8 +207,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Login Failed',
                 description: error.message,
             });
-        } finally {
-            setLoading(false);
+            setLoading(false); // ensure loading is false on error
         }
     };
 
@@ -355,7 +351,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    if (loading && !user) {
+    if (loading) {
          return (
             <div className="flex items-center justify-center h-screen bg-background">
                 <div className="text-center">
