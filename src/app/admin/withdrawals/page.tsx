@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collectionGroup, doc, getDocs, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
+import { collectionGroup, doc, getDocs, updateDoc, writeBatch, getDoc, query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface WithdrawalRequest {
@@ -50,7 +50,8 @@ export default function WithdrawalsPage() {
         const fetchWithdrawals = async () => {
             setLoading(true);
             try {
-                const withdrawalsSnapshot = await getDocs(collectionGroup(db, 'withdrawals'));
+                const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'));
+                const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
                 const requests: WithdrawalRequest[] = [];
                 withdrawalsSnapshot.forEach(doc => {
                     requests.push({ 
@@ -69,7 +70,7 @@ export default function WithdrawalsPage() {
                 setWithdrawals(requests);
             } catch (error: any) {
                 console.error("Error fetching withdrawals: ", error);
-                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch withdrawal requests.' });
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch withdrawal requests. Check permissions.' });
             } finally {
                 setLoading(false);
             }
@@ -216,5 +217,3 @@ export default function WithdrawalsPage() {
     </Card>
   );
 }
-
-    

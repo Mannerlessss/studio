@@ -1,50 +1,43 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if the user is an admin
+    
     function isAdmin() {
-      return request.auth.token.email == 'gagansharma.gs107@gmail.com';
+      return request.auth != null && request.auth.token.email == "gagansharma.gs107@gmail.com";
     }
 
-    // Rules for the main 'users' collection
+    // Rules for the users collection
     match /users/{userId} {
-      // ANY authenticated user can CREATE their own user document during signup
-      allow create: if request.auth != null;
+      // Admins can read/write any user document.
+      // Users can only read/write their own document.
+      allow read, write: if request.auth.uid == userId || isAdmin();
 
-      // Users can READ and UPDATE their own data.
-      // The ADMIN can READ and UPDATE any user's data.
-      allow read, update: if request.auth.uid == userId || isAdmin();
-      
-      // The ADMIN can LIST all users. Regular users cannot.
-      allow list: if isAdmin();
-
-      // Rules for subcollections within a user document
-      match /{allPaths=**} {
-         // The ADMIN can read/write to any subcollection document for any user.
-        allow read, write: if isAdmin();
-      }
-
-      // Users can access their own subcollections
+      // Rules for transactions subcollection
       match /transactions/{transactionId} {
-        allow read, list, create: if request.auth.uid == userId;
+        allow read, write: if request.auth.uid == userId || isAdmin();
       }
-      match /referrals/{referralId} {
-         allow read, list, create: if request.auth.uid == userId;
-      }
-      match /withdrawals/{withdrawalId} {
-         allow read, list, create: if request.auth.uid == userId;
-         // Admin can also update (approve/reject) withdrawals
-         allow update: if isAdmin();
+
+      // Rules for referrals subcollection
+       match /referrals/{referralId} {
+        allow read, write: if request.auth.uid == userId || isAdmin();
       }
     }
+    
+    // Grant admin ability to LIST all users, which is required for the admin user table
+    match /users {
+        allow list: if isAdmin();
+    }
+    
+    // Grant admin ability to LIST all withdrawals from any user
+    match /{path=**}/withdrawals/{withdrawalId} {
+      allow read: if isAdmin();
+    }
 
-    // Rules for the 'offers' collection
+    // Rules for the offers collection
     match /offers/{offerId} {
-      // Only the admin can create, read, update, list, or delete offers.
-      allow read, write, list, delete: if isAdmin();
+      // Only admins can read, list, and write to the offers collection.
+      allow list, read, write: if isAdmin();
     }
   }
 }
