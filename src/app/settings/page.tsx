@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import type { NextPage } from 'next';
@@ -144,7 +143,7 @@ const SettingsPage: NextPage = () => {
             <div className="space-y-2">
               <Label htmlFor="full-name">Full Name</Label>
                <div className="flex gap-2">
-                <Input id="full-name" placeholder="Enter your full name" value={name} onChange={(e) => setName(e.target.value)} disabled={isUpdatingName} />
+                <Input id="full-name" placeholder="Enter your full name" value={name} onChange={(e) => setName(e.target.value)} />
                 <Button onClick={handleUpdateName} disabled={isUpdatingName || !name || name === userData?.name}>
                   {isUpdatingName ? <Loader2 className="animate-spin"/> : 'Update'}
                 </Button>
@@ -153,7 +152,7 @@ const SettingsPage: NextPage = () => {
             <div className="space-y-2">
               <Label htmlFor="phone-number">Phone Number</Label>
               <div className="flex gap-2">
-                <Input id="phone-number" placeholder="Enter your phone number" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={isUpdatingPhone} />
+                <Input id="phone-number" placeholder="Enter your phone number" value={phone} onChange={(e) => setPhone(e.target.value)} />
                 <Button onClick={handleUpdatePhone} disabled={isUpdatingPhone || !phone || phone === userData?.phone}>
                   {isUpdatingPhone ? <Loader2 className="animate-spin"/> : 'Update'}
                 </Button>
