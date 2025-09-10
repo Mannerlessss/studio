@@ -12,7 +12,7 @@ import {
     sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, Timestamp } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Gem } from 'lucide-react';
@@ -34,6 +34,8 @@ interface UserData {
     referralEarnings: number;
     bonusEarnings: number;
     investmentEarnings: number;
+    hasInvested: boolean; // New field
+    lastBonusClaim?: Timestamp;
     createdAt: any;
     lastLogin: any;
 }
@@ -73,6 +75,7 @@ const createNewUserData = (user: User, extraData?: { name?: string, phone?: stri
     referralEarnings: 0,
     bonusEarnings: 0,
     investmentEarnings: 0,
+    hasInvested: false,
     createdAt: serverTimestamp(),
     lastLogin: serverTimestamp(),
 });
@@ -92,20 +95,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setIsInitialising(true);
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
-                const userDocSnap = await getDoc(userDocRef);
-
-                if (userDocSnap.exists()) {
-                    const dbData = userDocSnap.data() as UserData;
-                    setUserData(dbData);
-                    await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-                } else {
-                    // Document doesn't exist, so create it.
-                    const newUser = createNewUserData(currentUser);
-                    await setDoc(userDocRef, newUser);
-                    setUserData(newUser);
-                }
+                const unsubDoc = onSnapshot(userDocRef, async (userDocSnap) => {
+                    if (userDocSnap.exists()) {
+                        const dbData = userDocSnap.data() as UserData;
+                        setUserData(dbData);
+                        await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+                    } else {
+                        // Document doesn't exist, so create it.
+                        const newUser = createNewUserData(currentUser);
+                        await setDoc(userDocRef, newUser);
+                        setUserData(newUser);
+                    }
+                });
                 setUser(currentUser);
-
+                // Detach listener on cleanup
+                return () => unsubDoc();
             } else {
                 setUser(null);
                 setUserData(null);
@@ -171,7 +175,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const signInWithGoogle = async () => {
-        // This function is not used since the button was removed, but we keep it for completeness.
         const provider = new GoogleAuthProvider();
         setLoading(true);
         try {
@@ -210,7 +213,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            // onAuthStateChanged will handle the rest
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -243,7 +245,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         const batch = writeBatch(db);
-        const q = query(collection(db, "users"), where("referralCode", "==", code));
+        const q = query(collection(db, "users"), where("referralCode", "==", code.toUpperCase()));
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty || querySnapshot.docs[0].id === user.uid) {
@@ -254,13 +256,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         const userDocRef = doc(db, 'users', user.uid);
         batch.update(userDocRef, {
-            usedReferralCode: code,
+            usedReferralCode: code.toUpperCase(),
             referredBy: referrerDoc.id,
         });
 
-        setUserData({ ...userData, usedReferralCode: code, referredBy: referrerDoc.id });
-
         await batch.commit();
+        // The onSnapshot listener will update the local state automatically
     };
 
     const updateUserPhone = async (phone: string) => {
@@ -268,7 +269,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const userDocRef = doc(db, 'users', user.uid);
             await updateDoc(userDocRef, { phone });
-            setUserData(prev => prev ? { ...prev, phone } : null);
+            // State updates via onSnapshot
             toast({
                 title: 'Success!',
                 description: 'Your phone number has been updated.',
@@ -288,16 +289,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         try {
             const userDocRef = doc(db, 'users', user.uid);
-            const newBalance = userData.totalBalance + amount;
-            const newBonusEarnings = userData.bonusEarnings + amount;
-            const newEarnings = userData.earnings + amount;
-
             const batch = writeBatch(db);
             
             batch.update(userDocRef, {
-                totalBalance: newBalance,
-                bonusEarnings: newBonusEarnings,
-                earnings: newEarnings,
+                totalBalance: (userData.totalBalance || 0) + amount,
+                bonusEarnings: (userData.bonusEarnings || 0) + amount,
+                earnings: (userData.earnings || 0) + amount,
+                lastBonusClaim: serverTimestamp(),
             });
             
             const transactionsColRef = collection(db, `users/${user.uid}/transactions`);
@@ -310,13 +308,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
 
             await batch.commit();
-
-            setUserData({ 
-                ...userData,
-                totalBalance: newBalance,
-                bonusEarnings: newBonusEarnings,
-                earnings: newEarnings,
-            });
 
             toast({
                 title: 'Bonus Claimed!',

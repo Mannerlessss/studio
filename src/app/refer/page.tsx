@@ -1,5 +1,6 @@
 
 'use client';
+import { useState, useEffect } from 'react';
 import type { NextPage } from 'next';
 import { Header } from '@/components/vaultboost/header';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
@@ -10,13 +11,42 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { LeaderboardCard } from '@/components/vaultboost/leaderboard-card';
+import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const ReferPage: NextPage = () => {
     const { toast } = useToast();
-    const { userData } = useAuth();
-    const referralCode = userData?.referralCode || 'REFCODE';
+    const { user, userData } = useAuth();
+    const [referralStats, setReferralStats] = useState({
+        totalReferred: 0,
+        successfullyInvested: 0,
+    });
+    const [loadingStats, setLoadingStats] = useState(true);
+    
+    const referralCode = userData?.referralCode || '...';
     const referralLink = `https://vaultboost.app/ref/${referralCode}`;
     const shareMessage = `Check out VaultBoost! I'm earning money by investing. Join using my code and you can earn too! My referral code is ${referralCode}. Link: ${referralLink}`;
+
+    useEffect(() => {
+        if (!user) return;
+
+        const q = query(collection(db, "users"), where("referredBy", "==", user.uid));
+        
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const referredUsers = querySnapshot.docs.map(doc => doc.data());
+            const totalReferred = referredUsers.length;
+            const successfullyInvested = referredUsers.filter(u => u.hasInvested).length;
+            
+            setReferralStats({
+                totalReferred,
+                successfullyInvested
+            });
+            setLoadingStats(false);
+        });
+
+        return () => unsubscribe();
+    }, [user]);
 
     const copyToClipboard = () => {
         navigator.clipboard.writeText(referralCode);
@@ -74,19 +104,19 @@ const ReferPage: NextPage = () => {
         <div className="grid grid-cols-3 gap-4">
             <Card className="bg-card">
                 <CardContent className="p-4">
-                    <p className="text-3xl font-bold">0</p>
+                    {loadingStats ? <Skeleton className="h-8 w-1/2 mx-auto" /> : <p className="text-3xl font-bold">{referralStats.totalReferred}</p>}
                     <p className="text-xs flex items-center justify-center gap-1"><Users className='w-3 h-3'/> Total Referred</p>
                 </CardContent>
             </Card>
             <Card className="bg-card">
                 <CardContent className="p-4">
-                    <p className="text-3xl font-bold">0</p>
+                    {loadingStats ? <Skeleton className="h-8 w-1/2 mx-auto" /> : <p className="text-3xl font-bold">{referralStats.successfullyInvested}</p>}
                     <p className="text-xs flex items-center justify-center gap-1"><Star className='w-3 h-3' /> Successfully Invested</p>
                 </CardContent>
             </Card>
             <Card className="bg-card">
                 <CardContent className="p-4">
-                    <p className="text-3xl font-bold">0 <span className='text-xl'>Rs.</span></p>
+                    {loadingStats ? <Skeleton className="h-8 w-1/2 mx-auto" /> : <p className="text-3xl font-bold">{userData?.referralEarnings || 0} <span className='text-xl'>Rs.</span></p>}
                     <p className="text-xs flex items-center justify-center gap-1"><Gift className='w-3 h-3' /> Total Earnings</p>
                 </CardContent>
             </Card>

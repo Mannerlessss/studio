@@ -18,8 +18,6 @@ import { ProfileCompletionCard } from '@/components/vaultboost/profile-completio
 const Dashboard: NextPage = () => {
   const { userData, loading, claimDailyBonus } = useAuth();
 
-  // The AuthProvider now handles redirection and loading states.
-  // This check prevents rendering with incomplete data.
   if (loading || !userData) {
       return null;
   }
@@ -40,22 +38,22 @@ const Dashboard: NextPage = () => {
         <div className="grid grid-cols-2 gap-4" id="info-cards">
           <InfoCard
             title="Invested"
-            value={`${userData.invested} Rs.`}
+            value={`${userData.invested || 0} Rs.`}
             icon={<Wallet className="h-6 w-6 text-primary" />}
           />
           <InfoCard
             title="Earnings"
-            value={`${userData.earnings} Rs.`}
+            value={`${userData.earnings || 0} Rs.`}
             icon={<TrendingUp className="h-6 w-6 text-primary" />}
           />
            <InfoCard
             title="Projected"
-            value={`${userData.projected} Rs.`}
+            value={`${userData.projected || 0} Rs.`}
             icon={<PiggyBank className="h-6 w-6 text-primary" />}
           />
           <InfoCard
             title="Referral"
-            value={`${userData.referralEarnings} Rs.`}
+            value={`${userData.referralEarnings || 0} Rs.`}
             icon={<Users className="h-6 w-6 text-primary" />}
           />
         </div>

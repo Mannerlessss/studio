@@ -41,7 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, onSnapshot, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface User {
@@ -53,6 +53,8 @@ interface User {
     bonusEarnings: number;
     referralEarnings: number;
     investmentEarnings: number;
+    hasInvested?: boolean;
+    referredBy?: string;
 }
 
 export default function UsersPage() {
@@ -61,7 +63,7 @@ export default function UsersPage() {
     const [loading, setLoading] = useState(true);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [creditAmount, setCreditAmount] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
 
     useEffect(() => {
         const q = collection(db, 'users');
@@ -81,8 +83,8 @@ export default function UsersPage() {
         return () => unsubscribe();
     }, [toast]);
 
-    const handleCredit = async (userId: string) => {
-        setIsSubmitting(true);
+    const handleCredit = async (user: User) => {
+        setIsSubmitting(user.id);
         const amount = Number(creditAmount);
         if (isNaN(amount) || amount <= 0) {
             toast({
@@ -90,45 +92,82 @@ export default function UsersPage() {
                 title: 'Invalid Amount',
                 description: 'Please enter a valid amount to credit.',
             });
-            setIsSubmitting(false);
-            return;
-        }
-
-        const userToUpdate = users.find(u => u.id === userId);
-        if (!userToUpdate) {
-            toast({ variant: 'destructive', title: 'Error', description: 'User not found.' });
-            setIsSubmitting(false);
+            setIsSubmitting(null);
             return;
         }
 
         try {
-            const userDocRef = doc(db, 'users', userId);
+            const userDocRef = doc(db, 'users', user.id);
             const batch = writeBatch(db);
-            
-            const newBalance = userToUpdate.totalBalance + amount;
-            const newInvestmentEarnings = userToUpdate.investmentEarnings + amount;
-            const newEarnings = (userToUpdate as any).earnings + amount;
 
+            const newInvestedAmount = (user as any).invested + amount;
+            
             batch.update(userDocRef, { 
-                totalBalance: newBalance,
-                investmentEarnings: newInvestmentEarnings,
-                earnings: newEarnings
+                invested: newInvestedAmount,
+                // Daily earnings will be added by a separate process/function
             });
 
-            const transactionRef = doc(collection(db, `users/${userId}/transactions`));
+            const transactionRef = doc(collection(db, `users/${user.id}/transactions`));
             batch.set(transactionRef, {
                 type: 'investment',
                 amount,
-                description: `Admin Credit`,
+                description: `Admin Credit: ${amount} Rs.`,
                 status: 'Completed',
-                date: new Date(),
+                date: serverTimestamp(),
             });
+
+            // Check for first investment and referral bonus
+            if (!user.hasInvested && amount >= 100 && user.referredBy) {
+                const bonusAmount = 75;
+                const referrerDocRef = doc(db, 'users', user.referredBy);
+                const referrerDoc = await getDoc(referrerDocRef);
+
+                if (referrerDoc.exists()) {
+                    const referrerData = referrerDoc.data();
+                    // Award bonus to the new user
+                    batch.update(userDocRef, {
+                        totalBalance: (user.totalBalance || 0) + bonusAmount,
+                        bonusEarnings: (user.bonusEarnings || 0) + bonusAmount,
+                        earnings: ((user as any).earnings || 0) + bonusAmount,
+                        hasInvested: true
+                    });
+                    const userBonusTransactionRef = doc(collection(db, `users/${user.id}/transactions`));
+                    batch.set(userBonusTransactionRef, {
+                        type: 'bonus',
+                        amount: bonusAmount,
+                        description: `Welcome referral bonus!`,
+                        status: 'Completed',
+                        date: serverTimestamp(),
+                    });
+                    
+                    // Award bonus to the referrer
+                    batch.update(referrerDocRef, {
+                        totalBalance: (referrerData.totalBalance || 0) + bonusAmount,
+                        referralEarnings: (referrerData.referralEarnings || 0) + bonusAmount,
+                        earnings: (referrerData.earnings || 0) + bonusAmount,
+                    });
+                    const referrerBonusTransactionRef = doc(collection(db, `users/${user.referredBy}/transactions`));
+                     batch.set(referrerBonusTransactionRef, {
+                        type: 'bonus',
+                        amount: bonusAmount,
+                        description: `Referral bonus from ${user.name}`,
+                        status: 'Completed',
+                        date: serverTimestamp(),
+                    });
+                }
+            }
+            
+            // Mark user as hasInvested even if no referral
+             if (!user.hasInvested && amount >= 100) {
+                  batch.update(userDocRef, { hasInvested: true });
+             }
+
 
             await batch.commit();
 
             toast({
                 title: `Investment Credited`,
-                description: `${amount} Rs. has been credited for user ${userToUpdate.name}.`,
+                description: `${amount} Rs. has been credited for user ${user.name}.`,
             });
             setCreditAmount('');
         } catch (error: any) {
@@ -138,12 +177,12 @@ export default function UsersPage() {
                 description: error.message,
             });
         } finally {
-            setIsSubmitting(false);
+            setIsSubmitting(null);
         }
     }
 
     const handleUpgrade = async (userId: string) => {
-        setIsSubmitting(true);
+        setIsSubmitting(userId);
         try {
             const userDocRef = doc(db, 'users', userId);
             await updateDoc(userDocRef, { membership: 'Pro' });
@@ -158,7 +197,7 @@ export default function UsersPage() {
                 description: error.message,
             });
         } finally {
-            setIsSubmitting(false);
+            setIsSubmitting(null);
         }
     }
 
@@ -208,7 +247,7 @@ export default function UsersPage() {
                         </Button>
                        <AlertDialog onOpenChange={(open) => !open && setCreditAmount('')}>
                           <AlertDialogTrigger asChild>
-                             <Button variant="outline" size="sm" disabled={isSubmitting}>
+                             <Button variant="outline" size="sm" disabled={!!isSubmitting}>
                                 <DollarSign className='w-4 h-4 mr-1' /> Credit
                             </Button>
                           </AlertDialogTrigger>
@@ -216,25 +255,25 @@ export default function UsersPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Credit Investment for {user.name}</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Enter the amount to credit. This action cannot be undone.
+                                Enter the amount to credit. This will trigger referral bonuses on first investment.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <div className="space-y-2">
                                 <Label htmlFor="credit-amount">Amount (in Rs.)</Label>
-                                <Input id="credit-amount" type="number" placeholder="e.g., 1000" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} disabled={isSubmitting}/>
+                                <Input id="credit-amount" type="number" placeholder="e.g., 1000" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} disabled={!!isSubmitting}/>
                             </div>
                             <AlertDialogFooter>
-                              <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleCredit(user.id)} disabled={isSubmitting}>
-                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                              <AlertDialogCancel disabled={!!isSubmitting}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleCredit(user)} disabled={!!isSubmitting}>
+                                {isSubmitting === user.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Confirm Credit
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
                         {user.membership !== 'Pro' && (
-                            <Button size="sm" onClick={() => handleUpgrade(user.id)} disabled={isSubmitting}>
-                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            <Button size="sm" onClick={() => handleUpgrade(user.id)} disabled={!!isSubmitting}>
+                                {isSubmitting === user.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 <Crown className='w-4 h-4 mr-1' /> Upgrade
                             </Button>
                         )}
@@ -261,7 +300,7 @@ export default function UsersPage() {
                             <Wallet className="w-5 h-5 text-primary" />
                             <span className="font-semibold">Total Balance</span>
                         </div>
-                        <span className="font-bold text-lg">{selectedUser.totalBalance} Rs.</span>
+                        <span className="font-bold text-lg">{selectedUser.totalBalance || 0} Rs.</span>
                     </div>
                     <div className="space-y-2 text-sm">
                        <div className="flex items-center justify-between">
@@ -269,21 +308,21 @@ export default function UsersPage() {
                                 <TrendingUp className="w-4 h-4" />
                                 <span>Investment Earnings</span>
                             </div>
-                            <span>{selectedUser.investmentEarnings} Rs.</span>
+                            <span>{selectedUser.investmentEarnings || 0} Rs.</span>
                        </div>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-muted-foreground">
                                 <Users className="w-4 h-4" />
                                 <span>Referral Earnings</span>
                             </div>
-                            <span>{selectedUser.referralEarnings} Rs.</span>
+                            <span>{selectedUser.referralEarnings || 0} Rs.</span>
                        </div>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-muted-foreground">
                                 <Gift className="w-4 h-4" />
                                 <span>Bonus Earnings</span>
                             </div>
-                            <span>{selectedUser.bonusEarnings} Rs.</span>
+                            <span>{selectedUser.bonusEarnings || 0} Rs.</span>
                        </div>
                     </div>
                 </div>

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Briefcase, Gift } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/auth-context';
 
 interface DailyBonusCardProps {
   onBonusClaim: (amount: number) => void;
@@ -26,10 +27,9 @@ const shuffle = (array: number[]) => {
 
 
 export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
-  const [lastClaim, setLastClaim] = useState<number | null>(null);
+  const { userData } = useAuth();
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [bonusAvailable, setBonusAvailable] = useState<boolean>(false);
-  const [claimedAmount, setClaimedAmount] = useState<number | null>(null);
 
   const [gameState, setGameState] = useState<'ready' | 'picked' | 'revealed'>('ready');
   const [userChoiceIndex, setUserChoiceIndex] = useState<number | null>(null);
@@ -44,45 +44,26 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
 
 
   useEffect(() => {
-    // The line below is commented out to always show the game for testing.
-    const storedLastClaim = localStorage.getItem('lastBonusClaim');
-    // const storedLastClaim = null; 
-    const storedClaimedAmount = localStorage.getItem('lastClaimedAmount');
-    if (storedLastClaim) {
-      setLastClaim(Number(storedLastClaim));
-      setBonusAvailable(false);
-      if(storedClaimedAmount) {
-        setClaimedAmount(Number(storedClaimedAmount));
-      }
-    } else {
-      setBonusAvailable(true);
-      handleGameReset();
-    }
+    handleGameReset();
   }, []);
 
   useEffect(() => {
-    if (bonusAvailable) return;
-
+    if (!userData?.lastBonusClaim) {
+        setBonusAvailable(true);
+        return;
+    }
+    
     const interval = setInterval(() => {
       const now = Date.now();
-      // lastClaim can be null here if bonusAvailable is false from the start but no lastClaim is in storage
-      // This is a race condition on initial load. We should check for lastClaim.
-      if (lastClaim === null) {
-          clearInterval(interval);
-          setBonusAvailable(true); // Should be available if there's no claim time
-          return;
-      }
+      const lastClaimTime = userData.lastBonusClaim!.toDate().getTime();
         
       const twelveHours = 12 * 60 * 60 * 1000;
-      const timeSinceClaim = now - lastClaim;
+      const timeSinceClaim = now - lastClaimTime;
 
       if (timeSinceClaim >= twelveHours) {
         setBonusAvailable(true);
         setTimeRemaining('');
-        setClaimedAmount(null);
         handleGameReset();
-        localStorage.removeItem('lastBonusClaim');
-        localStorage.removeItem('lastClaimedAmount');
         clearInterval(interval);
       } else {
         setBonusAvailable(false);
@@ -99,7 +80,7 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [bonusAvailable, lastClaim]);
+  }, [userData?.lastBonusClaim]);
 
   const handleGameReset = () => {
     setPrizes(shuffle([...prizeAmounts]));
@@ -122,13 +103,7 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
     if (gameState !== 'revealed' || wonAmount === null) return;
     
     onBonusClaim(wonAmount);
-    const now = Date.now();
-    setLastClaim(now);
-    localStorage.setItem('lastBonusClaim', String(now));
-    localStorage.setItem('lastClaimedAmount', String(wonAmount));
-    
-    setClaimedAmount(wonAmount);
-    setBonusAvailable(false);
+    setBonusAvailable(false); // UI will update via useEffect on next render
   }
 
   return (
@@ -142,11 +117,6 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
       <CardContent className="text-center flex flex-col items-center justify-center space-y-4 relative">
         {!bonusAvailable ? (
           <>
-            {claimedAmount !== null && (
-              <p className="text-lg font-semibold text-accent mb-2">
-                You won {claimedAmount} Rs!
-              </p>
-            )}
             <p className="text-muted-foreground">
               Come back in <span className="font-semibold text-primary">{timeRemaining}</span> for your next bonus.
             </p>

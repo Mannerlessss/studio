@@ -11,7 +11,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 
-type TransactionType = 'bonus' | 'investment' | 'earning' | 'withdrawal';
+type TransactionType = 'bonus' | 'investment' | 'earning' | 'withdrawal' | 'referral';
 
 interface Transaction {
     id: string;
@@ -32,6 +32,8 @@ const getTransactionIcon = (type: string) => {
             return <ArrowUpCircle className="h-5 w-5 text-muted-foreground" />;
         case 'withdrawal':
             return <ArrowDownCircle className="h-5 w-5 text-muted-foreground" />;
+        case 'referral':
+             return <Users className="h-5 w-5 text-muted-foreground" />;
         default:
             return <Clock className="h-5 w-5 text-muted-foreground" />;
     }
@@ -90,7 +92,7 @@ export function TransactionHistoryCard() {
     filter === 'all' || transaction.type === filter
   );
 
-  const filters: ('all' | TransactionType)[] = ['all', 'earning', 'bonus', 'withdrawal'];
+  const filters: ('all' | TransactionType)[] = ['all', 'investment', 'earning', 'bonus', 'referral', 'withdrawal'];
 
   return (
     <Card>
@@ -134,8 +136,8 @@ export function TransactionHistoryCard() {
                             </div>
                         </div>
                         <div className='text-right'>
-                            <p className={cn("font-bold", transaction.amount > 0 ? 'text-green-500' : 'text-red-500')}>
-                                {transaction.amount > 0 ? '+' : ''}{transaction.amount.toFixed(2)} Rs.
+                            <p className={cn("font-bold", ['investment', 'withdrawal'].includes(transaction.type) ? 'text-red-500' : 'text-green-500')}>
+                                {['investment', 'withdrawal'].includes(transaction.type) ? '-' : '+'}{transaction.amount.toFixed(2)} Rs.
                             </p>
                             <Badge variant={getStatusBadgeVariant(transaction.status)} 
                                 className={cn({
