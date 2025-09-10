@@ -20,7 +20,7 @@ interface UserData {
     earnings: number;
     projected: number;
     referralEarnings: number;
-qc    bonusEarnings: number;
+    bonusEarnings: number;
     investmentEarnings: number;
     createdAt: any;
     lastLogin: any;
