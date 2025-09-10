@@ -92,27 +92,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setIsInitialising(true);
             if (currentUser) {
                 setUser(currentUser);
                 const userDocRef = doc(db, 'users', currentUser.uid);
+                
                 const unsubDoc = onSnapshot(userDocRef, async (userDocSnap) => {
                     if (userDocSnap.exists()) {
                         const dbData = userDocSnap.data() as UserData;
                         setUserData(dbData);
-                        await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+                         if (dbData.lastLogin) { // Only update if not the first login
+                            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+                        }
                     } else {
-                        // Document doesn't exist, so create it.
+                        // This case handles sign-in where a user exists in Auth but not Firestore.
                         const newUser = createNewUserData(currentUser);
                         await setDoc(userDocRef, newUser);
-                        setUserData(newUser);
+                        setUserData(newUser); // The onSnapshot listener will update this again, but this sets it initially
                     }
-                    setIsInitialising(false); // Stop loading once data is set/created
+                    setIsInitialising(false);
+                }, (error) => {
+                    console.error("Auth Snapshot Error:", error);
+                    setIsInitialising(false);
                 });
                  return () => unsubDoc();
             } else {
                 setUser(null);
                 setUserData(null);
-                setIsInitialising(false); // Stop loading if no user
+                setIsInitialising(false); 
             }
         });
 
@@ -125,27 +132,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const isAuthPage = pathname.startsWith('/login');
         const isAdminPage = pathname.startsWith('/admin');
         const isPublicPage = ['/terms', '/privacy'].includes(pathname);
-
-        if (user && user.email === ADMIN_EMAIL) {
-            if (!isAdminPage) {
-                router.push('/admin');
-            }
-            return;
-        }
         
-        if (isAdminPage && (!user || user.email !== ADMIN_EMAIL)) {
-             router.push('/');
-             return;
-        }
-
         if (isPublicPage) return;
 
-        if (!user && !isAuthPage) {
-            router.push('/login');
-        } else if (user && isAuthPage) {
-            router.push('/');
+        if (user) {
+            if (user.email === ADMIN_EMAIL) {
+                if (!isAdminPage) router.push('/admin');
+            } else {
+                 if (isAdminPage) router.push('/');
+                 if (isAuthPage) router.push('/');
+            }
+        } else {
+            if (!isAuthPage) router.push('/login');
         }
-    }, [user, isInitialising, pathname, router]);
+
+    }, [user, userData, isInitialising, pathname, router]);
 
 
     const handleSuccessfulSignUp = async (loggedInUser: User, extraData: { name: string, phone: string, referralCode?: string }) => {
@@ -169,7 +170,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
              }
         }
         await setDoc(userDocRef, newUser);
-        setUserData(newUser);
+        // No need to setUserData here, the onSnapshot listener will take care of it.
         setUser(loggedInUser);
     }
 
@@ -288,12 +289,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         try {
             const userDocRef = doc(db, 'users', user.uid);
+            const userDocSnap = await getDoc(userDocRef); // Get fresh data
+            if (!userDocSnap.exists()) throw new Error("User data not found.");
+
+            const currentData = userDocSnap.data();
             const batch = writeBatch(db);
             
             batch.update(userDocRef, {
-                totalBalance: (userData.totalBalance || 0) + amount,
-                bonusEarnings: (userData.bonusEarnings || 0) + amount,
-                earnings: (userData.earnings || 0) + amount,
+                totalBalance: (currentData.totalBalance || 0) + amount,
+                bonusEarnings: (currentData.bonusEarnings || 0) + amount,
+                earnings: (currentData.earnings || 0) + amount,
                 lastBonusClaim: serverTimestamp(),
             });
             
