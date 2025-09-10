@@ -1,5 +1,6 @@
 
 'use client';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -17,72 +18,100 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase';
+import { collectionGroup, doc, getDocs, onSnapshot, updateDoc, writeBatch } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const mockWithdrawals = [
-  {
-    id: 'WDR-001',
-    userName: 'John Doe',
-    amount: 1500,
-    method: 'UPI',
-    details: { upiId: 'john.doe@upi' },
-    date: '2024-09-05',
-    status: 'Pending',
-  },
-  {
-    id: 'WDR-002',
-    userName: 'Jane Smith',
-    amount: 2500,
-    method: 'Bank Transfer',
-    details: {
-      accountHolder: 'Jane Smith',
-      accountNumber: '123456789012',
-      ifsc: 'BANK0001234',
-    },
-    date: '2024-09-04',
-    status: 'Pending',
-  },
-    {
-    id: 'WDR-003',
-    userName: 'Sam Wilson',
-    amount: 1000,
-    method: 'UPI',
-    details: { upiId: 'sam.wilson@upi' },
-    date: '2024-09-03',
-    status: 'Approved',
-  },
-    {
-    id: 'WDR-004',
-    userName: 'Lisa Ray',
-    amount: 5000,
-    method: 'Bank Transfer',
-    details: {
-        accountHolder: 'Lisa Ray',
-        accountNumber: '098765432109',
-        ifsc: 'BANK0005678',
-     },
-    date: '2024-09-02',
-    status: 'Rejected',
-  },
-];
+interface WithdrawalRequest {
+  id: string; // Document ID of the withdrawal request
+  userId: string;
+  userName: string;
+  amount: number;
+  method: 'UPI' | 'Bank Transfer';
+  details: { 
+    upiId?: string;
+    accountHolder?: string;
+    accountNumber?: string;
+    ifsc?: string;
+  };
+  date: any; // Firestore timestamp
+  status: 'Pending' | 'Approved' | 'Rejected';
+}
+
 
 export default function WithdrawalsPage() {
     const { toast } = useToast();
+    const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState<string | null>(null); // Store ID of item being submitted
 
-    const handleApprove = (id: string) => {
-        toast({
-            title: 'Request Approved',
-            description: `Withdrawal request ${id} has been approved.`,
+    useEffect(() => {
+        const withdrawalsRef = collectionGroup(db, 'withdrawals');
+        const unsubscribe = onSnapshot(withdrawalsRef, (snapshot) => {
+            const requests: WithdrawalRequest[] = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                requests.push({ 
+                    id: doc.id,
+                    userId: doc.ref.parent.parent!.id,
+                    ...data
+                 } as WithdrawalRequest);
+            });
+            // Sort by date descending, pending first
+            requests.sort((a, b) => {
+                if (a.status === 'Pending' && b.status !== 'Pending') return -1;
+                if (a.status !== 'Pending' && b.status === 'Pending') return 1;
+                return b.date.toMillis() - a.date.toMillis();
+            });
+            setWithdrawals(requests);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching withdrawals: ", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch withdrawal requests.' });
+            setLoading(false);
         });
-    }
 
-    const handleReject = (id: string) => {
-        toast({
-            variant: 'destructive',
-            title: 'Request Rejected',
-            description: `Withdrawal request ${id} has been rejected.`,
-        });
+        return () => unsubscribe();
+    }, [toast]);
+
+    const handleStatusChange = async (req: WithdrawalRequest, newStatus: 'Approved' | 'Rejected') => {
+        setIsSubmitting(req.id);
+        const withdrawalDocRef = doc(db, `users/${req.userId}/withdrawals`, req.id);
+        const userDocRef = doc(db, 'users', req.userId);
+
+        try {
+            const batch = writeBatch(db);
+
+            batch.update(withdrawalDocRef, { status: newStatus });
+            
+            // If rejected, refund the amount to the user's balance
+            if (newStatus === 'Rejected') {
+                 const userDoc = await getDocs(collection(db, 'users'));
+                 const userData = userDoc.docs.find(d => d.id === req.userId)?.data();
+                 if (userData) {
+                    batch.update(userDocRef, {
+                        totalBalance: userData.totalBalance + req.amount
+                    });
+                 }
+            }
+
+            await batch.commit();
+
+            toast({
+                title: `Request ${newStatus}`,
+                description: `Withdrawal request for ${req.userName} has been ${newStatus.toLowerCase()}.`,
+            });
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Update Failed',
+                description: error.message,
+            });
+        } finally {
+            setIsSubmitting(null);
+        }
     }
 
 
@@ -108,7 +137,19 @@ export default function WithdrawalsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockWithdrawals.map((withdrawal) => (
+             {loading ? (
+                 Array.from({ length: 4 }).map((_, i) => (
+                    <TableRow key={i}>
+                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-28" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell>
+                    </TableRow>
+                ))
+            ) : withdrawals.map((withdrawal) => (
               <TableRow key={withdrawal.id}>
                 <TableCell className="font-medium">{withdrawal.userName}</TableCell>
                 <TableCell>{withdrawal.amount} Rs.</TableCell>
@@ -124,7 +165,7 @@ export default function WithdrawalsPage() {
                         </div>
                     )}
                 </TableCell>
-                <TableCell>{withdrawal.date}</TableCell>
+                <TableCell>{withdrawal.date.toDate().toLocaleDateString()}</TableCell>
                 <TableCell>
                   <Badge
                     variant={
@@ -142,11 +183,13 @@ export default function WithdrawalsPage() {
                 <TableCell className="text-right">
                     {withdrawal.status === 'Pending' && (
                         <div className='flex gap-2 justify-end'>
-                            <Button variant="outline" size="sm" onClick={() => handleApprove(withdrawal.id)}>
-                                <CheckCircle className='w-4 h-4 mr-1' /> Approve
+                            <Button variant="outline" size="sm" onClick={() => handleStatusChange(withdrawal, 'Approved')} disabled={!!isSubmitting}>
+                                {isSubmitting === withdrawal.id ? <Loader2 className='w-4 h-4 mr-1 animate-spin'/> : <CheckCircle className='w-4 h-4 mr-1' />} 
+                                Approve
                             </Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleReject(withdrawal.id)}>
-                                <XCircle className='w-4 h-4 mr-1' /> Reject
+                            <Button variant="destructive" size="sm" onClick={() => handleStatusChange(withdrawal, 'Rejected')} disabled={!!isSubmitting}>
+                                {isSubmitting === withdrawal.id ? <Loader2 className='w-4 h-4 mr-1 animate-spin'/> : <XCircle className='w-4 h-4 mr-1' />}
+                                Reject
                             </Button>
                         </div>
                     )}
@@ -155,6 +198,9 @@ export default function WithdrawalsPage() {
             ))}
           </TableBody>
         </Table>
+        {!loading && withdrawals.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">No withdrawal requests found.</p>
+        )}
       </CardContent>
     </Card>
   );

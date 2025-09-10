@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Copy, Gift, PlusCircle, Trash2 } from 'lucide-react';
+import { Copy, Gift, PlusCircle, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -41,80 +41,102 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { db } from '@/lib/firebase';
+import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Offer {
     id: string;
     code: string;
-    status: 'Active' | 'Expired';
-    usageCount: number;
-    rewardAmount?: number;
+    rewardAmount: number;
     maxUsers?: number;
-    expiresIn?: string;
+    expiresAt?: Timestamp;
+    usageCount: number;
+    createdAt: Timestamp;
 }
-
-const mockOffers: Offer[] = [
-  {
-    id: 'OFR-001',
-    code: 'WELCOME50',
-    status: 'Active',
-    usageCount: 25,
-    rewardAmount: 50,
-  },
-  {
-    id: 'OFR-002',
-    code: 'SPECIAL10',
-    status: 'Active',
-    usageCount: 150,
-    rewardAmount: 10,
-  },
-    {
-    id: 'OFR-003',
-    code: 'EXPIRED20',
-    status: 'Expired',
-    usageCount: 50,
-    rewardAmount: 20,
-  },
-];
 
 export default function OffersPage() {
     const { toast } = useToast();
-    const [offers, setOffers] = useState<Offer[]>(mockOffers);
+    const [offers, setOffers] = useState<Offer[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Form state
     const [newCode, setNewCode] = useState('');
     const [rewardAmount, setRewardAmount] = useState('');
     const [maxUsers, setMaxUsers] = useState('');
     const [expiresIn, setExpiresIn] = useState<string | undefined>();
 
-    const handleCreateCode = () => {
+     useEffect(() => {
+        const q = collection(db, 'offers');
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const offersData: Offer[] = [];
+            querySnapshot.forEach((doc) => {
+                offersData.push({ id: doc.id, ...doc.data() } as Offer);
+            });
+            // Sort by creation date descending
+            offersData.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+            setOffers(offersData);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching offers: ", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch offer codes.' });
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [toast]);
+
+    const handleCreateCode = async () => {
+        setIsSubmitting(true);
         if (!newCode || !rewardAmount) {
             toast({
                 variant: 'destructive',
                 title: 'Missing Information',
                 description: 'Please provide a code and a reward amount.',
             });
+            setIsSubmitting(false);
             return;
         }
 
-        const newOffer: Offer = {
-            id: `OFR-00${offers.length + 1}`,
-            code: newCode,
-            status: 'Active',
-            usageCount: 0,
+        let expiresAt: Date | null = null;
+        if (expiresIn) {
+            expiresAt = new Date();
+            if (expiresIn === '1-day') expiresAt.setDate(expiresAt.getDate() + 1);
+            if (expiresIn === '7-days') expiresAt.setDate(expiresAt.getDate() + 7);
+            if (expiresIn === '30-days') expiresAt.setDate(expiresAt.getDate() + 30);
+            if (expiresIn === 'never') expiresAt = null;
+        }
+
+        const newOffer = {
+            code: newCode.toUpperCase(),
             rewardAmount: Number(rewardAmount),
-            maxUsers: maxUsers ? Number(maxUsers) : undefined,
-            expiresIn: expiresIn,
+            maxUsers: maxUsers ? Number(maxUsers) : null,
+            expiresAt: expiresAt ? Timestamp.fromDate(expiresAt) : null,
+            usageCount: 0,
+            createdAt: serverTimestamp(),
         };
 
-        setOffers([newOffer, ...offers]);
-        toast({
-            title: 'Code Created!',
-            description: `New offer code "${newCode}" has been created.`,
-        });
-
-        // Reset form
-        setNewCode('');
-        setRewardAmount('');
-        setMaxUsers('');
-        setExpiresIn(undefined);
+        try {
+            await addDoc(collection(db, 'offers'), newOffer);
+             toast({
+                title: 'Code Created!',
+                description: `New offer code "${newCode.toUpperCase()}" has been created.`,
+            });
+            // Reset form
+            setNewCode('');
+            setRewardAmount('');
+            setMaxUsers('');
+            setExpiresIn(undefined);
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: 'Creation Failed',
+                description: error.message,
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const copyCode = (code: string) => {
@@ -125,13 +147,30 @@ export default function OffersPage() {
         });
     }
 
-    const deleteCode = (id: string) => {
-        setOffers(offers.filter(offer => offer.id !== id));
-        toast({
-            variant: 'destructive',
-            title: 'Code Deleted!',
-            description: `The offer code has been deleted.`,
-        });
+    const deleteCode = async (id: string) => {
+        try {
+            await deleteDoc(doc(db, 'offers', id));
+            toast({
+                title: 'Code Deleted!',
+                description: `The offer code has been deleted.`,
+            });
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: 'Deletion Failed',
+                description: error.message,
+            });
+        }
+    }
+    
+    const getStatus = (offer: Offer): { text: 'Active' | 'Expired'; variant: 'default' | 'outline' } => {
+        if (offer.maxUsers && offer.usageCount >= offer.maxUsers) {
+            return { text: 'Expired', variant: 'outline' };
+        }
+        if (offer.expiresAt && offer.expiresAt.toMillis() < Date.now()) {
+             return { text: 'Expired', variant: 'outline' };
+        }
+        return { text: 'Active', variant: 'default' };
     }
 
   return (
@@ -149,19 +188,19 @@ export default function OffersPage() {
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
             <Label htmlFor="code">Code</Label>
-            <Input id="code" placeholder="e.g., WELCOME100" value={newCode} onChange={e => setNewCode(e.target.value.toUpperCase())}/>
+            <Input id="code" placeholder="e.g., WELCOME100" value={newCode} onChange={e => setNewCode(e.target.value.toUpperCase())} disabled={isSubmitting}/>
         </div>
          <div className="space-y-2">
             <Label htmlFor="reward">Reward Amount (₹)</Label>
-            <Input id="reward" type="number" placeholder="e.g., 100" value={rewardAmount} onChange={e => setRewardAmount(e.target.value)} />
+            <Input id="reward" type="number" placeholder="e.g., 100" value={rewardAmount} onChange={e => setRewardAmount(e.target.value)} disabled={isSubmitting}/>
         </div>
          <div className="space-y-2">
-            <Label htmlFor="max-users">Max Users</Label>
-            <Input id="max-users" type="number" placeholder="e.g., 100" value={maxUsers} onChange={e => setMaxUsers(e.target.value)} />
+            <Label htmlFor="max-users">Max Users (Optional)</Label>
+            <Input id="max-users" type="number" placeholder="e.g., 100" value={maxUsers} onChange={e => setMaxUsers(e.target.value)} disabled={isSubmitting}/>
         </div>
          <div className="space-y-2">
             <Label htmlFor="expires">Expires At (Optional)</Label>
-            <Select onValueChange={setExpiresIn}>
+            <Select onValueChange={setExpiresIn} disabled={isSubmitting}>
                 <SelectTrigger id="expires">
                     <SelectValue placeholder="Select duration" />
                 </SelectTrigger>
@@ -175,8 +214,8 @@ export default function OffersPage() {
         </div>
       </CardContent>
       <CardFooter>
-          <Button onClick={handleCreateCode}>
-            <PlusCircle className='w-4 h-4 mr-2' />
+          <Button onClick={handleCreateCode} disabled={isSubmitting}>
+            {isSubmitting ? <Loader2 className='w-4 h-4 mr-2 animate-spin' /> : <PlusCircle className='w-4 h-4 mr-2' />}
             Create Offer Code
         </Button>
       </CardFooter>
@@ -201,17 +240,29 @@ export default function OffersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {offers.map((offer) => (
+            {loading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                    <TableRow key={i}>
+                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell>
+                    </TableRow>
+                ))
+            ) : offers.map((offer) => {
+                const status = getStatus(offer);
+                return (
               <TableRow key={offer.id}>
                 <TableCell className="font-mono font-semibold">{offer.code}</TableCell>
                 <TableCell>{offer.rewardAmount} Rs.</TableCell>
                 <TableCell>
-                  <Badge variant={offer.status === 'Active' ? 'default' : 'outline'}
-                   className={offer.status === 'Active' ? 'bg-green-500/80' : ''}>
-                    {offer.status}
+                  <Badge variant={status.variant}
+                   className={status.text === 'Active' ? 'bg-green-500/80' : ''}>
+                    {status.text}
                   </Badge>
                 </TableCell>
-                <TableCell>{offer.usageCount} times</TableCell>
+                <TableCell>{offer.usageCount} / {offer.maxUsers || '∞'}</TableCell>
                 <TableCell className="text-right">
                     <div className='flex gap-2 justify-end'>
                         <Button variant="outline" size="sm" onClick={() => copyCode(offer.code)}>
@@ -227,7 +278,7 @@ export default function OffersPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the offer code.
+                                This action cannot be undone. This will permanently delete the offer code "{offer.code}".
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -242,12 +293,14 @@ export default function OffersPage() {
                     </div>
                 </TableCell>
               </TableRow>
-            ))}
+            )})}
           </TableBody>
         </Table>
+        {!loading && offers.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">No offer codes found.</p>
+        )}
       </CardContent>
     </Card>
     </div>
   );
-
-    
+}

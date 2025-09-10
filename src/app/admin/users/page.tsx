@@ -10,7 +10,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import {
     Dialog,
@@ -37,10 +36,13 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp } from 'lucide-react';
+import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { db } from '@/lib/firebase';
+import { collection, doc, getDocs, onSnapshot, updateDoc, writeBatch } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface User {
     id: string;
@@ -53,20 +55,34 @@ interface User {
     investmentEarnings: number;
 }
 
-const mockUsers: User[] = [
-    { id: 'usr-001', name: 'John Doe', email: 'john@example.com', membership: 'Pro', totalBalance: 5500, investmentEarnings: 4000, referralEarnings: 1200, bonusEarnings: 300 },
-    { id: 'usr-002', name: 'Jane Smith', email: 'jane@example.com', membership: 'Basic', totalBalance: 1200, investmentEarnings: 1000, referralEarnings: 150, bonusEarnings: 50 },
-    { id: 'usr-003', name: 'Sam Wilson', email: 'sam@example.com', membership: 'Basic', totalBalance: 800, investmentEarnings: 800, referralEarnings: 0, bonusEarnings: 0 },
-];
-
-
 export default function UsersPage() {
     const { toast } = useToast();
-    const [users, setUsers] = useState<User[]>(mockUsers);
+    const [users, setUsers] = useState<User[]>([]);
+    const [loading, setLoading] = useState(true);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [creditAmount, setCreditAmount] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        const q = collection(db, 'users');
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const usersData: User[] = [];
+            querySnapshot.forEach((doc) => {
+                usersData.push({ id: doc.id, ...doc.data() } as User);
+            });
+            setUsers(usersData);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching users: ", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch users.' });
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [toast]);
 
     const handleCredit = async (userId: string) => {
+        setIsSubmitting(true);
         const amount = Number(creditAmount);
         if (isNaN(amount) || amount <= 0) {
             toast({
@@ -74,33 +90,76 @@ export default function UsersPage() {
                 title: 'Invalid Amount',
                 description: 'Please enter a valid amount to credit.',
             });
+            setIsSubmitting(false);
             return;
         }
 
-        setUsers(users.map(u => 
-            u.id === userId 
-            ? { ...u, totalBalance: u.totalBalance + amount, investmentEarnings: u.investmentEarnings + amount }
-            : u
-        ));
+        const userToUpdate = users.find(u => u.id === userId);
+        if (!userToUpdate) {
+            toast({ variant: 'destructive', title: 'Error', description: 'User not found.' });
+            setIsSubmitting(false);
+            return;
+        }
 
-        toast({
-            title: `Investment Credited (Mock)`,
-            description: `${amount} Rs. has been credited for user ${userId}.`,
-        });
-        
-        setCreditAmount('');
+        try {
+            const userDocRef = doc(db, 'users', userId);
+            const batch = writeBatch(db);
+            
+            const newBalance = userToUpdate.totalBalance + amount;
+            const newInvestmentEarnings = userToUpdate.investmentEarnings + amount;
+            const newEarnings = (userToUpdate as any).earnings + amount;
+
+            batch.update(userDocRef, { 
+                totalBalance: newBalance,
+                investmentEarnings: newInvestmentEarnings,
+                earnings: newEarnings
+            });
+
+            const transactionRef = doc(collection(db, `users/${userId}/transactions`));
+            batch.set(transactionRef, {
+                type: 'investment',
+                amount,
+                description: `Admin Credit`,
+                status: 'Completed',
+                date: new Date(),
+            });
+
+            await batch.commit();
+
+            toast({
+                title: `Investment Credited`,
+                description: `${amount} Rs. has been credited for user ${userToUpdate.name}.`,
+            });
+            setCreditAmount('');
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: `Credit Failed`,
+                description: error.message,
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
     }
 
     const handleUpgrade = async (userId: string) => {
-         setUsers(users.map(u => 
-            u.id === userId 
-            ? { ...u, membership: 'Pro' }
-            : u
-        ));
-        toast({
-            title: `Upgraded to Pro (Mock)`,
-            description: `User ${userId} has been upgraded to the Pro plan.`,
-        });
+        setIsSubmitting(true);
+        try {
+            const userDocRef = doc(db, 'users', userId);
+            await updateDoc(userDocRef, { membership: 'Pro' });
+            toast({
+                title: `Upgraded to Pro`,
+                description: `User has been upgraded to the Pro plan.`,
+            });
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: `Upgrade Failed`,
+                description: error.message,
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
     }
 
   return (
@@ -123,7 +182,16 @@ export default function UsersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.map((user) => (
+            {loading ? (
+                 Array.from({ length: 3 }).map((_, i) => (
+                    <TableRow key={i}>
+                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell>
+                    </TableRow>
+                ))
+            ) : users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell className="font-medium">{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>
@@ -138,9 +206,9 @@ export default function UsersPage() {
                             <Eye className='w-4 h-4' />
                             <span className="sr-only">View Details</span>
                         </Button>
-                       <AlertDialog>
+                       <AlertDialog onOpenChange={(open) => !open && setCreditAmount('')}>
                           <AlertDialogTrigger asChild>
-                             <Button variant="outline" size="sm">
+                             <Button variant="outline" size="sm" disabled={isSubmitting}>
                                 <DollarSign className='w-4 h-4 mr-1' /> Credit
                             </Button>
                           </AlertDialogTrigger>
@@ -153,18 +221,20 @@ export default function UsersPage() {
                             </AlertDialogHeader>
                             <div className="space-y-2">
                                 <Label htmlFor="credit-amount">Amount (in Rs.)</Label>
-                                <Input id="credit-amount" type="number" placeholder="e.g., 1000" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} />
+                                <Input id="credit-amount" type="number" placeholder="e.g., 1000" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} disabled={isSubmitting}/>
                             </div>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleCredit(user.id)}>
+                              <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleCredit(user.id)} disabled={isSubmitting}>
+                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Confirm Credit
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
                         {user.membership !== 'Pro' && (
-                            <Button size="sm" onClick={() => handleUpgrade(user.id)}>
+                            <Button size="sm" onClick={() => handleUpgrade(user.id)} disabled={isSubmitting}>
+                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 <Crown className='w-4 h-4 mr-1' /> Upgrade
                             </Button>
                         )}
