@@ -56,6 +56,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ADMIN_EMAIL = "gagansharma.gs107@gmail.com";
 
+const generateReferralCode = (name: string) => `${name.slice(0, 5).toUpperCase()}${Math.random().toString(36).substring(2, 6)}`;
+
+const createNewUserData = (user: User, extraData?: { name?: string, phone?: string }): UserData => ({
+    uid: user.uid,
+    name: extraData?.name || user.displayName || 'Vault User',
+    email: user.email || '',
+    phone: extraData?.phone || user.phoneNumber || '',
+    referralCode: generateReferralCode(extraData?.name || user.displayName || 'USER'),
+    membership: 'Basic',
+    rank: 'Bronze',
+    totalBalance: 0,
+    invested: 0,
+    earnings: 0,
+    projected: 0,
+    referralEarnings: 0,
+    bonusEarnings: 0,
+    investmentEarnings: 0,
+    createdAt: serverTimestamp(),
+    lastLogin: serverTimestamp(),
+});
+
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [userData, setUserData] = useState<UserData | null>(null);
@@ -71,16 +93,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
+
                 if (userDocSnap.exists()) {
                     const dbData = userDocSnap.data() as UserData;
                     setUserData(dbData);
-                    setUser(currentUser);
                     await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
                 } else {
-                    await signOut(auth);
-                    setUser(null);
-                    setUserData(null);
+                    // Document doesn't exist, so create it.
+                    const newUser = createNewUserData(currentUser);
+                    await setDoc(userDocRef, newUser);
+                    setUserData(newUser);
                 }
+                setUser(currentUser);
+
             } else {
                 setUser(null);
                 setUserData(null);
@@ -120,61 +145,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [user, isInitialising, pathname, router]);
 
 
-    const handleSuccessfulLogin = async (loggedInUser: User, extraData?: { name?: string, phone?: string, referralCode?: string }) => {
+    const handleSuccessfulSignUp = async (loggedInUser: User, extraData: { name: string, phone: string, referralCode?: string }) => {
         const userDocRef = doc(db, 'users', loggedInUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-             await updateDoc(userDocRef, {
-                lastLogin: serverTimestamp(),
-            });
-        } else {
-             const referralCode = `${(extraData?.name || loggedInUser.displayName || loggedInUser.email?.split('@')[0] || 'USER').slice(0, 5).toUpperCase()}${Math.random().toString(36).substring(2, 6)}`;
-            
-            const newUser: UserData = {
-                uid: loggedInUser.uid,
-                name: extraData?.name || loggedInUser.displayName || 'Vault User',
-                email: loggedInUser.email || '',
-                phone: extraData?.phone || loggedInUser.phoneNumber || '',
-                referralCode,
-                membership: 'Basic',
-                rank: 'Bronze',
-                totalBalance: 0,
-                invested: 0,
-                earnings: 0,
-                projected: 0,
-                referralEarnings: 0,
-                bonusEarnings: 0,
-                investmentEarnings: 0,
-                createdAt: serverTimestamp(),
-                lastLogin: serverTimestamp(),
-            };
-            
-            if (extraData?.referralCode) {
-                 const q = query(collection(db, "users"), where("referralCode", "==", extraData.referralCode.toUpperCase()));
-                 const querySnapshot = await getDocs(q);
-                 if (!querySnapshot.empty) {
-                     const referrerDoc = querySnapshot.docs[0];
-                     newUser.referredBy = referrerDoc.id;
-                     newUser.usedReferralCode = extraData.referralCode;
-                 } else {
-                    toast({
-                        variant: 'destructive',
-                        title: 'Invalid Referral Code',
-                        description: `The code "${extraData.referralCode}" is not valid.`,
-                    });
-                 }
-            }
-            await setDoc(userDocRef, newUser);
+        
+        const newUser = createNewUserData(loggedInUser, extraData);
+        
+        if (extraData.referralCode) {
+             const q = query(collection(db, "users"), where("referralCode", "==", extraData.referralCode.toUpperCase()));
+             const querySnapshot = await getDocs(q);
+             if (!querySnapshot.empty) {
+                 const referrerDoc = querySnapshot.docs[0];
+                 newUser.referredBy = referrerDoc.id;
+                 newUser.usedReferralCode = extraData.referralCode;
+             } else {
+                toast({
+                    variant: 'destructive',
+                    title: 'Invalid Referral Code',
+                    description: `The code "${extraData.referralCode}" is not valid, but your account was created.`,
+                });
+             }
         }
+        await setDoc(userDocRef, newUser);
+        setUserData(newUser);
+        setUser(loggedInUser);
     }
 
     const signInWithGoogle = async () => {
+        // This function is not used since the button was removed, but we keep it for completeness.
         const provider = new GoogleAuthProvider();
         setLoading(true);
         try {
-            const result = await signInWithPopup(auth, provider);
-            await handleSuccessfulLogin(result.user);
+            await signInWithPopup(auth, provider);
+            // onAuthStateChanged will handle data creation/update
         } catch (error: any) {
             if (error.code !== 'auth/popup-closed-by-user') {
                 toast({
@@ -192,7 +194,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
+            await handleSuccessfulSignUp(userCredential.user, { name, phone, referralCode });
         } catch (error: any) {
             toast({
                 variant: 'destructive',
@@ -208,6 +210,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             await signInWithEmailAndPassword(auth, email, password);
+            // onAuthStateChanged will handle the rest
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -361,7 +364,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (isInitialising) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-background p-4">
-                <div className="flex flex-col items-center justify-center text-center">
+                 <div className="flex flex-col items-center justify-center text-center">
                     <h1 className="text-3xl font-bold tracking-widest text-primary">
                         UPI BOOST VAULT
                     </h1>
@@ -387,5 +390,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
