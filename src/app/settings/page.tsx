@@ -26,19 +26,24 @@ import {
 
 
 const SettingsPage: NextPage = () => {
-    const { userData, logOut, redeemReferralCode, updateUserPhone } = useAuth();
+    const { userData, logOut, redeemReferralCode, updateUserPhone, updateUserName } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
     const [referralCodeInput, setReferralCodeInput] = useState('');
     const [showRedeemSuccess, setShowRedeemSuccess] = useState(false);
+    
+    const [name, setName] = useState(userData?.name || '');
     const [phone, setPhone] = useState(userData?.phone || '');
-    const [isUpdating, setIsUpdating] = useState(false);
+
+    const [isUpdatingName, setIsUpdatingName] = useState(false);
+    const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
 
     useEffect(() => {
-      if (userData?.phone) {
+      if (userData) {
+        setName(userData.name);
         setPhone(userData.phone);
       }
-    }, [userData?.phone]);
+    }, [userData]);
 
     const handleLogout = async () => {
         try {
@@ -52,17 +57,31 @@ const SettingsPage: NextPage = () => {
         }
     }
 
+    const handleUpdateName = async () => {
+        if (!name || name === userData?.name) {
+            return;
+        }
+        setIsUpdatingName(true);
+        try {
+            await updateUserName(name);
+        } catch (error) {
+            // Error toast is handled in the context
+        } finally {
+            setIsUpdatingName(false);
+        }
+    };
+
     const handleUpdatePhone = async () => {
         if (!phone || phone === userData?.phone) {
             return;
         }
-        setIsUpdating(true);
+        setIsUpdatingPhone(true);
         try {
             await updateUserPhone(phone);
         } catch (error) {
             // Error toast is handled in the context
         } finally {
-            setIsUpdating(false);
+            setIsUpdatingPhone(false);
         }
     };
 
@@ -105,14 +124,19 @@ const SettingsPage: NextPage = () => {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="full-name">Full Name</Label>
-               <Input id="full-name" defaultValue={userData?.name} readOnly />
+               <div className="flex gap-2">
+                <Input id="full-name" placeholder="Enter your full name" value={name} onChange={(e) => setName(e.target.value)} disabled={isUpdatingName} />
+                <Button onClick={handleUpdateName} disabled={isUpdatingName || name === userData?.name}>
+                  {isUpdatingName ? 'Updating...' : 'Update'}
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone-number">Phone Number</Label>
               <div className="flex gap-2">
-                <Input id="phone-number" placeholder="Enter your phone number" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={isUpdating} />
-                <Button onClick={handleUpdatePhone} disabled={isUpdating || phone === userData?.phone}>
-                  {isUpdating ? 'Updating...' : 'Update'}
+                <Input id="phone-number" placeholder="Enter your phone number" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={isUpdatingPhone} />
+                <Button onClick={handleUpdatePhone} disabled={isUpdatingPhone || phone === userData?.phone}>
+                  {isUpdatingPhone ? 'Updating...' : 'Update'}
                 </Button>
               </div>
             </div>

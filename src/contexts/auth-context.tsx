@@ -50,6 +50,7 @@ interface AuthContextType {
   logOut: () => Promise<void>;
   redeemReferralCode: (code: string) => Promise<void>;
   updateUserPhone: (phone: string) => Promise<void>;
+  updateUserName: (name: string) => Promise<void>;
   claimDailyBonus: (amount: number) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
 }
@@ -287,6 +288,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // The onSnapshot listener will update the local state automatically
     };
 
+    const updateUserName = async (name: string) => {
+        if (!user) throw new Error("No user is logged in.");
+        try {
+            const userDocRef = doc(db, 'users', user.uid);
+            await updateDoc(userDocRef, { name });
+            // State updates via onSnapshot
+            toast({
+                title: 'Success!',
+                description: 'Your name has been updated.',
+            });
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Update Failed',
+                description: error.message,
+            });
+            throw error;
+        }
+    };
+
     const updateUserPhone = async (phone: string) => {
         if (!user) throw new Error("No user is logged in.");
         try {
@@ -371,6 +392,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         logOut,
         redeemReferralCode,
         updateUserPhone,
+        updateUserName,
         claimDailyBonus,
         sendPasswordReset,
     };
