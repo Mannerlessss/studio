@@ -24,7 +24,9 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
   const [spinResult, setSpinResult] = useState(0);
 
   useEffect(() => {
-    const storedLastClaim = localStorage.getItem('lastBonusClaim');
+    // Timer reset: The line below is commented out to always show the game for testing.
+    // const storedLastClaim = localStorage.getItem('lastBonusClaim');
+    const storedLastClaim = null; 
     const storedClaimedAmount = localStorage.getItem('lastClaimedAmount');
     if (storedLastClaim) {
       setLastClaim(Number(storedLastClaim));
@@ -153,16 +155,12 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
           </>
         ) : (
           <>
-            {claimedAmount !== null ? (
+            {claimedAmount !== null && (
               <p className="text-lg font-semibold text-accent mb-2">
                 You won {claimedAmount} Rs!
               </p>
-            ) : (
-                 <p className="text-muted-foreground mb-2">
-                    Bonus claimed for today!
-                </p>
             )}
-            <p className="text-muted-foreground">
+             <p className="text-muted-foreground">
               Come back in <span className="font-semibold text-primary">{timeRemaining}</span> for another spin.
             </p>
           </>
