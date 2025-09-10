@@ -92,38 +92,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // --- Mock Functions ---
     const signInWithGoogle = async () => {
         console.log("Mock sign in with Google");
-        setLoading(true);
-        setUser(mockUser);
-        setUserData(mockUserData);
-        router.push('/');
-        setLoading(false);
     };
 
     const signUpWithEmail = async (details: any) => {
         console.log("Mock sign up with email", details);
-        setLoading(true);
-        setUser(mockUser);
-        setUserData(mockUserData);
-        router.push('/');
-        setLoading(false);
     };
 
     const signInWithEmail = async (details: any) => {
         console.log("Mock sign in with email", details);
-        setLoading(true);
-        setUser(mockUser);
-        setUserData(mockUserData);
-        router.push('/');
-        setLoading(false);
     };
 
     const logOut = async () => {
         console.log("Mock log out");
-        setLoading(true);
         setUser(null);
         setUserData(null);
         router.push('/login');
-        setLoading(false);
     };
 
     const redeemReferralCode = async (code: string) => {
@@ -144,9 +127,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         redeemReferralCode,
     };
     
-    if (pathname === '/login' && !loading && user) {
+    // If on the login page, redirect to home since we're using mock auth
+    if (pathname === '/login') {
         router.push('/');
-        return null;
+        return null; // Return null while redirecting
     }
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
