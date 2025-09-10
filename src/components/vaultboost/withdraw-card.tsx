@@ -23,11 +23,11 @@ export function WithdrawCard() {
     <Card>
       <CardHeader>
         <CardTitle>Withdraw Earnings</CardTitle>
-        <CardDescription>Available Balance: 0.00 Rs.</CardDescription>
+        <CardDescription>Available Balance: {userData?.totalBalance.toFixed(2) || '0.00'} Rs.</CardDescription>
       </CardHeader>
       <CardContent>
         {!showWithdrawForm ? (
-          <Button className="w-full" onClick={handleRequestWithdrawal}>
+          <Button className="w-full" onClick={handleRequestWithdrawal} disabled={(userData?.totalBalance || 0) < 1000}>
             <Banknote className="mr-2" /> Request Withdrawal
           </Button>
         ) : (

@@ -16,15 +16,14 @@ import { ProfileCompletionCard } from '@/components/vaultboost/profile-completio
 
 
 const Dashboard: NextPage = () => {
-  const { userData, loading } = useAuth();
+  const { userData, loading, claimDailyBonus } = useAuth();
 
   if (loading || !userData) {
       return null; // AuthProvider will handle redirection
   }
   
   const handleBonusClaim = (amount: number) => {
-    // This will be updated to modify Firestore data
-    console.log(`Claimed ${amount} bonus`);
+    claimDailyBonus(amount);
   };
 
   return (

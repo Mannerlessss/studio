@@ -47,6 +47,7 @@ interface AuthContextType {
   logOut: () => Promise<void>;
   redeemReferralCode: (code: string) => Promise<void>;
   updateUserPhone: (phone: string) => Promise<void>;
+  claimDailyBonus: (amount: number) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -69,9 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     setUser(currentUser);
                     setUserData(userDocSnap.data() as UserData);
                 } else {
-                    // This case might happen if user is deleted from db but not auth
-                    // Or during initial creation race conditions
-                     await signOut(auth); // Log out from auth
+                    await signOut(auth);
                     setUser(null);
                     setUserData(null);
                 }
@@ -258,6 +257,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw error;
         }
     };
+    
+    const claimDailyBonus = (amount: number) => {
+        if (!userData) return;
+        
+        // This is a local update for the mock scenario.
+        // For a real app, this would be an update to Firestore.
+        const newUserData = {
+            ...userData,
+            earnings: userData.earnings + amount,
+            bonusEarnings: userData.bonusEarnings + amount,
+            totalBalance: userData.totalBalance + amount,
+        };
+        setUserData(newUserData);
+        toast({
+            title: 'Bonus Claimed!',
+            description: `You've received ${amount} Rs.`,
+        });
+    }
 
     const value: AuthContextType = {
         user,
@@ -269,6 +286,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         logOut,
         redeemReferralCode,
         updateUserPhone,
+        claimDailyBonus,
     };
     
     if (loading) {
