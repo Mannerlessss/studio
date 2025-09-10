@@ -84,16 +84,6 @@ export default function LoginPage() {
         setResetEmail(''); // Clear the input after sending
     };
 
-
-    const GoogleIcon = () => (
-        <svg className="w-5 h-5" viewBox="0 0 48 48">
-            <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039L38.804 12.12C34.553 8.246 29.626 6 24 6C13.49 6 5 14.49 5 25s8.49 19 19 19s19-8.49 19-19c0-1.838-.27-3.626-.789-5.333z" />
-            <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039L38.804 12.12C34.553 8.246 29.626 6 24 6C16.3 6 9.682 10.182 6.306 14.691z" />
-            <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" />
-            <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C42.022 35.786 44 30.825 44 25c0-1.838-.27-3.626-.789-5.333z" />
-        </svg>
-    );
-
   return (
     <div className="flex items-center justify-center min-h-screen bg-background p-4">
        <AlertDialog>
@@ -144,9 +134,6 @@ export default function LoginPage() {
                 <CardFooter className="flex-col gap-4">
                     <Button className="w-full" onClick={handleSignIn} disabled={loading}>
                         {loading ? 'Signing In...' : 'Login'}
-                    </Button>
-                    <Button variant="outline" className="w-full" onClick={signInWithGoogle} disabled={loading}>
-                        <GoogleIcon /> Sign In with Google
                     </Button>
                 </CardFooter>
             </Card>
@@ -201,9 +188,6 @@ export default function LoginPage() {
                 <CardFooter className="flex-col gap-4">
                     <Button className="w-full" onClick={handleSignUp} disabled={loading}>
                         {loading ? 'Creating Account...' : 'Sign Up'}
-                    </Button>
-                    <Button variant="outline" className="w-full" onClick={signInWithGoogle} disabled={loading}>
-                        <GoogleIcon /> Sign Up with Google
                     </Button>
                 </CardFooter>
             </Card>
