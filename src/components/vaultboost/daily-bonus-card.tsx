@@ -25,8 +25,12 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
 
   useEffect(() => {
     const storedLastClaim = localStorage.getItem('lastBonusClaim');
+    const storedClaimedAmount = localStorage.getItem('lastClaimedAmount');
     if (storedLastClaim) {
       setLastClaim(Number(storedLastClaim));
+      if(storedClaimedAmount) {
+        setClaimedAmount(Number(storedClaimedAmount));
+      }
     } else {
       setBonusAvailable(true);
     }
@@ -44,6 +48,7 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
         setBonusAvailable(true);
         setTimeRemaining('');
         setClaimedAmount(null);
+        localStorage.removeItem('lastClaimedAmount');
         clearInterval(interval);
       } else {
         setBonusAvailable(false);
@@ -83,6 +88,7 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
       const now = Date.now();
       setLastClaim(now);
       localStorage.setItem('lastBonusClaim', String(now));
+      localStorage.setItem('lastClaimedAmount', String(prizeAmount));
       setBonusAvailable(false);
       setClaimedAmount(prizeAmount);
       setIsSpinning(false);
