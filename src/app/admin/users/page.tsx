@@ -41,7 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, onSnapshot, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, updateDoc, writeBatch, serverTimestamp, collectionGroup, query, where, getDocs } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface User {
@@ -104,7 +104,6 @@ export default function UsersPage() {
             
             batch.update(userDocRef, { 
                 invested: newInvestedAmount,
-                // Daily earnings will be added by a separate process/function
             });
 
             const transactionRef = doc(collection(db, `users/${user.id}/transactions`));
@@ -154,6 +153,15 @@ export default function UsersPage() {
                         status: 'Completed',
                         date: serverTimestamp(),
                     });
+
+                    // Update the `hasInvested` flag in the referrer's subcollection
+                    const referrerReferralsRef = collection(db, 'users', user.referredBy, 'referrals');
+                    const q = query(referrerReferralsRef, where("userId", "==", user.id));
+                    const referredUserDocs = await getDocs(q);
+                    if (!referredUserDocs.empty) {
+                        const referredUserDocRef = referredUserDocs.docs[0].ref;
+                        batch.update(referredUserDocRef, { hasInvested: true });
+                    }
                 }
             }
             

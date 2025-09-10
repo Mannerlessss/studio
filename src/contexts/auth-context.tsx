@@ -12,7 +12,7 @@ import {
     sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, Timestamp, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, Timestamp, onSnapshot, addDoc } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Gem } from 'lucide-react';
@@ -92,7 +92,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setIsInitialising(true);
             if (currentUser) {
                 setUser(currentUser);
                 const userDocRef = doc(db, 'users', currentUser.uid);
@@ -106,9 +105,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         }
                     } else {
                         // This case handles sign-in where a user exists in Auth but not Firestore.
+                        // For example, Google Sign in for the first time.
                         const newUser = createNewUserData(currentUser);
                         await setDoc(userDocRef, newUser);
-                        setUserData(newUser); // The onSnapshot listener will update this again, but this sets it initially
+                        setUserData(newUser); 
                     }
                     setIsInitialising(false);
                 }, (error) => {
@@ -151,9 +151,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const handleSuccessfulSignUp = async (loggedInUser: User, extraData: { name: string, phone: string, referralCode?: string }) => {
         const userDocRef = doc(db, 'users', loggedInUser.uid);
-        
         const newUser = createNewUserData(loggedInUser, extraData);
         
+        const batch = writeBatch(db);
+
         if (extraData.referralCode) {
              const q = query(collection(db, "users"), where("referralCode", "==", extraData.referralCode.toUpperCase()));
              const querySnapshot = await getDocs(q);
@@ -161,6 +162,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                  const referrerDoc = querySnapshot.docs[0];
                  newUser.referredBy = referrerDoc.id;
                  newUser.usedReferralCode = extraData.referralCode;
+
+                 // Add a record to the referrer's `referrals` subcollection
+                 const referrerReferralsRef = collection(db, 'users', referrerDoc.id, 'referrals');
+                 batch.set(doc(referrerReferralsRef), {
+                     userId: loggedInUser.uid,
+                     name: newUser.name,
+                     email: newUser.email,
+                     date: serverTimestamp(),
+                     hasInvested: false
+                 });
+
              } else {
                 toast({
                     variant: 'destructive',
@@ -169,8 +181,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 });
              }
         }
-        await setDoc(userDocRef, newUser);
-        // No need to setUserData here, the onSnapshot listener will take care of it.
+        batch.set(userDocRef, newUser);
+        await batch.commit();
+
         setUser(loggedInUser);
     }
 
@@ -259,6 +272,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             usedReferralCode: code.toUpperCase(),
             referredBy: referrerDoc.id,
         });
+        
+        // Add a record to the referrer's `referrals` subcollection
+        const referrerReferralsRef = collection(db, 'users', referrerDoc.id, 'referrals');
+        batch.set(doc(referrerReferralsRef), {
+            userId: user.uid,
+            name: userData.name,
+            email: userData.email,
+            date: serverTimestamp(),
+            hasInvested: false
+        });
 
         await batch.commit();
         // The onSnapshot listener will update the local state automatically
@@ -288,17 +311,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!user || !userData) return;
         
         try {
-            const userDocRef = doc(db, 'users', user.uid);
-            const userDocSnap = await getDoc(userDocRef); // Get fresh data
-            if (!userDocSnap.exists()) throw new Error("User data not found.");
-
-            const currentData = userDocSnap.data();
             const batch = writeBatch(db);
+            const userDocRef = doc(db, 'users', user.uid);
             
             batch.update(userDocRef, {
-                totalBalance: (currentData.totalBalance || 0) + amount,
-                bonusEarnings: (currentData.bonusEarnings || 0) + amount,
-                earnings: (currentData.earnings || 0) + amount,
+                totalBalance: (userData.totalBalance || 0) + amount,
+                bonusEarnings: (userData.bonusEarnings || 0) + amount,
+                earnings: (userData.earnings || 0) + amount,
                 lastBonusClaim: serverTimestamp(),
             });
             

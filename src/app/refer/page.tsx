@@ -11,9 +11,16 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { LeaderboardCard } from '@/components/vaultboost/leaderboard-card';
-import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
+
+interface ReferredUser {
+    id: string;
+    name: string;
+    email: string;
+    hasInvested: boolean;
+}
 
 const ReferPage: NextPage = () => {
     const { toast } = useToast();
@@ -31,10 +38,11 @@ const ReferPage: NextPage = () => {
     useEffect(() => {
         if (!user) return;
 
-        const q = query(collection(db, "users"), where("referredBy", "==", user.uid));
+        const referralsRef = collection(db, `users/${user.uid}/referrals`);
+        const q = query(referralsRef);
         
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const referredUsers = querySnapshot.docs.map(doc => doc.data());
+            const referredUsers = querySnapshot.docs.map(doc => doc.data() as ReferredUser);
             const totalReferred = referredUsers.length;
             const successfullyInvested = referredUsers.filter(u => u.hasInvested).length;
             
@@ -42,6 +50,9 @@ const ReferPage: NextPage = () => {
                 totalReferred,
                 successfullyInvested
             });
+            setLoadingStats(false);
+        }, (error) => {
+            console.error("Failed to fetch referrals:", error);
             setLoadingStats(false);
         });
 

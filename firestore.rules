@@ -2,15 +2,37 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow users to read and write their own data
-    match /users/{userId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
+
+    // Allow reading and creating offer codes by an admin
+    match /offers/{offerId} {
+      allow read, create: if request.auth != null && request.auth.token.email == 'gagansharma.gs107@gmail.com';
     }
 
-    // Allow users to read their own transactions
-     match /users/{userId}/transactions/{transactionId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    match /users/{userId} {
+      // A user can read/write to their own document
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      // Any authenticated user can create a user document (for sign-up)
+      allow create: if request.auth != null;
+
+      // Transactions subcollection
+      match /transactions/{transactionId} {
+        allow read, write, create: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      // Referrals subcollection (for tracking who a user has referred)
+      match /referrals/{referralId} {
+        allow read, create: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Withdrawals subcollection
+      match /withdrawals/{withdrawalId} {
+        allow read, write, create: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Admin access for withdrawals collection group
+    match /{path=**}/withdrawals/{withdrawalId} {
+      allow read, write: if request.auth != null && request.auth.token.email == 'gagansharma.gs107@gmail.com';
     }
   }
 }
