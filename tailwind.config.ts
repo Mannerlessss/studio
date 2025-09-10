@@ -78,17 +78,50 @@ export default {
             height: '0',
           },
         },
-        'confetti': {
-          '0%': { transform: 'translateY(0%) rotate(0deg)', opacity: '1' },
-          '100%': { transform: 'translateY(200px) rotate(360deg)', opacity: '0' },
+        'open-suitcase': {
+          'from': { transform: 'rotateY(0deg)' },
+          'to': { transform: 'rotateY(180deg)' },
+        },
+        'shake': {
+           '0%, 100%': { transform: 'translateX(0)' },
+           '10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-5px) rotate(-2deg)' },
+           '20%, 40%, 60%, 80%': { transform: 'translateX(5px) rotate(2deg)' },
         }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
-        'confetti': 'confetti 1.5s ease-out forwards',
+        'open-suitcase': 'open-suitcase 1s ease-in-out forwards',
+        'shake': 'shake 0.5s ease-in-out',
+      },
+      perspective: {
+        '1000': '1000px',
+      },
+      transformStyle: {
+        'preserve-3d': 'preserve-3d',
+      },
+      backfaceVisibility: {
+        'hidden': 'hidden',
       },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [
+    require('tailwindcss-animate'),
+    function ({ addUtilities }: { addUtilities: any}) {
+      addUtilities({
+        '.perspective-1000': {
+          perspective: '1000px',
+        },
+        '.preserve-3d': {
+          transformStyle: 'preserve-3d',
+        },
+        '.backface-hidden': {
+          backfaceVisibility: 'hidden',
+        },
+        '.rotate-y-180': {
+            transform: 'rotateY(180deg)',
+        }
+      })
+    }
+  ],
 } satisfies Config;

@@ -1,30 +1,46 @@
 'use client';
-import { FC, useState, useEffect } from 'react';
+import { FC, useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Gift, Zap } from 'lucide-react';
+import { Briefcase, Gift } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DailyBonusCardProps {
   onBonusClaim: (amount: number) => void;
 }
 
-const prizes = [1, 5, 3, 7, 2, 8, 4, 6];
-const wheelColors = [
-  'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
-  'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
-];
+const prizeAmounts = [1, 2, 3, 4, 5, 6, 7, 8];
+
+// Function to shuffle an array
+const shuffle = (array: number[]) => {
+  let currentIndex = array.length, randomIndex;
+  while (currentIndex !== 0) {
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+    [array[currentIndex], array[randomIndex]] = [
+      array[randomIndex], array[currentIndex]];
+  }
+  return array;
+};
+
 
 export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
   const [lastClaim, setLastClaim] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [bonusAvailable, setBonusAvailable] = useState<boolean>(false);
   const [claimedAmount, setClaimedAmount] = useState<number | null>(null);
-  
-  const [gameState, setGameState] = useState<'ready' | 'spinning' | 'spun' | 'collected'>('ready');
-  const [spinResult, setSpinResult] = useState(0);
-  const [prize, setPrize] = useState<number | null>(null);
-  const [showConfetti, setShowConfetti] = useState(false);
+
+  const [gameState, setGameState] = useState<'ready' | 'picked' | 'revealed'>('ready');
+  const [userChoiceIndex, setUserChoiceIndex] = useState<number | null>(null);
+  const [prizes, setPrizes] = useState<number[]>([]);
+
+  const wonAmount = useMemo(() => {
+    if (userChoiceIndex !== null) {
+      return prizes[userChoiceIndex];
+    }
+    return null;
+  }, [userChoiceIndex, prizes]);
+
 
   useEffect(() => {
     // Timer reset: The line below is commented out to always show the game for testing.
@@ -33,18 +49,17 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
     const storedClaimedAmount = localStorage.getItem('lastClaimedAmount');
     if (storedLastClaim) {
       setLastClaim(Number(storedLastClaim));
-      setGameState('collected');
       if(storedClaimedAmount) {
         setClaimedAmount(Number(storedClaimedAmount));
       }
     } else {
       setBonusAvailable(true);
-      setGameState('ready');
+      handleGameReset();
     }
   }, []);
 
   useEffect(() => {
-    if (gameState !== 'collected' || lastClaim === null) return;
+    if (!bonusAvailable || lastClaim === null) return;
 
     const interval = setInterval(() => {
       const now = Date.now();
@@ -55,8 +70,8 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
         setBonusAvailable(true);
         setTimeRemaining('');
         setClaimedAmount(null);
-        setGameState('ready');
-        setPrize(null);
+        handleGameReset();
+        localStorage.removeItem('lastBonusClaim');
         localStorage.removeItem('lastClaimedAmount');
         clearInterval(interval);
       } else {
@@ -74,65 +89,37 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [gameState, lastClaim]);
+  }, [bonusAvailable, lastClaim]);
 
-  const handleSpin = () => {
+  const handleGameReset = () => {
+    setPrizes(shuffle([...prizeAmounts]));
+    setGameState('ready');
+    setUserChoiceIndex(null);
+  };
+  
+  const handleSuitcasePick = (index: number) => {
     if (gameState !== 'ready') return;
 
-    setGameState('spinning');
-    const randomIndex = Math.floor(Math.random() * prizes.length);
-    const prizeAmount = prizes[randomIndex];
-    
-    // Consistent spin for accurate prize display
-    const fullSpins = 5;
-    const segmentAngle = 360 / prizes.length;
-    // Center the pointer in the middle of the prize segment
-    const prizeAngle = (randomIndex * segmentAngle) + (segmentAngle / 2);
-    const totalRotation = (360 * fullSpins) + prizeAngle;
-
-    setSpinResult(totalRotation);
+    setUserChoiceIndex(index);
+    setGameState('picked');
 
     setTimeout(() => {
-      setPrize(prizeAmount);
-      setGameState('spun');
-    }, 4000); // Corresponds to the animation duration
+      setGameState('revealed');
+    }, 2000); // Wait 2 seconds before revealing all
   };
 
   const handleCollect = () => {
-    if (gameState !== 'spun' || prize === null) return;
+    if (gameState !== 'revealed' || wonAmount === null) return;
     
-    setShowConfetti(true);
-
-    setTimeout(() => {
-      onBonusClaim(prize);
-      const now = Date.now();
-      setLastClaim(now);
-      localStorage.setItem('lastBonusClaim', String(now));
-      localStorage.setItem('lastClaimedAmount', String(prize));
-      
-      setClaimedAmount(prize);
-      setBonusAvailable(false);
-      setGameState('collected');
-      setShowConfetti(false);
-    }, 1500); // Confetti animation duration
+    onBonusClaim(wonAmount);
+    const now = Date.now();
+    setLastClaim(now);
+    localStorage.setItem('lastBonusClaim', String(now));
+    localStorage.setItem('lastClaimedAmount', String(wonAmount));
+    
+    setClaimedAmount(wonAmount);
+    setBonusAvailable(false);
   }
-
-  const Confetti = () => (
-    <div className="absolute inset-0 pointer-events-none">
-      {[...Array(50)].map((_, i) => (
-        <div 
-          key={i}
-          className="absolute w-2 h-2 bg-yellow-400 rounded-full animate-confetti"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * -50}%`,
-            animationDelay: `${Math.random() * 1.5}s`,
-            backgroundColor: ['#fde047', '#f97316', '#22c55e', '#3b82f6'][i % 4]
-          }}
-        />
-      ))}
-    </div>
-  );
 
   return (
     <Card className="shadow-md overflow-hidden">
@@ -143,73 +130,63 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
         </div>
       </CardHeader>
       <CardContent className="text-center flex flex-col items-center justify-center space-y-4 relative">
-        {showConfetti && <Confetti />}
-
-        {gameState === 'collected' ? (
-           <>
+        {!bonusAvailable ? (
+          <>
             {claimedAmount !== null && (
               <p className="text-lg font-semibold text-accent mb-2">
                 You won {claimedAmount} Rs!
               </p>
             )}
-             <p className="text-muted-foreground">
-              Come back in <span className="font-semibold text-primary">{timeRemaining}</span> for another spin.
+            <p className="text-muted-foreground">
+              Come back in <span className="font-semibold text-primary">{timeRemaining}</span> for your next bonus.
             </p>
           </>
         ) : (
           <>
-            <div className="relative w-64 h-64 flex items-center justify-center mb-4">
-              <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20" style={{ transform: 'translateY(-4px) translateX(-50%)', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))' }}>
-                 <div className="w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-[16px] border-t-white"></div>
-              </div>
-              
-              <div
-                className={cn(
-                  "relative w-60 h-60 rounded-full border-4 border-primary/50 shadow-inner overflow-hidden",
-                  gameState === 'spinning' && "transition-transform duration-[4000ms] ease-out"
-                )}
-                style={{ transform: `rotate(${spinResult}deg)` }}
-              >
-                {prizes.map((p, index) => (
-                  <div
-                    key={index}
-                    className={cn(
-                      'absolute w-1/2 h-1/2 origin-bottom-right flex items-center justify-center',
-                      wheelColors[index % wheelColors.length]
-                    )}
-                    style={{
-                      transform: `rotate(${index * (360 / prizes.length)}deg)`,
-                      clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 0)',
-                    }}
-                  >
-                    <span
-                      className="text-white font-bold text-lg"
-                      style={{ transform: `rotate(${(360/prizes.length)/2 - 90}deg) translate(40px, 0px)` }}
-                    >
-                      {p}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div className="absolute w-16 h-16 rounded-full bg-card border-4 border-primary flex items-center justify-center text-primary z-10">
-                <Zap className="w-8 h-8" />
-              </div>
-            </div>
+            {gameState === 'ready' && <p className="text-muted-foreground">Pick a suitcase to reveal your prize!</p>}
+            {gameState === 'picked' && <p className="text-muted-foreground animate-pulse">Revealing prizes...</p>}
+            {gameState === 'revealed' && <p className="text-muted-foreground">You won {wonAmount} Rs!</p>}
 
-            {gameState === 'ready' && (
-              <>
-              <p className="text-muted-foreground">Click the button to spin the wheel for your daily bonus!</p>
-              <Button onClick={handleSpin}>Spin Now</Button>
-              </>
-            )}
-            {gameState === 'spinning' && (
-              <p className="text-muted-foreground animate-pulse">Spinning for a prize...</p>
-            )}
-            {gameState === 'spun' && prize !== null && (
-              <>
-                <p className="text-muted-foreground">Congratulations! You won:</p>
-                <Button onClick={handleCollect} size="lg" className='animate-bounce'>Collect {prize} Rs.</Button>
-              </>
+            <div className="grid grid-cols-4 gap-4 w-full">
+              {prizes.map((prize, index) => {
+                const isPicked = userChoiceIndex === index;
+                const isRevealed = gameState === 'revealed';
+                
+                return (
+                  <div key={index} className="perspective-1000">
+                    <button
+                      onClick={() => handleSuitcasePick(index)}
+                      disabled={gameState !== 'ready'}
+                      className={cn(
+                        "w-full aspect-square preserve-3d transition-transform duration-1000",
+                        isRevealed ? 'rotate-y-180' : ''
+                      )}
+                    >
+                      {/* Front of suitcase */}
+                      <div className={cn(
+                        "absolute w-full h-full backface-hidden rounded-lg border-2 border-amber-700 bg-amber-500 flex items-center justify-center cursor-pointer",
+                        "hover:animate-shake disabled:cursor-not-allowed disabled:hover:animate-none",
+                         isPicked && !isRevealed ? "ring-4 ring-primary ring-offset-2 ring-offset-background" : ""
+                      )}>
+                        <Briefcase className="w-8 h-8 text-amber-900" />
+                      </div>
+                      {/* Back of suitcase (prize) */}
+                      <div className={cn(
+                        "absolute w-full h-full backface-hidden rounded-lg flex items-center justify-center rotate-y-180",
+                         isPicked ? "bg-primary text-primary-foreground border-2 border-primary" : "bg-muted text-muted-foreground border"
+                      )}>
+                        <span className="text-2xl font-bold">{prize}</span>
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {gameState === 'revealed' && (
+              <Button onClick={handleCollect} size="lg" className="animate-bounce mt-6">
+                Collect {wonAmount} Rs.
+              </Button>
             )}
           </>
         )}
@@ -217,5 +194,3 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
     </Card>
   );
 };
-
-    
