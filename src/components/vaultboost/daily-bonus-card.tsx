@@ -83,11 +83,12 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
     const randomIndex = Math.floor(Math.random() * prizes.length);
     const prizeAmount = prizes[randomIndex];
     
+    // Consistent spin for accurate prize display
     const fullSpins = 5;
     const segmentAngle = 360 / prizes.length;
-    const prizeAngle = randomIndex * segmentAngle;
-    const randomOffset = Math.random() * segmentAngle * 0.8 - (segmentAngle * 0.4);
-    const totalRotation = (360 * fullSpins) + prizeAngle + randomOffset;
+    // Center the pointer in the middle of the prize segment
+    const prizeAngle = (randomIndex * segmentAngle) + (segmentAngle / 2);
+    const totalRotation = (360 * fullSpins) + prizeAngle;
 
     setSpinResult(totalRotation);
 
@@ -158,7 +159,7 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
         ) : (
           <>
             <div className="relative w-64 h-64 flex items-center justify-center mb-4">
-              <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20" style={{ filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))' }}>
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20" style={{ transform: 'translateY(-4px) translateX(-50%)', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))' }}>
                  <div className="w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-[16px] border-t-white"></div>
               </div>
               
@@ -216,3 +217,5 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
     </Card>
   );
 };
+
+    
