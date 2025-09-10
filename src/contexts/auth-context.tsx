@@ -65,7 +65,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setLoading(true);
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
@@ -73,32 +72,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const dbData = userDocSnap.data() as UserData;
                     setUserData(dbData);
                     setUser(currentUser);
-                     if (pathname.startsWith('/login')) {
-                        router.push('/');
-                    }
                 } else {
                     // This can happen if user is deleted from db but not from auth
                     await signOut(auth);
                     setUser(null);
                     setUserData(null);
-                    router.push('/login');
                 }
             } else {
                 setUser(null);
                 setUserData(null);
-                if (!pathname.startsWith('/login') && !pathname.startsWith('/admin')) {
-                    router.push('/login');
-                }
             }
             setLoading(false);
         });
 
         return () => unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [router]);
+    }, []);
+
+    useEffect(() => {
+        if (!loading) {
+            const isAuthPage = pathname.startsWith('/login');
+            const isAdminPage = pathname.startsWith('/admin');
+
+            if (!user && !isAuthPage && !isAdminPage) {
+                router.push('/login');
+            } else if (user && isAuthPage) {
+                router.push('/');
+            }
+        }
+    }, [user, loading, pathname, router]);
 
 
     const handleSuccessfulLogin = async (loggedInUser: User, extraData?: { name?: string, phone?: string, referralCode?: string }) => {
+        setLoading(true);
         const userDocRef = doc(db, 'users', loggedInUser.uid);
         const userDocSnap = await getDoc(userDocRef);
 
@@ -150,16 +156,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             finalUserData = newUser;
         }
         
-        // After setting user data, onAuthStateChanged will handle redirection
         setUserData(finalUserData);
         setUser(loggedInUser);
-        router.push('/');
+        // setLoading will be handled by the onAuthStateChanged listener's flow
     }
 
     const signInWithGoogle = async () => {
         const provider = new GoogleAuthProvider();
         try {
-            setLoading(true);
             const result = await signInWithPopup(auth, provider);
             await handleSuccessfulLogin(result.user);
         } catch (error: any) {
@@ -170,13 +174,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     description: error.message,
                 });
             }
-            setLoading(false);
         }
     };
 
     const signUpWithEmail = async ({ name, email, password, phone, referralCode }: any) => {
         try {
-            setLoading(true);
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
         } catch (error: any) {
@@ -185,22 +187,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-Up Failed',
                 description: error.message,
             });
-            setLoading(false);
         }
     };
 
     const signInWithEmail = async ({ email, password }: any) => {
         try {
-            setLoading(true);
             const result = await signInWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(result.user);
         } catch (error: any) {
-            toast({
+             toast({
                 variant: 'destructive',
                 title: 'Login Failed',
                 description: error.message,
             });
-            setLoading(false);
         }
     };
 
