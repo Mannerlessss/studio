@@ -1,3 +1,4 @@
+
 'use client';
 import { FC, useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,12 +44,13 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
 
 
   useEffect(() => {
-    // Timer reset: The line below is commented out to always show the game for testing.
-    // const storedLastClaim = localStorage.getItem('lastBonusClaim');
-    const storedLastClaim = null; 
+    // The line below is commented out to always show the game for testing.
+    const storedLastClaim = localStorage.getItem('lastBonusClaim');
+    // const storedLastClaim = null; 
     const storedClaimedAmount = localStorage.getItem('lastClaimedAmount');
     if (storedLastClaim) {
       setLastClaim(Number(storedLastClaim));
+      setBonusAvailable(false);
       if(storedClaimedAmount) {
         setClaimedAmount(Number(storedClaimedAmount));
       }
@@ -59,10 +61,18 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
   }, []);
 
   useEffect(() => {
-    if (!bonusAvailable || lastClaim === null) return;
+    if (bonusAvailable) return;
 
     const interval = setInterval(() => {
       const now = Date.now();
+      // lastClaim can be null here if bonusAvailable is false from the start but no lastClaim is in storage
+      // This is a race condition on initial load. We should check for lastClaim.
+      if (lastClaim === null) {
+          clearInterval(interval);
+          setBonusAvailable(true); // Should be available if there's no claim time
+          return;
+      }
+        
       const twelveHours = 12 * 60 * 60 * 1000;
       const timeSinceClaim = now - lastClaim;
 
