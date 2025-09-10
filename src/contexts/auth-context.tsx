@@ -54,6 +54,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const ADMIN_EMAIL = "gagansharma.gs107@gmail.com";
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -74,8 +75,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     setUser(currentUser);
                     await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
                 } else {
-                    // This can happen if a user is in auth but not DB (e.g., deleted user).
-                    // Log them out to ensure a clean slate.
                     await signOut(auth);
                     setUser(null);
                     setUserData(null);
@@ -97,7 +96,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const isAdminPage = pathname.startsWith('/admin');
         const isPublicPage = ['/terms', '/privacy'].includes(pathname);
 
-        if (isPublicPage || isAdminPage) return;
+        if (user && user.email === ADMIN_EMAIL) {
+            if (!isAdminPage) {
+                router.push('/admin');
+            }
+            return;
+        }
+        
+        if (isAdminPage && (!user || user.email !== ADMIN_EMAIL)) {
+             router.push('/');
+             return;
+        }
+
+        if (isPublicPage) return;
 
         if (!user && !isAuthPage) {
             router.push('/login');
@@ -362,3 +373,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
