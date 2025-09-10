@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Gift, TrendingUp, Banknote, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Clock, Gift, TrendingUp, Banknote, ArrowUpCircle, ArrowDownCircle, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { useAuth } from '@/contexts/auth-context';
