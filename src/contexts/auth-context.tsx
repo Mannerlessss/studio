@@ -12,7 +12,7 @@ import {
     sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, Timestamp, onSnapshot } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Gem } from 'lucide-react';
@@ -381,3 +381,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
