@@ -90,13 +90,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     useEffect(() => {
-        if (!loading) {
-            const isAuthPage = pathname === '/login';
-            if (user && isAuthPage) {
-                router.push('/');
-            } else if (!user && !isAuthPage) {
-                router.push('/login');
-            }
+        // This effect handles redirection based on auth state.
+        // It's crucial to wait for the initial loading to be false.
+        if (loading) return;
+
+        const isAuthPage = pathname === '/login';
+
+        // If user is not logged in and not on the login page, redirect to login.
+        if (!user && !isAuthPage) {
+            router.push('/login');
+        }
+
+        // If user is logged in and on the login page, redirect to the dashboard.
+        if (user && isAuthPage) {
+            router.push('/');
         }
     }, [user, loading, pathname, router]);
 
@@ -154,6 +161,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         setUser(loggedInUser);
         setUserData(finalUserData);
+        // Do not redirect here, let the useEffect handle it.
     }
 
     const signInWithGoogle = async () => {
@@ -210,7 +218,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logOut = async () => {
         try {
             await signOut(auth);
-            router.push('/login');
+            // No need to push, useEffect will handle it.
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -347,7 +355,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    if (loading) {
+    if (loading && !user) {
          return (
             <div className="flex items-center justify-center h-screen bg-background">
                 <div className="text-center">
