@@ -58,6 +58,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [userData, setUserData] = useState<UserData | null>(null);
+    const [isInitialising, setIsInitialising] = useState(true);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
     const pathname = usePathname();
@@ -65,25 +66,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setLoading(true);
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     const dbData = userDocSnap.data() as UserData;
                     setUserData(dbData);
-                    setUser(currentUser);
                     await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
                 } else {
                     // This can happen if user is deleted from db but not from auth
                     await signOut(auth);
-                    setUser(null);
-                    setUserData(null);
                 }
+                setUser(currentUser);
             } else {
                 setUser(null);
                 setUserData(null);
             }
+            setIsInitialising(false);
             setLoading(false);
         });
 
@@ -92,7 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     useEffect(() => {
-        if (loading) return;
+        if (isInitialising) return;
 
         const isAuthPage = pathname.startsWith('/login');
         const isAdminPage = pathname.startsWith('/admin');
@@ -105,7 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (user && isAuthPage) {
             router.push('/');
         }
-    }, [user, loading, pathname, router]);
+    }, [user, isInitialising, pathname, router]);
 
 
     const handleSuccessfulLogin = async (loggedInUser: User, extraData?: { name?: string, phone?: string, referralCode?: string }) => {
@@ -157,7 +156,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             await setDoc(userDocRef, newUser);
         }
-        // onAuthStateChanged will handle setting state and loading
     }
 
     const signInWithGoogle = async () => {
@@ -166,7 +164,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const result = await signInWithPopup(auth, provider);
             await handleSuccessfulLogin(result.user);
-            // No redirect here, onAuthStateChanged handles it
         } catch (error: any) {
             if (error.code !== 'auth/popup-closed-by-user') {
                 toast({
@@ -340,7 +337,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const value: AuthContextType = {
         user,
         userData,
-        loading,
+        loading: isInitialising || loading,
         signInWithGoogle,
         signUpWithEmail,
         signInWithEmail,
@@ -351,15 +348,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    if (loading) {
-         return (
+    if (isInitialising) {
+        return (
             <div className="flex flex-col items-center justify-center h-screen bg-background">
-                <div className="text-center">
-                    <Gem className="w-16 h-16 text-primary animate-spin-y mb-6" />
-                    <h1 className="text-2xl font-bold tracking-widest text-primary">
-                        VAULTBOOST
+                <div className="text-center p-4">
+                    <Gem className="w-16 h-16 text-primary animate-spin-y mb-6 mx-auto" />
+                    <h1 className="text-3xl font-bold tracking-widest text-primary">
+                        UPI BOOST VAULT
                     </h1>
-                    <p className="text-lg text-muted-foreground mt-2">Loading...</p>
+                    <p className="text-md text-muted-foreground mt-4">
+                        Your partner❤️ takes time to respond you so our dashboard is 😉
+                    </p>
                 </div>
             </div>
         );
@@ -379,5 +378,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
