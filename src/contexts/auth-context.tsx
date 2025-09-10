@@ -107,6 +107,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     if (userDocSnap.exists()) {
                         const dbData = userDocSnap.data() as UserData;
                         setUserData(dbData);
+                         // Update last login only if data exists and user is logged in
+                        updateDoc(userDocRef, { lastLogin: serverTimestamp() }).catch(err => console.error("Failed to update last login", err));
                     } else {
                         // This case is for when the doc doesn't exist, which happens during signup
                         // The user data will be created by the signup function.
@@ -143,12 +145,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (isPublicPage) return;
 
         if (user) {
-            // Update last login timestamp only if userData is loaded
-            if (userData) {
-                 const userDocRef = doc(db, 'users', user.uid);
-                 updateDoc(userDocRef, { lastLogin: serverTimestamp() }).catch(err => console.error("Failed to update last login", err));
-            }
-
             if (user.email === ADMIN_EMAIL) {
                 if (!isAdminPage) router.push('/admin');
             } else {
@@ -166,10 +162,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, 'users', loggedInUser.uid);
         const newUser = createNewUserData(loggedInUser, extraData);
         
+        // This is a more secure way to handle referrals.
+        // The user now redeems the code on the settings page AFTER they are logged in.
         if (extraData.referralCode) {
-            newUser.usedReferralCode = extraData.referralCode.toUpperCase();
-        }
+             try {
+                const q = query(collection(db, "users"), where("referralCode", "==", extraData.referralCode.toUpperCase()));
+                const querySnapshot = await getDocs(q);
 
+                if (!querySnapshot.empty) {
+                    const referrerDoc = querySnapshot.docs[0];
+                    if(referrerDoc.id !== loggedInUser.uid) {
+                        newUser.usedReferralCode = extraData.referralCode.toUpperCase();
+                        newUser.referredBy = referrerDoc.id;
+                    }
+                }
+            } catch (e) {
+                console.error("Error finding referrer on signup:", e);
+            }
+        }
+        
         await setDoc(userDocRef, newUser);
     }
 
@@ -258,7 +269,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             referredBy: referrerDoc.id,
         });
         
-        const referrerReferralsRef = doc(collection(db, 'users', referrerDoc.id, 'referrals', user.uid));
+        const referrerReferralsRef = doc(collection(db, 'users', referrerDoc.id, 'referrals'), user.uid);
         batch.set(referrerReferralsRef, {
             userId: user.uid,
             name: userData.name,
@@ -394,3 +405,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
