@@ -138,7 +138,7 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
                       onClick={() => handleSuitcasePick(index)}
                       disabled={gameState !== 'ready'}
                       className={cn(
-                        "w-full aspect-square preserve-3d transition-transform duration-1000",
+                        "w-full h-16 preserve-3d transition-transform duration-1000",
                         isRevealed ? 'rotate-y-180' : ''
                       )}
                     >
