@@ -57,17 +57,17 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
       const now = Date.now();
       const lastClaimTime = userData.lastBonusClaim!.toDate().getTime();
         
-      const twelveHours = 12 * 60 * 60 * 1000;
+      const fourHours = 4 * 60 * 60 * 1000;
       const timeSinceClaim = now - lastClaimTime;
 
-      if (timeSinceClaim >= twelveHours) {
+      if (timeSinceClaim >= fourHours) {
         setBonusAvailable(true);
         setTimeRemaining('');
         handleGameReset();
         clearInterval(interval);
       } else {
         setBonusAvailable(false);
-        const remaining = twelveHours - timeSinceClaim;
+        const remaining = fourHours - timeSinceClaim;
         const hours = Math.floor((remaining / (1000 * 60 * 60)) % 24);
         const minutes = Math.floor((remaining / 1000 / 60) % 60);
         const seconds = Math.floor((remaining / 1000) % 60);
@@ -138,7 +138,7 @@ export const DailyBonusCard: FC<DailyBonusCardProps> = ({ onBonusClaim }) => {
                       onClick={() => handleSuitcasePick(index)}
                       disabled={gameState !== 'ready'}
                       className={cn(
-                        "w-full h-16 preserve-3d transition-transform duration-1000",
+                        "w-full h-20 preserve-3d transition-transform duration-1000",
                         isRevealed ? 'rotate-y-180' : ''
                       )}
                     >
