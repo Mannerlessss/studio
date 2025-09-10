@@ -61,7 +61,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            setLoading(true);
             if (user) {
                 const userDocRef = doc(db, 'users', user.uid);
                 const userDocSnap = await getDoc(userDocRef);
@@ -69,15 +68,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     setUserData(userDocSnap.data() as UserData);
                 }
                 setUser(user);
+                 if (pathname === '/login') {
+                    router.push('/');
+                }
             } else {
                 setUser(null);
                 setUserData(null);
+                router.push('/login');
             }
             setLoading(false);
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [router, pathname]);
 
     const handleSuccessfulLogin = async (user: User, referredByCode?: string) => {
         const userDocRef = doc(db, 'users', user.uid);
@@ -135,13 +138,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const signInWithGoogle = async () => {
-        setLoading(true);
         const provider = new GoogleAuthProvider();
         try {
             const result = await signInWithPopup(auth, provider);
             await handleSuccessfulLogin(result.user);
         } catch (error: any) {
-            console.error("Google Sign-In Error:", error);
             if (error.code !== 'auth/popup-closed-by-user') {
                 toast({
                     variant: 'destructive',
@@ -149,18 +150,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     description: error.message,
                 });
             }
-        } finally {
-            setLoading(false);
         }
     };
 
     const signUpWithEmail = async ({ name, email, password, phone, referralCode }: any) => {
-        setLoading(true);
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
             
-            // Override user object for profile creation
             const profileDetails = {
                 ...user,
                 displayName: name,
@@ -175,13 +172,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-Up Failed',
                 description: error.message,
             });
-        } finally {
-            setLoading(false);
         }
     };
 
     const signInWithEmail = async ({ email, password }: any) => {
-        setLoading(true);
         try {
             const result = await signInWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(result.user);
@@ -191,13 +185,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Login Failed',
                 description: error.message,
             });
-        } finally {
-            setLoading(false);
         }
     };
 
     const logOut = async () => {
-        setLoading(true);
         try {
             await signOut(auth);
             setUser(null);
@@ -209,8 +200,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Logout Failed',
                 description: error.message,
             });
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -220,8 +209,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         const batch = writeBatch(db);
-
-        // 1. Check if the referral code is valid and belongs to another user
         const q = query(collection(db, "users"), where("referralCode", "==", code));
         const querySnapshot = await getDocs(q);
 
@@ -231,14 +218,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const referrerDoc = querySnapshot.docs[0];
         
-        // 2. Update the current user's document
         const userDocRef = doc(db, 'users', user.uid);
         batch.update(userDocRef, {
             usedReferralCode: code,
             referredBy: referrerDoc.id,
         });
 
-        // 3. (Optional) Update local state immediately
         setUserData({ ...userData, usedReferralCode: code, referredBy: referrerDoc.id });
 
         await batch.commit();
@@ -255,23 +240,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         redeemReferralCode,
     };
     
-    // Auth-aware routing
-    useEffect(() => {
-        if (loading) return;
-
-        const isAuthPage = pathname === '/login';
-        const isProtectedPage = !isAuthPage;
-
-        if (isProtectedPage && !user) {
-            router.push('/login');
-        }
-        if (isAuthPage && user) {
-            router.push('/');
-        }
-
-    }, [user, loading, pathname, router]);
-
-    
     if (loading) {
          return (
             <div className="flex items-center justify-center h-screen bg-background">
@@ -282,19 +250,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             </div>
         );
     }
-    
-    // Render children only when loading is false and routing is settled
-    if ((pathname === '/login' && user) || (pathname !== '/login' && !user)) {
-         return (
-            <div className="flex items-center justify-center h-screen bg-background">
-                <div className="text-center">
-                    <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
-                    <p className="text-lg text-muted-foreground">Redirecting...</p>
-                </div>
-            </div>
-        );
-    }
-
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
@@ -306,5 +261,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
