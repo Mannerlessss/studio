@@ -66,16 +66,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setLoading(true);
+            if (isInitialising) setLoading(true);
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     const dbData = userDocSnap.data() as UserData;
                     setUserData(dbData);
-                    await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+                    if(isInitialising) { // Only update login time on first load, not every data refresh
+                        await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+                    }
                 } else {
-                    // This can happen if user is deleted from db but not from auth
                     await signOut(auth);
                 }
                 setUser(currentUser);
@@ -83,7 +84,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(null);
                 setUserData(null);
             }
-            setIsInitialising(false);
+            if (isInitialising) {
+                setIsInitialising(false);
+            }
             setLoading(false);
         });
 
@@ -114,7 +117,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
-             // Data will be fetched by onAuthStateChanged, just update last login
              await updateDoc(userDocRef, {
                 lastLogin: serverTimestamp(),
             });
@@ -157,6 +159,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             await setDoc(userDocRef, newUser);
         }
+        // State will be set by onAuthStateChanged
     }
 
     const signInWithGoogle = async () => {
@@ -218,7 +221,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 description: error.message,
             });
         } finally {
-            // State updates will be triggered by onAuthStateChanged
+             setLoading(false);
         }
     };
 
@@ -279,14 +282,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             const batch = writeBatch(db);
             
-            // Update user's balance
             batch.update(userDocRef, {
                 totalBalance: newBalance,
                 bonusEarnings: newBonusEarnings,
                 earnings: newEarnings,
             });
             
-            // Create a new transaction record
             const transactionsColRef = collection(db, `users/${user.uid}/transactions`);
             batch.set(doc(transactionsColRef), {
                 type: 'bonus',
@@ -298,7 +299,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             await batch.commit();
 
-            // Update local state
             setUserData({ 
                 ...userData,
                 totalBalance: newBalance,
@@ -359,9 +359,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     <p className="text-md text-muted-foreground mt-4">
                         Your partner❤️ takes time to respond you so our dashboard is 😉
                     </p>
-                    <div className="relative w-16 h-16 mx-auto mt-6">
-                        <Gem className="w-16 h-16 text-primary animate-sparkle" />
-                    </div>
+                    <Gem className="w-16 h-16 text-primary animate-sparkle mx-auto mt-6" />
                 </div>
             </div>
         );
@@ -369,7 +367,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return (
         <AuthContext.Provider value={value}>
-            {children}
+            {loading ? (
+                 <div className="flex flex-col items-center justify-center h-screen bg-background">
+                    <div className="text-center p-4">
+                        <h1 className="text-3xl font-bold tracking-widest text-primary">
+                            UPI BOOST VAULT
+                        </h1>
+                        <p className="text-md text-muted-foreground mt-4">
+                            Your partner❤️ takes time to respond you so our dashboard is 😉
+                        </p>
+                        <Gem className="w-16 h-16 text-primary animate-sparkle mx-auto mt-6" />
+                    </div>
+                </div>
+            ) : children}
         </AuthContext.Provider>
     );
 };
@@ -381,5 +391,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
