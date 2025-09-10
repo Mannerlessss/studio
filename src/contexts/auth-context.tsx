@@ -65,6 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setLoading(true);
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
@@ -72,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const dbData = userDocSnap.data() as UserData;
                     setUserData(dbData);
                     setUser(currentUser);
-                     if (pathname === '/login') {
+                     if (pathname.startsWith('/login')) {
                         router.push('/');
                     }
                 } else {
@@ -85,17 +86,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             } else {
                 setUser(null);
                 setUserData(null);
-                if (pathname !== '/login' && !pathname.startsWith('/admin')) {
+                if (!pathname.startsWith('/login') && !pathname.startsWith('/admin')) {
                     router.push('/login');
                 }
             }
-            // Set loading to false only after all async operations are done
             setLoading(false);
         });
 
         return () => unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [router]);
 
 
     const handleSuccessfulLogin = async (loggedInUser: User, extraData?: { name?: string, phone?: string, referralCode?: string }) => {
@@ -150,7 +150,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             finalUserData = newUser;
         }
         
-        // onAuthStateChanged will handle setting state and routing
+        // After setting user data, let onAuthStateChanged handle redirection
+        setUserData(finalUserData);
+        setUser(loggedInUser);
+        router.push('/');
     }
 
     const signInWithGoogle = async () => {
@@ -159,7 +162,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(true);
             const result = await signInWithPopup(auth, provider);
             await handleSuccessfulLogin(result.user);
-            // No redirect here, onAuthStateChanged will handle it
         } catch (error: any) {
             if (error.code !== 'auth/popup-closed-by-user') {
                 toast({
@@ -168,7 +170,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     description: error.message,
                 });
             }
-            setLoading(false); // ensure loading is false on error
+            setLoading(false);
         }
     };
 
@@ -177,14 +179,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(true);
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
-             // No redirect here, onAuthStateChanged will handle it
         } catch (error: any) {
             toast({
                 variant: 'destructive',
                 title: 'Sign-Up Failed',
                 description: error.message,
             });
-            setLoading(false); // ensure loading is false on error
+            setLoading(false);
         }
     };
 
@@ -193,14 +194,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(true);
             const result = await signInWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(result.user);
-            // No redirect here, onAuthStateChanged will handle it
         } catch (error: any) {
             toast({
                 variant: 'destructive',
                 title: 'Login Failed',
                 description: error.message,
             });
-            setLoading(false); // ensure loading is false on error
+            setLoading(false);
         }
     };
 
