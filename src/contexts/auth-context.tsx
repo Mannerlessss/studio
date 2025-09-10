@@ -61,12 +61,13 @@ const ADMIN_EMAIL = "gagansharma.gs107@gmail.com";
 
 const generateReferralCode = (name: string) => `${name.slice(0, 5).toUpperCase()}${Math.random().toString(36).substring(2, 6)}`;
 
-const createNewUserData = (user: User, extraData?: { name?: string, phone?: string }): UserData => ({
+const createNewUserData = (user: User, extraData?: { name?: string, phone?: string, referralCode?: string }): UserData => ({
     uid: user.uid,
     name: extraData?.name || user.displayName || 'Vault User',
     email: user.email || '',
     phone: extraData?.phone || user.phoneNumber || '',
     referralCode: generateReferralCode(extraData?.name || user.displayName || 'USER'),
+    usedReferralCode: extraData?.referralCode || '',
     membership: 'Basic',
     rank: 'Bronze',
     totalBalance: 0,
@@ -154,38 +155,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, 'users', loggedInUser.uid);
         const newUser = createNewUserData(loggedInUser, extraData);
         
-        const batch = writeBatch(db);
-
+        // The referral code is now just stored, not validated here.
+        // Validation happens when the user *redeems* a code on the settings page.
         if (extraData.referralCode) {
-             const q = query(collection(db, "users"), where("referralCode", "==", extraData.referralCode.toUpperCase()));
-             const querySnapshot = await getDocs(q);
-             if (!querySnapshot.empty) {
-                 const referrerDoc = querySnapshot.docs[0];
-                 newUser.referredBy = referrerDoc.id;
-                 newUser.usedReferralCode = extraData.referralCode;
-
-                 // Add a record to the referrer's `referrals` subcollection
-                 const referrerReferralsRef = collection(db, 'users', referrerDoc.id, 'referrals');
-                 batch.set(doc(referrerReferralsRef), {
-                     userId: loggedInUser.uid,
-                     name: newUser.name,
-                     email: newUser.email,
-                     date: serverTimestamp(),
-                     hasInvested: false
-                 });
-
-             } else {
-                toast({
-                    variant: 'destructive',
-                    title: 'Invalid Referral Code',
-                    description: `The code "${extraData.referralCode}" is not valid, but your account was created.`,
-                });
-             }
+            newUser.usedReferralCode = extraData.referralCode.toUpperCase();
         }
-        batch.set(userDocRef, newUser);
-        await batch.commit();
 
+        await setDoc(userDocRef, newUser);
         setUser(loggedInUser);
+        // The onSnapshot listener will pick up the new user data.
     }
 
     const signInWithGoogle = async () => {
@@ -254,8 +232,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const redeemReferralCode = async (code: string) => {
-        if (!user || !userData || userData.usedReferralCode) {
-            throw new Error("Action not allowed.");
+        if (!user || !userData || userData.referredBy) {
+            throw new Error("Action not allowed. You may have already used a code.");
         }
 
         const batch = writeBatch(db);
@@ -274,7 +252,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             referredBy: referrerDoc.id,
         });
         
-        // Add a record to the referrer's `referrals` subcollection
         const referrerReferralsRef = collection(db, 'users', referrerDoc.id, 'referrals');
         batch.set(doc(referrerReferralsRef), {
             userId: user.uid,
@@ -285,7 +262,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
 
         await batch.commit();
-        // The onSnapshot listener will update the local state automatically
     };
 
     const updateUserName = async (name: string) => {
@@ -293,11 +269,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const userDocRef = doc(db, 'users', user.uid);
             await updateDoc(userDocRef, { name });
-            // State updates via onSnapshot
-            toast({
-                title: 'Success!',
-                description: 'Your name has been updated.',
-            });
         } catch (error: any) {
             toast({
                 variant: 'destructive',
@@ -313,11 +284,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const userDocRef = doc(db, 'users', user.uid);
             await updateDoc(userDocRef, { phone });
-            // State updates via onSnapshot
-            toast({
-                title: 'Success!',
-                description: 'Your phone number has been updated.',
-            });
         } catch (error: any) {
             toast({
                 variant: 'destructive',
@@ -422,3 +388,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
