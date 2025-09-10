@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Banknote, ShieldCheck } from 'lucide-react';
+import { Banknote, ShieldCheck, Info } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 
 export function WithdrawCard() {
@@ -27,16 +27,19 @@ export function WithdrawCard() {
       </CardHeader>
       <CardContent>
         {!showWithdrawForm ? (
-          <Button className="w-full" onClick={handleRequestWithdrawal} disabled={(userData?.totalBalance || 0) < 1000}>
-            <Banknote className="mr-2" /> Request Withdrawal
-          </Button>
+          <div className='space-y-4'>
+            <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                    Minimum withdrawal is 1000 Rs. Withdrawal will be transferred within 24 to 48 hours.
+                </AlertDescription>
+            </Alert>
+            <Button className="w-full" onClick={handleRequestWithdrawal} disabled={(userData?.totalBalance || 0) < 1000}>
+                <Banknote className="mr-2" /> Request Withdrawal
+            </Button>
+          </div>
         ) : (
           <div className="space-y-6">
-            <Alert>
-              <AlertDescription>
-                Minimum withdrawal is 1000 Rs. Withdrawal will be transferred within 24 to 48 hours.
-              </AlertDescription>
-            </Alert>
              {userData?.name && (
                 <Alert variant="default" className="border-green-500/50 text-green-700 dark:text-green-400">
                     <ShieldCheck className="h-4 w-4 !text-green-500" />
