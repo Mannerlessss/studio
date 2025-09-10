@@ -3,21 +3,59 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read, update: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
 
+    // Helper function to check for admin email
+    function isAdmin() {
+      return request.auth.token.email == 'gagansharma.gs107@gmail.com';
+    }
+
+    // Rules for the 'users' collection
+    match /users/{uid} {
+      // A user can read their own document. Admins can read any user document.
+      allow read: if request.auth.uid == uid || isAdmin();
+      
+      // A user can create their own document.
+      allow create: if request.auth.uid == uid;
+
+      // A user can update their own document. Admins can update any user document.
+      allow update: if request.auth.uid == uid || isAdmin();
+
+      // Users cannot delete their own accounts from the client.
+      allow delete: if false;
+
+      // Rules for the 'transactions' subcollection
       match /transactions/{transactionId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        // A user can read and create their own transactions. Admins can read any.
+        allow read, create: if request.auth.uid == uid || isAdmin();
+        allow update, delete: if false; // Transactions should be immutable
+      }
+
+      // Rules for the 'withdrawals' subcollection
+      match /withdrawals/{withdrawalId} {
+         // A user can create their own withdrawal requests.
+        allow create: if request.auth.uid == uid;
+        // A user can read their own requests. Admins can read all requests.
+        allow read: if request.auth.uid == uid || isAdmin();
+        // Only admins can update (approve/reject) requests.
+        allow update: if isAdmin();
+        allow delete: if false;
       }
       
+      // Rules for the 'referrals' subcollection (people a user has referred)
       match /referrals/{referralId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        // A user can read their own list of referrals.
+        allow read: if request.auth.uid == uid;
+        // The backend/auth context handles writing to this, not the client directly after creation.
+        allow write: if request.auth.uid != null; 
       }
     }
 
+    // Rules for the 'offers' collection
     match /offers/{offerId} {
-      allow read, write: if request.auth != null; // Should be more secure for a real app
+      // Anyone can read offer codes.
+      allow read: if true;
+      // Only admins can create, update, or delete offer codes.
+      allow write: if isAdmin();
     }
   }
 }
