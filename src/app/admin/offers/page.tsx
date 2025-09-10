@@ -42,7 +42,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { db } from '@/lib/firebase';
-import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, setDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Offer {
@@ -75,7 +75,7 @@ export default function OffersPage() {
                 offersData.push({ id: doc.id, ...doc.data() } as Offer);
             });
             // Sort by creation date descending
-            offersData.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+            offersData.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
             setOffers(offersData);
             setLoading(false);
         }, (error) => {
@@ -99,26 +99,30 @@ export default function OffersPage() {
             return;
         }
 
-        let expiresAt: Date | null = null;
+        let expiresAtTimestamp: Timestamp | null = null;
         if (expiresIn) {
-            expiresAt = new Date();
-            if (expiresIn === '1-day') expiresAt.setDate(expiresAt.getDate() + 1);
-            if (expiresIn === '7-days') expiresAt.setDate(expiresAt.getDate() + 7);
-            if (expiresIn === '30-days') expiresAt.setDate(expiresAt.getDate() + 30);
-            if (expiresIn === 'never') expiresAt = null;
+            const expiresAtDate = new Date();
+            if (expiresIn === '1-day') expiresAtDate.setDate(expiresAtDate.getDate() + 1);
+            else if (expiresIn === '7-days') expiresAtDate.setDate(expiresAtDate.getDate() + 7);
+            else if (expiresIn === '30-days') expiresAtDate.setDate(expiresAtDate.getDate() + 30);
+            
+            if (expiresIn !== 'never') {
+                expiresAtTimestamp = Timestamp.fromDate(expiresAtDate);
+            }
         }
 
-        const newOffer = {
+        const newOfferData = {
             code: newCode.toUpperCase(),
             rewardAmount: Number(rewardAmount),
             maxUsers: maxUsers ? Number(maxUsers) : null,
-            expiresAt: expiresAt ? Timestamp.fromDate(expiresAt) : null,
+            expiresAt: expiresAtTimestamp,
             usageCount: 0,
             createdAt: serverTimestamp(),
         };
 
         try {
-            await addDoc(collection(db, 'offers'), newOffer);
+            // Using setDoc with a specific doc ref might be better if codes should be unique
+            await addDoc(collection(db, 'offers'), newOfferData);
              toast({
                 title: 'Code Created!',
                 description: `New offer code "${newCode.toUpperCase()}" has been created.`,
@@ -200,7 +204,7 @@ export default function OffersPage() {
         </div>
          <div className="space-y-2">
             <Label htmlFor="expires">Expires At (Optional)</Label>
-            <Select onValueChange={setExpiresIn} disabled={isSubmitting}>
+            <Select onValueChange={setExpiresIn} disabled={isSubmitting} value={expiresIn}>
                 <SelectTrigger id="expires">
                     <SelectValue placeholder="Select duration" />
                 </SelectTrigger>

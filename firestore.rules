@@ -1,55 +1,38 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to identify the admin user by email
     function isAdmin() {
-      return request.auth.token.email == 'gagansharma.gs107@gmail.com';
+      return request.auth != null && request.auth.token.email == "gagansharma.gs107@gmail.com";
     }
 
-    // Rules for the 'users' collection
+    // USERS COLLECTION
+    // Admin can list/read all users. Users can create their own doc and read/update it.
     match /users/{userId} {
-      // A user can create their own document when signing up
+      allow list, read: if isAdmin();
       allow create: if request.auth.uid == userId;
+      allow read, update: if request.auth.uid == userId && !("membership" in request.resource.data); // Prevent user from upgrading themselves
 
-      // A user can read/update their own data. Admin can read/update any user's data.
-      allow read, update: if request.auth.uid == userId || isAdmin();
-      
-      // Admin can list all users. Regular users cannot.
-      allow list: if isAdmin();
-      
-      // A user can only delete their own account.
-      allow delete: if request.auth.uid == userId;
-
-      // Rules for the 'transactions' subcollection
-      match /transactions/{transactionId} {
-        // A user can read and create their own transactions. Admins can read any.
-        allow read, create: if request.auth.uid == userId;
-        allow get, list: if isAdmin();
-      }
-      
-      // Rules for the 'referrals' subcollection
-      match /referrals/{referralId} {
-        // A user can read and create their own referral entries. Admins can read any.
-        allow read, create: if request.auth.uid == userId;
-        allow get, list: if isAdmin();
-      }
-
-      // Rules for the 'withdrawals' subcollection
+      // WITHDRAWALS SUBCOLLECTION
+      // Admin can list/read/update all withdrawals. Users can create/read their own.
       match /withdrawals/{withdrawalId} {
-         // A user can create and read their own withdrawal requests.
+        allow list, read, update: if isAdmin();
         allow create, read: if request.auth.uid == userId;
-        // Admin can read and update any withdrawal request.
-        allow get, list, update: if isAdmin();
+      }
+      
+      // OTHER SUBCOLLECTIONS (Transactions, Referrals)
+      // Users can manage their own subcollections. Admin has full access.
+      match /{subcollection}/{docId} {
+        allow read, write: if request.auth.uid == userId || isAdmin();
       }
     }
-
-    // Rules for the 'offers' collection
+    
+    // OFFERS COLLECTION
+    // Admin has full control. All authenticated users can read.
     match /offers/{offerId} {
-      // Any authenticated user can view the list of offers.
-      allow read: if request.auth != null;
-      // Only admins can create, update, or delete offers.
-      allow write: if isAdmin();
+      allow read, write, create, delete, list: if isAdmin();
+      allow get, list: if request.auth != null;
     }
   }
 }
