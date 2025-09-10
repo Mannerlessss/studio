@@ -60,12 +60,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [userData, setUserData] = useState<UserData | null>(null);
     const [isInitialising, setIsInitialising] = useState(true);
+    const [loading, setLoading] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
     const { toast } = useToast();
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setIsInitialising(true);
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
@@ -169,6 +171,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const signInWithGoogle = async () => {
         const provider = new GoogleAuthProvider();
+        setLoading(true);
         try {
             const result = await signInWithPopup(auth, provider);
             await handleSuccessfulLogin(result.user);
@@ -180,10 +183,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     description: error.message,
                 });
             }
+        } finally {
+            setLoading(false);
         }
     };
 
     const signUpWithEmail = async ({ name, email, password, phone, referralCode }: any) => {
+        setLoading(true);
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
@@ -193,10 +199,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-Up Failed',
                 description: error.message,
             });
+        } finally {
+            setLoading(false);
         }
     };
 
     const signInWithEmail = async ({ email, password }: any) => {
+        setLoading(true);
         try {
             await signInWithEmailAndPassword(auth, email, password);
         } catch (error: any) {
@@ -205,10 +214,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Login Failed',
                 description: error.message,
             });
+        } finally {
+            setLoading(false);
         }
     };
 
     const logOut = async () => {
+        setLoading(true);
         try {
             await signOut(auth);
         } catch (error: any) {
@@ -217,6 +229,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Logout Failed',
                 description: error.message,
             });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -333,7 +347,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const value: AuthContextType = {
         user,
         userData,
-        loading: isInitialising,
+        loading: isInitialising || loading,
         signInWithGoogle,
         signUpWithEmail,
         signInWithEmail,
@@ -347,7 +361,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (isInitialising) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-background p-4">
-                <div className="text-center">
+                <div className="flex flex-col items-center justify-center text-center">
                     <h1 className="text-3xl font-bold tracking-widest text-primary">
                         UPI BOOST VAULT
                     </h1>
