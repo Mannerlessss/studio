@@ -19,7 +19,7 @@ const Dashboard: NextPage = () => {
   const { userData, loading, claimDailyBonus } = useAuth();
 
   if (loading || !userData) {
-      return null; // AuthProvider will handle redirection
+      return null; // AuthProvider handles redirection, so we just wait.
   }
   
   const handleBonusClaim = (amount: number) => {

@@ -65,46 +65,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
      useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setLoading(true); // Start loading whenever auth state changes
             if (currentUser) {
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     const dbData = userDocSnap.data() as UserData;
-                    setUser(currentUser);
                     setUserData(dbData);
+                    setUser(currentUser);
+                     if (pathname === '/login') {
+                        router.push('/');
+                    }
                 } else {
                     // This can happen if user is deleted from db but not from auth
                     await signOut(auth);
                     setUser(null);
                     setUserData(null);
+                    router.push('/login');
                 }
             } else {
                 setUser(null);
                 setUserData(null);
+                if (pathname !== '/login') {
+                    router.push('/login');
+                }
             }
             setLoading(false);
         });
 
         return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    useEffect(() => {
-        // This effect handles redirection based on auth state.
-        // It's crucial to wait for the initial loading to be false.
-        if (loading) return;
-
-        const isAuthPage = pathname === '/login';
-
-        // If user is not logged in and not on the login page, redirect to login.
-        if (!user && !isAuthPage) {
-            router.push('/login');
-        }
-
-        // If user is logged in and on the login page, redirect to the dashboard.
-        if (user && isAuthPage) {
-            router.push('/');
-        }
-    }, [user, loading, pathname, router]);
 
     const handleSuccessfulLogin = async (loggedInUser: User, extraData?: { name?: string, phone?: string, referralCode?: string }) => {
         const userDocRef = doc(db, 'users', loggedInUser.uid);
@@ -158,9 +150,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             finalUserData = newUser;
         }
         
-        setUser(loggedInUser);
         setUserData(finalUserData);
-        // Do not redirect here, let the useEffect handle it.
+        setUser(loggedInUser);
+        router.push('/');
     }
 
     const signInWithGoogle = async () => {
@@ -214,7 +206,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logOut = async () => {
         try {
             await signOut(auth);
-            // No need to push, useEffect will handle it.
+            setUser(null);
+            setUserData(null);
+            router.push('/login');
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -351,6 +345,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
+    // The loading screen is now more robust. It will only show children when loading is false.
+    // The redirection logic is handled by the onAuthStateChanged listener.
     if (loading) {
          return (
             <div className="flex items-center justify-center h-screen bg-background">
@@ -362,7 +358,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
     }
 
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+    // Don't render children if we're on the login page, as the logic there is self-contained.
+    // Also, don't render children if we are loading, as that will be the loading screen.
+    // This prevents components from trying to access user data that doesn't exist yet.
+    return (
+        <AuthContext.Provider value={value}>
+            {!loading && children}
+        </AuthContext.Provider>
+    );
 };
 
 export const useAuth = (): AuthContextType => {
