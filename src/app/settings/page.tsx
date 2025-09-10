@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Gift, Shield, LogOut } from 'lucide-react';
+import { User, Gift, Shield, LogOut, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
@@ -32,16 +32,17 @@ const SettingsPage: NextPage = () => {
     const [referralCodeInput, setReferralCodeInput] = useState('');
     const [showRedeemSuccess, setShowRedeemSuccess] = useState(false);
     
-    const [name, setName] = useState(userData?.name || '');
-    const [phone, setPhone] = useState(userData?.phone || '');
+    const [name, setName] = useState('');
+    const [phone, setPhone] = useState('');
 
     const [isUpdatingName, setIsUpdatingName] = useState(false);
     const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
+    const [isRedeeming, setIsRedeeming] = useState(false);
 
     useEffect(() => {
       if (userData) {
-        setName(userData.name);
-        setPhone(userData.phone);
+        setName(userData.name || '');
+        setPhone(userData.phone || '');
       }
     }, [userData]);
 
@@ -64,8 +65,16 @@ const SettingsPage: NextPage = () => {
         setIsUpdatingName(true);
         try {
             await updateUserName(name);
-        } catch (error) {
-            // Error toast is handled in the context
+             toast({
+                title: 'Success!',
+                description: 'Your name has been updated.',
+            });
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: 'Update Failed',
+                description: error.message,
+            });
         } finally {
             setIsUpdatingName(false);
         }
@@ -78,8 +87,16 @@ const SettingsPage: NextPage = () => {
         setIsUpdatingPhone(true);
         try {
             await updateUserPhone(phone);
-        } catch (error) {
-            // Error toast is handled in the context
+             toast({
+                title: 'Success!',
+                description: 'Your phone number has been updated.',
+            });
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: 'Update Failed',
+                description: error.message,
+            });
         } finally {
             setIsUpdatingPhone(false);
         }
@@ -94,7 +111,7 @@ const SettingsPage: NextPage = () => {
             });
             return;
         }
-
+        setIsRedeeming(true);
         try {
             await redeemReferralCode(referralCodeInput);
             setShowRedeemSuccess(true);
@@ -104,6 +121,8 @@ const SettingsPage: NextPage = () => {
                 title: 'Redemption Failed',
                 description: error.message || 'This code is invalid or has already been used.',
             });
+        } finally {
+            setIsRedeeming(false);
         }
     }
 
@@ -126,8 +145,8 @@ const SettingsPage: NextPage = () => {
               <Label htmlFor="full-name">Full Name</Label>
                <div className="flex gap-2">
                 <Input id="full-name" placeholder="Enter your full name" value={name} onChange={(e) => setName(e.target.value)} disabled={isUpdatingName} />
-                <Button onClick={handleUpdateName} disabled={isUpdatingName || name === userData?.name}>
-                  {isUpdatingName ? 'Updating...' : 'Update'}
+                <Button onClick={handleUpdateName} disabled={isUpdatingName || !name || name === userData?.name}>
+                  {isUpdatingName ? <Loader2 className="animate-spin"/> : 'Update'}
                 </Button>
               </div>
             </div>
@@ -135,8 +154,8 @@ const SettingsPage: NextPage = () => {
               <Label htmlFor="phone-number">Phone Number</Label>
               <div className="flex gap-2">
                 <Input id="phone-number" placeholder="Enter your phone number" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={isUpdatingPhone} />
-                <Button onClick={handleUpdatePhone} disabled={isUpdatingPhone || phone === userData?.phone}>
-                  {isUpdatingPhone ? 'Updating...' : 'Update'}
+                <Button onClick={handleUpdatePhone} disabled={isUpdatingPhone || !phone || phone === userData?.phone}>
+                  {isUpdatingPhone ? <Loader2 className="animate-spin"/> : 'Update'}
                 </Button>
               </div>
             </div>
@@ -164,14 +183,14 @@ const SettingsPage: NextPage = () => {
                   placeholder="FRIENDSCODE" 
                   value={referralCodeInput}
                   onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
-                  disabled={!!userData?.usedReferralCode}
+                  disabled={!!userData?.usedReferralCode || isRedeeming}
                 />
                 <Button 
                   variant="secondary"
                   onClick={handleRedeem}
-                  disabled={!!userData?.usedReferralCode}
+                  disabled={!!userData?.usedReferralCode || isRedeeming || !referralCodeInput}
                 >
-                  Redeem
+                  {isRedeeming ? <Loader2 className="animate-spin"/> : 'Redeem'}
                 </Button>
               </div>
             </div>
