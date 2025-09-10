@@ -1,66 +1,58 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to identify the admin user
+  
+    // Helper function to check if the user is an admin
     function isAdmin() {
-      return request.auth.token.email == 'gagansharma.gs107@gmail.com';
+      return request.auth != null && request.auth.token.email == 'gagansharma.gs107@gmail.com';
     }
 
     // Rules for the 'users' collection
     match /users/{userId} {
-      // Admin can read and write any user document
-      allow read, write: if isAdmin();
+      // Admin can read/write any user document
+      // A specific user can read/update their own document
+      allow read, update: if request.auth.uid == userId || isAdmin();
       
-      // A user can create their own document
+      // Only authenticated users can create their own user document
       allow create: if request.auth.uid == userId;
       
-      // A user can read and update their own document, but not delete it
-      allow get, update: if request.auth.uid == userId;
-
-      // Rules for the 'transactions' subcollection
+      // Admin can list all user documents
+      allow list: if isAdmin();
+      
+      // Rules for user subcollections
       match /transactions/{transactionId} {
-        // Admin can read any transaction
-        allow get: if isAdmin();
-        // Users can read their own transactions
-        allow list, get: if request.auth.uid == userId;
-        // Users can create their own transactions (and admin can create for them)
-        allow create: if request.auth.uid == userId || isAdmin();
-      }
-
-      // Rules for the 'withdrawals' subcollection
-      match /withdrawals/{withdrawalId} {
-        // Admin can do anything with withdrawals
-        allow read, write: if isAdmin();
-        // Users can read and create their own withdrawal requests
-        allow list, get, create: if request.auth.uid == userId;
+        // Users can read/create their own transactions, Admin can read any
+        allow read, create: if request.auth.uid == userId;
+        allow list: if isAdmin();
       }
       
-      // Rules for the 'referrals' subcollection
       match /referrals/{referralId} {
-         // Admin can read any referral document
-         allow get: if isAdmin();
-         // Users can list and read their own referrals
-         allow list, get: if request.auth.uid == userId;
-         // Only admin can create or update referral documents (e.g. marking as invested)
-         allow write: if isAdmin();
+        // Users can manage their own referrals, Admin can read any
+        allow read, create, update: if request.auth.uid == userId;
+        allow list: if isAdmin();
+      }
+      
+      match /withdrawals/{withdrawalId} {
+         // Users can read/create their own withdrawals
+        allow read, create: if request.auth.uid == userId;
+        // Admins can read/update any withdrawal request
+        allow update: if isAdmin();
       }
     }
     
+    // Explicitly allow admin to list the withdrawals collection group
+    match /{path=**}/withdrawals/{withdrawalId} {
+      allow read: if isAdmin();
+    }
+
     // Rules for the 'offers' collection
     match /offers/{offerId} {
-        // Admin can do anything with offers
-        allow read, write: if isAdmin();
-        // Users can read the list of offers
-        allow get, list: if request.auth != null;
-    }
-    
-    // Rule for the 'withdrawals' collection group
-    // This allows the admin to query across all users' withdrawals
-    match /{path=**}/withdrawals/{withdrawalId} {
-        allow read: if isAdmin();
+      // Anyone can read offer codes (for redemption)
+      allow read: if request.auth != null;
+      // Only admins can create, update, delete, and list offer codes
+      allow list, create, update, delete: if isAdmin();
     }
   }
 }
+    

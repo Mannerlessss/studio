@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import {
@@ -26,7 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Copy, Gift, PlusCircle, Trash2, Loader2 } from 'lucide-react';
+import { Copy, PlusCircle, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -42,15 +41,15 @@ import {
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { db } from '@/lib/firebase';
-import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, setDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Offer {
     id: string;
     code: string;
     rewardAmount: number;
-    maxUsers?: number;
-    expiresAt?: Timestamp;
+    maxUsers?: number | null;
+    expiresAt?: Timestamp | null;
     usageCount: number;
     createdAt: Timestamp;
 }
@@ -68,23 +67,21 @@ export default function OffersPage() {
     const [expiresIn, setExpiresIn] = useState<string | undefined>();
 
      useEffect(() => {
-        const q = collection(db, 'offers');
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const offersData: Offer[] = [];
-            querySnapshot.forEach((doc) => {
-                offersData.push({ id: doc.id, ...doc.data() } as Offer);
-            });
-            // Sort by creation date descending
-            offersData.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-            setOffers(offersData);
-            setLoading(false);
-        }, (error) => {
-            console.error("Error fetching offers: ", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch offer codes.' });
-            setLoading(false);
-        });
-
-        return () => unsubscribe();
+        const fetchOffers = async () => {
+            setLoading(true);
+            try {
+                const offersSnapshot = await getDocs(collection(db, 'offers'));
+                const offersData: Offer[] = offersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Offer));
+                offersData.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                setOffers(offersData);
+            } catch (error: any) {
+                console.error("Error fetching offers: ", error);
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch offer codes.' });
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchOffers();
     }, [toast]);
 
     const handleCreateCode = async () => {
@@ -100,15 +97,12 @@ export default function OffersPage() {
         }
 
         let expiresAtTimestamp: Timestamp | null = null;
-        if (expiresIn) {
+        if (expiresIn && expiresIn !== 'never') {
             const expiresAtDate = new Date();
             if (expiresIn === '1-day') expiresAtDate.setDate(expiresAtDate.getDate() + 1);
             else if (expiresIn === '7-days') expiresAtDate.setDate(expiresAtDate.getDate() + 7);
             else if (expiresIn === '30-days') expiresAtDate.setDate(expiresAtDate.getDate() + 30);
-            
-            if (expiresIn !== 'never') {
-                expiresAtTimestamp = Timestamp.fromDate(expiresAtDate);
-            }
+            expiresAtTimestamp = Timestamp.fromDate(expiresAtDate);
         }
 
         const newOfferData = {
@@ -121,12 +115,20 @@ export default function OffersPage() {
         };
 
         try {
-            // Using setDoc with a specific doc ref might be better if codes should be unique
-            await addDoc(collection(db, 'offers'), newOfferData);
+            const docRef = await addDoc(collection(db, 'offers'), newOfferData);
              toast({
                 title: 'Code Created!',
                 description: `New offer code "${newCode.toUpperCase()}" has been created.`,
             });
+
+            // Add new offer to local state
+            const newOffer: Offer = {
+                id: docRef.id,
+                ...newOfferData,
+                createdAt: Timestamp.now() // Approximate timestamp for local state
+            };
+            setOffers(prev => [newOffer, ...prev]);
+
             // Reset form
             setNewCode('');
             setRewardAmount('');
@@ -158,6 +160,7 @@ export default function OffersPage() {
                 title: 'Code Deleted!',
                 description: `The offer code has been deleted.`,
             });
+            setOffers(prev => prev.filter(offer => offer.id !== id));
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -298,13 +301,19 @@ export default function OffersPage() {
                 </TableCell>
               </TableRow>
             )})}
+             {!loading && offers.length === 0 && (
+                <TableRow>
+                    <TableCell colSpan={5} className="h-24 text-center">
+                        No offer codes found.
+                    </TableCell>
+                </TableRow>
+            )}
           </TableBody>
         </Table>
-        {!loading && offers.length === 0 && (
-            <p className="text-center text-muted-foreground py-8">No offer codes found.</p>
-        )}
       </CardContent>
     </Card>
     </div>
   );
 }
+
+    

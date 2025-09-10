@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import {
@@ -42,7 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, onSnapshot, updateDoc, writeBatch, serverTimestamp, collectionGroup, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, updateDoc, writeBatch, serverTimestamp, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface User {
@@ -67,21 +66,21 @@ export default function UsersPage() {
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
 
     useEffect(() => {
-        const q = collection(db, 'users');
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const usersData: User[] = [];
-            querySnapshot.forEach((doc) => {
-                usersData.push({ id: doc.id, ...doc.data() } as User);
-            });
-            setUsers(usersData);
-            setLoading(false);
-        }, (error) => {
-            console.error("Error fetching users: ", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch users.' });
-            setLoading(false);
-        });
+        const fetchUsers = async () => {
+            setLoading(true);
+            try {
+                const usersSnapshot = await getDocs(collection(db, 'users'));
+                const usersData: User[] = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+                setUsers(usersData);
+            } catch (error: any) {
+                console.error("Error fetching users: ", error);
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch users. Check permissions.' });
+            } finally {
+                setLoading(false);
+            }
+        };
 
-        return () => unsubscribe();
+        fetchUsers();
     }, [toast]);
 
     const handleCredit = async (user: User) => {
@@ -101,7 +100,7 @@ export default function UsersPage() {
             const userDocRef = doc(db, 'users', user.id);
             const batch = writeBatch(db);
 
-            const newInvestedAmount = (user as any).invested + amount;
+            const newInvestedAmount = ((user as any).invested || 0) + amount;
             
             batch.update(userDocRef, { 
                 invested: newInvestedAmount,
@@ -116,7 +115,6 @@ export default function UsersPage() {
                 date: serverTimestamp(),
             });
 
-            // Check for first investment and referral bonus
             if (!user.hasInvested && amount >= 100 && user.referredBy) {
                 const bonusAmount = 75;
                 const referrerDocRef = doc(db, 'users', user.referredBy);
@@ -124,7 +122,6 @@ export default function UsersPage() {
 
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
-                    // Award bonus to the new user
                     batch.update(userDocRef, {
                         totalBalance: (user.totalBalance || 0) + bonusAmount,
                         bonusEarnings: (user.bonusEarnings || 0) + bonusAmount,
@@ -140,7 +137,6 @@ export default function UsersPage() {
                         date: serverTimestamp(),
                     });
                     
-                    // Award bonus to the referrer
                     batch.update(referrerDocRef, {
                         totalBalance: (referrerData.totalBalance || 0) + bonusAmount,
                         referralEarnings: (referrerData.referralEarnings || 0) + bonusAmount,
@@ -155,7 +151,6 @@ export default function UsersPage() {
                         date: serverTimestamp(),
                     });
 
-                    // Update the `hasInvested` flag in the referrer's subcollection
                     const referrerReferralsRef = collection(db, 'users', user.referredBy, 'referrals');
                     const q = query(referrerReferralsRef, where("userId", "==", user.id));
                     const referredUserDocs = await getDocs(q);
@@ -166,11 +161,9 @@ export default function UsersPage() {
                 }
             }
             
-            // Mark user as hasInvested even if no referral
              if (!user.hasInvested && amount >= 100) {
                   batch.update(userDocRef, { hasInvested: true });
              }
-
 
             await batch.commit();
 
@@ -178,6 +171,7 @@ export default function UsersPage() {
                 title: `Investment Credited`,
                 description: `${amount} Rs. has been credited for user ${user.name}.`,
             });
+            setUsers(prevUsers => prevUsers.map(u => u.id === user.id ? { ...u, hasInvested: true, invested: newInvestedAmount } : u));
             setCreditAmount('');
         } catch (error: any) {
              toast({
@@ -199,6 +193,7 @@ export default function UsersPage() {
                 title: `Upgraded to Pro`,
                 description: `User has been upgraded to the Pro plan.`,
             });
+            setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, membership: 'Pro' } : u));
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -231,12 +226,12 @@ export default function UsersPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-                 Array.from({ length: 3 }).map((_, i) => (
+                 Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                        <TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-48" /></TableCell>
                     </TableRow>
                 ))
             ) : users.map((user) => (
@@ -250,10 +245,14 @@ export default function UsersPage() {
                 </TableCell>
                 <TableCell className="text-right">
                     <div className='flex gap-2 justify-end'>
-                        <Button variant="ghost" size="icon" onClick={() => setSelectedUser(user)}>
-                            <Eye className='w-4 h-4' />
-                            <span className="sr-only">View Details</span>
-                        </Button>
+                        <Dialog onOpenChange={(isOpen) => !isOpen && setSelectedUser(null)}>
+                            <DialogTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => setSelectedUser(user)}>
+                                    <Eye className='w-4 h-4' />
+                                    <span className="sr-only">View Details</span>
+                                </Button>
+                            </DialogTrigger>
+                        </Dialog>
                        <AlertDialog onOpenChange={(open) => !open && setCreditAmount('')}>
                           <AlertDialogTrigger asChild>
                              <Button variant="outline" size="sm" disabled={!!isSubmitting}>
@@ -290,6 +289,13 @@ export default function UsersPage() {
                 </TableCell>
               </TableRow>
             ))}
+             {!loading && users.length === 0 && (
+                <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                        No users found.
+                    </TableCell>
+                </TableRow>
+            )}
           </TableBody>
         </Table>
       </CardContent>
@@ -341,3 +347,5 @@ export default function UsersPage() {
     </>
   );
 }
+
+    
