@@ -46,6 +46,7 @@ interface AuthContextType {
   signInWithEmail: (details: any) => Promise<void>;
   logOut: () => Promise<void>;
   redeemReferralCode: (code: string) => Promise<void>;
+  updateUserPhone: (phone: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -68,7 +69,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     setUser(currentUser);
                     setUserData(userDocSnap.data() as UserData);
                 } else {
-                    // Handle case where user exists in auth but not in db
+                    // This case might happen if user is deleted from db but not auth
+                    // Or during initial creation race conditions
+                     await signOut(auth); // Log out from auth
                     setUser(null);
                     setUserData(null);
                 }
@@ -84,9 +87,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         if (!loading) {
-            if (user && (pathname === '/login' || pathname === '/signup')) {
+            const isAuthPage = pathname === '/login';
+            if (user && isAuthPage) {
                 router.push('/');
-            } else if (!user && pathname !== '/login' && pathname !== '/signup') {
+            } else if (!user && !isAuthPage) {
                 router.push('/login');
             }
         }
@@ -104,7 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
             finalUserData = userDocSnap.data() as UserData;
         } else {
-            const referralCode = `${(extraData?.name || loggedInUser.displayName || loggedInUser.email?.split('@')[0] || 'USER').slice(0, 5).toUpperCase()}${Math.random().toString(36).substring(2, 6)}`;
+             const referralCode = `${(extraData?.name || loggedInUser.displayName || loggedInUser.email?.split('@')[0] || 'USER').slice(0, 5).toUpperCase()}${Math.random().toString(36).substring(2, 6)}`;
             
             const newUser: UserData = {
                 uid: loggedInUser.uid,
@@ -126,7 +130,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             };
             
             if (extraData?.referralCode) {
-                 const q = query(collection(db, "users"), where("referralCode", "==", extraData.referralCode));
+                 const q = query(collection(db, "users"), where("referralCode", "==", extraData.referralCode.toUpperCase()));
                  const querySnapshot = await getDocs(q);
                  if (!querySnapshot.empty) {
                      const referrerDoc = querySnapshot.docs[0];
@@ -146,7 +150,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         setUser(loggedInUser);
         setUserData(finalUserData);
-        router.push('/');
     }
 
     const signInWithGoogle = async () => {
@@ -167,6 +170,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const signUpWithEmail = async ({ name, email, password, phone, referralCode }: any) => {
         try {
+            setLoading(true);
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(userCredential.user, { name, phone, referralCode });
         } catch (error: any) {
@@ -175,11 +179,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-Up Failed',
                 description: error.message,
             });
+        } finally {
+            setLoading(false);
         }
     };
 
     const signInWithEmail = async ({ email, password }: any) => {
         try {
+            setLoading(true);
             const result = await signInWithEmailAndPassword(auth, email, password);
             await handleSuccessfulLogin(result.user);
         } catch (error: any) {
@@ -188,14 +195,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Login Failed',
                 description: error.message,
             });
+        } finally {
+            setLoading(false);
         }
     };
 
     const logOut = async () => {
         try {
             await signOut(auth);
-            setUser(null);
-            setUserData(null);
             router.push('/login');
         } catch (error: any) {
              toast({
@@ -232,6 +239,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await batch.commit();
     };
 
+    const updateUserPhone = async (phone: string) => {
+        if (!user) throw new Error("No user is logged in.");
+        try {
+            const userDocRef = doc(db, 'users', user.uid);
+            await updateDoc(userDocRef, { phone });
+            setUserData(prev => prev ? { ...prev, phone } : null);
+            toast({
+                title: 'Success!',
+                description: 'Your phone number has been updated.',
+            });
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Update Failed',
+                description: error.message,
+            });
+            throw error;
+        }
+    };
+
     const value: AuthContextType = {
         user,
         userData,
@@ -241,6 +268,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signInWithEmail,
         logOut,
         redeemReferralCode,
+        updateUserPhone,
     };
     
     if (loading) {

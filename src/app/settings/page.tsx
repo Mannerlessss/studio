@@ -1,6 +1,6 @@
 
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { NextPage } from 'next';
 import { Header } from '@/components/vaultboost/header';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
@@ -26,11 +26,19 @@ import {
 
 
 const SettingsPage: NextPage = () => {
-    const { userData, logOut, redeemReferralCode } = useAuth();
+    const { userData, logOut, redeemReferralCode, updateUserPhone } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
     const [referralCodeInput, setReferralCodeInput] = useState('');
     const [showRedeemSuccess, setShowRedeemSuccess] = useState(false);
+    const [phone, setPhone] = useState(userData?.phone || '');
+    const [isUpdating, setIsUpdating] = useState(false);
+
+    useEffect(() => {
+      if (userData?.phone) {
+        setPhone(userData.phone);
+      }
+    }, [userData?.phone]);
 
     const handleLogout = async () => {
         try {
@@ -43,6 +51,20 @@ const SettingsPage: NextPage = () => {
             });
         }
     }
+
+    const handleUpdatePhone = async () => {
+        if (!phone || phone === userData?.phone) {
+            return;
+        }
+        setIsUpdating(true);
+        try {
+            await updateUserPhone(phone);
+        } catch (error) {
+            // Error toast is handled in the context
+        } finally {
+            setIsUpdating(false);
+        }
+    };
 
     const handleRedeem = async () => {
         if (!referralCodeInput) {
@@ -88,8 +110,10 @@ const SettingsPage: NextPage = () => {
             <div className="space-y-2">
               <Label htmlFor="phone-number">Phone Number</Label>
               <div className="flex gap-2">
-                <Input id="phone-number" placeholder="Enter your phone number" defaultValue={userData?.phone} />
-                <Button>Update</Button>
+                <Input id="phone-number" placeholder="Enter your phone number" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={isUpdating} />
+                <Button onClick={handleUpdatePhone} disabled={isUpdating || phone === userData?.phone}>
+                  {isUpdating ? 'Updating...' : 'Update'}
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -116,12 +140,12 @@ const SettingsPage: NextPage = () => {
                   placeholder="FRIENDSCODE" 
                   value={referralCodeInput}
                   onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
-                  disabled={userData?.usedReferralCode}
+                  disabled={!!userData?.usedReferralCode}
                 />
                 <Button 
                   variant="secondary"
                   onClick={handleRedeem}
-                  disabled={userData?.usedReferralCode}
+                  disabled={!!userData?.usedReferralCode}
                 >
                   Redeem
                 </Button>
