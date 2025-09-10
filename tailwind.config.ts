@@ -96,16 +96,6 @@ export default {
             '0%, 100%': { opacity: '1', transform: 'scale(1)' },
             '50%': { opacity: '0.5', transform: 'scale(1.2)' },
         },
-        'money-travel': {
-            '0%': { left: '0', opacity: '0' },
-            '25%': { opacity: '1' },
-            '75%': { opacity: '1' },
-            '100%': { left: 'calc(50% - 2rem)', opacity: '0' },
-        },
-        'bank-pulse': {
-             '0%, 100%': { transform: 'scale(1)' },
-             '50%': { transform: 'scale(1.1)' },
-        }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -114,8 +104,6 @@ export default {
         'shake': 'shake 0.5s ease-in-out',
         'spin-y': 'spin-y 2s linear infinite',
         'sparkle': 'sparkle 1.5s ease-in-out infinite',
-        'money-travel': 'money-travel 2s ease-in-out infinite',
-        'bank-pulse': 'bank-pulse 2s ease-in-out infinite',
       },
       perspective: {
         '1000': '1000px',

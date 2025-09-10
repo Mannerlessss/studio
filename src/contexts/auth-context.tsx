@@ -15,7 +15,7 @@ import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, Timestamp, onSnapshot } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { Banknote, Landmark } from 'lucide-react';
+import { Gem } from 'lucide-react';
 
 interface UserData {
     uid: string;
@@ -354,18 +354,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     if (isInitialising) {
         return (
-            <div className="flex h-screen w-full flex-col items-center justify-center bg-background p-4 space-y-8 overflow-hidden">
-                <div className="relative w-full max-w-sm">
-                    <Banknote className="absolute left-0 top-1/2 -translate-y-1/2 h-12 w-12 text-green-500 animate-money-travel" />
-                    <Landmark className="h-16 w-16 text-primary mx-auto animate-bank-pulse" />
-                </div>
-                 <div className="flex flex-col items-center justify-center text-center">
-                    <h1 className="text-3xl font-bold tracking-widest text-primary">
-                        UPI BOOST VAULT
-                    </h1>
-                    <p className="text-md text-muted-foreground mt-4">
-                        Your partner❤️ takes time to respond you so our dashboard is 😉
-                    </p>
+            <div className="flex items-center justify-center h-screen bg-background">
+                <div className="text-center">
+                    <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
+                    <p className="text-lg text-muted-foreground">Loading VaultBoost...</p>
                 </div>
             </div>
         );
