@@ -335,13 +335,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     if (isInitialising) {
         return (
-            <div className="flex flex-col items-center justify-center h-screen bg-background p-4 text-center">
-                <h1 className="text-3xl font-bold tracking-widest text-primary">
-                    UPI BOOST VAULT
-                </h1>
-                <p className="text-md text-muted-foreground mt-4">
-                    Your partner❤️ takes time to respond you so our dashboard is 😉
-                </p>
+            <div className="flex h-screen w-full items-center justify-center bg-background p-4">
+                <div className="text-center">
+                    <h1 className="text-3xl font-bold tracking-widest text-primary">
+                        UPI BOOST VAULT
+                    </h1>
+                    <p className="text-md text-muted-foreground mt-4">
+                        Your partner❤️ takes time to respond you so our dashboard is 😉
+                    </p>
+                </div>
             </div>
         );
     }
