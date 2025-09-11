@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, updateDoc, writeBatch, getDoc, collectionGroup } from 'firebase/firestore';
+import { collection, doc, getDocs, updateDoc, writeBatch, getDoc, collectionGroup, query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface WithdrawalRequest {
@@ -50,7 +50,8 @@ export default function WithdrawalsPage() {
         const fetchWithdrawals = async () => {
             setLoading(true);
             try {
-                const withdrawalsSnapshot = await getDocs(collectionGroup(db, 'withdrawals'));
+                const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'));
+                const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
                 const requests: WithdrawalRequest[] = [];
                  withdrawalsSnapshot.forEach(doc => {
                     requests.push({ 

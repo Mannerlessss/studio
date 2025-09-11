@@ -26,9 +26,9 @@ export default function AdminDashboard() {
                 const totalUsers = usersSnapshot.size;
 
                 // Pending Withdrawals
-                const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'), where('status', '==', 'Pending'));
+                const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'));
                 const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
-                const pendingWithdrawals = withdrawalsSnapshot.size;
+                const pendingWithdrawals = withdrawalsSnapshot.docs.filter(doc => doc.data().status === 'Pending').length;
 
                 // Active Offer Codes
                 const offersSnapshot = await getDocs(collection(db, 'offers'));
