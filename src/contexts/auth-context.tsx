@@ -32,7 +32,7 @@ interface UserData {
     earnings: number;
     projected: number;
     referralEarnings: number;
-    bonusEarnings: number;
+bonusEarnings: number;
     investmentEarnings: number;
     hasInvested: boolean; // New field
     lastBonusClaim?: Timestamp;
@@ -101,10 +101,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const pathname = usePathname();
     const { toast } = useToast();
 
-     useEffect(() => {
+    useEffect(() => {
         let unsubscribeDoc: Unsubscribe | undefined;
 
         const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+            setIsInitialising(true); // Reset initialising state on user change
             if (unsubscribeDoc) {
                 unsubscribeDoc();
             }
@@ -120,11 +121,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         await updateDoc(userDocRef, { lastLogin: serverTimestamp() }).catch(err => console.error("Failed to update last login", err));
                         await handleAdminClaim(currentUser); 
                     } else {
+                        // If user is logged in but doc doesn't exist, it might be a new sign up.
+                        // The handleSuccessfulSignUp function will set the data.
+                        // We will set userData to null temporarily.
                         setUserData(null);
                     }
                     setIsInitialising(false);
                 }, (error) => {
                     console.error("Auth Snapshot Error:", error);
+                    setUserData(null);
                     setIsInitialising(false);
                 });
             } else {
@@ -141,49 +146,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         };
     }, []);
-
+    
     useEffect(() => {
-        if (isInitialising) return;
+        if (isInitialising) {
+            return; // Wait until initial auth check is done
+        }
     
         const isAuthPage = pathname.startsWith('/login');
         const isAdminPage = pathname.startsWith('/admin');
-    
+        const isPublicPage = ['/terms', '/privacy', '/support'].includes(pathname);
+
         if (user) {
-            const checkAdminStatus = async () => {
-                try {
-                    const idTokenResult = await user.getIdTokenResult(true); // Force refresh token
-                    const isAdmin = idTokenResult.claims.admin === true;
-    
-                    if (isAdmin) {
-                        if (!isAdminPage) {
-                            router.push('/admin');
-                        }
-                    } else {
-                        if (isAdminPage) {
-                            router.push('/');
-                        }
-                    }
-    
-                    if (isAuthPage) {
-                        router.push(isAdmin ? '/admin' : '/');
-                    }
-                } catch (error) {
-                    console.error("Error checking admin status:", error);
-                    // Fallback to non-admin view if token check fails
-                    if (isAdminPage) {
-                        router.push('/');
-                    }
+            if (userData) { // Only check for admin/redirect when userData is loaded
+                const isAdmin = userData.email === ADMIN_EMAIL; // Simple check for routing
+                 if (isAdmin) {
+                    if (!isAdminPage) router.push('/admin');
+                } else {
+                    if (isAdminPage) router.push('/');
                 }
-            };
-            checkAdminStatus();
+                if (isAuthPage) {
+                    router.push(isAdmin ? '/admin' : '/');
+                }
+            }
+            // If user exists but no userData, we wait, maybe it's being created.
         } else {
-            const isPublicPage = ['/terms', '/privacy', '/support'].includes(pathname);
-            if (!isAuthPage && !isPublicPage) {
+             if (!isAuthPage && !isPublicPage) {
                 router.push('/login');
             }
         }
-    }, [user, isInitialising, pathname, router]);
-
+    
+    }, [user, userData, isInitialising, pathname, router]);
 
     const handleSuccessfulSignUp = async (loggedInUser: User, extraData: { name: string, phone: string, referralCode?: string }) => {
         const userDocRef = doc(db, 'users', loggedInUser.uid);
@@ -207,7 +199,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         await setDoc(userDocRef, newUser);
-        setUserData(newUser); // Immediately set user data in state
+        // Snapshot listener will pick this up and set state, so no need to setUserData here.
         await handleAdminClaim(loggedInUser);
     }
 
@@ -215,7 +207,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const provider = new GoogleAuthProvider();
         setLoading(true);
         try {
-            await signInWithPopup(auth, provider);
+            const result = await signInWithPopup(auth, provider);
+            const userDocRef = doc(db, 'users', result.user.uid);
+            const userDoc = await getDoc(userDocRef);
+            if (!userDoc.exists()) {
+                await handleSuccessfulSignUp(result.user, { name: result.user.displayName || 'Google User', phone: result.user.phoneNumber || '' });
+            }
         } catch (error: any) {
             if (error.code !== 'auth/popup-closed-by-user') {
                 toast({
@@ -408,9 +405,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    if (isInitialising || (user && !userData)) {
-        return (
-             <div className="flex items-center justify-center min-h-screen bg-background">
+    if (isInitialising || (user && !userData && !pathname.startsWith('/login'))) {
+         return (
+            <div className="flex items-center justify-center min-h-screen bg-background">
                 <div className="text-center">
                     <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
                     <p className="text-lg text-muted-foreground">Loading VaultBoost...</p>
