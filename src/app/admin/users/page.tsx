@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import {
@@ -55,6 +56,7 @@ interface User {
     investmentEarnings: number;
     hasInvested?: boolean;
     referredBy?: string;
+    invested?: number;
 }
 
 export default function UsersPage() {
@@ -100,7 +102,7 @@ export default function UsersPage() {
             const userDocRef = doc(db, 'users', user.id);
             const batch = writeBatch(db);
 
-            const newInvestedAmount = ((user as any).invested || 0) + amount;
+            const newInvestedAmount = (user.invested || 0) + amount;
             
             batch.update(userDocRef, { 
                 invested: newInvestedAmount,
@@ -347,3 +349,5 @@ export default function UsersPage() {
     </>
   );
 }
+
+    

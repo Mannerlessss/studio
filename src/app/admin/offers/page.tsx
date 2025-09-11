@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import {
@@ -64,7 +65,7 @@ export default function OffersPage() {
     const [newCode, setNewCode] = useState('');
     const [rewardAmount, setRewardAmount] = useState('');
     const [maxUsers, setMaxUsers] = useState('');
-    const [expiresIn, setExpiresIn] = useState<string | undefined>();
+    const [expiresIn, setExpiresIn] = useState<string>('never');
 
      useEffect(() => {
         const fetchOffers = async () => {
@@ -76,7 +77,7 @@ export default function OffersPage() {
                 setOffers(offersData);
             } catch (error: any) {
                 console.error("Error fetching offers: ", error);
-                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch offer codes.' });
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch offer codes. Check permissions.' });
             } finally {
                 setLoading(false);
             }
@@ -133,7 +134,7 @@ export default function OffersPage() {
             setNewCode('');
             setRewardAmount('');
             setMaxUsers('');
-            setExpiresIn(undefined);
+            setExpiresIn('never');
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -207,7 +208,7 @@ export default function OffersPage() {
         </div>
          <div className="space-y-2">
             <Label htmlFor="expires">Expires At (Optional)</Label>
-            <Select onValueChange={setExpiresIn} disabled={isSubmitting} value={expiresIn}>
+            <Select onValueChange={(value) => setExpiresIn(value)} disabled={isSubmitting} value={expiresIn}>
                 <SelectTrigger id="expires">
                     <SelectValue placeholder="Select duration" />
                 </SelectTrigger>
