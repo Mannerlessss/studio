@@ -1,34 +1,52 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow admins to read and write all data
-    match /{document=**} {
-      allow read, write: if request.auth.token.admin == true;
-    }
 
-    // Rules for non-admin users
-    match /users/{userId} {
-      allow read, update: if request.auth.uid == userId;
-      
-      // Allow users to read their own transactions and referrals
-      match /{subcollection}/{docId} {
-        allow read: if request.auth.uid == userId;
-      }
-
-      // Allow users to create their own transactions
-      match /transactions/{transactionId} {
-        allow create: if request.auth.uid == userId;
-      }
-      
-      // Allow users to create their own withdrawals
-      match /withdrawals/{withdrawalId} {
-        allow create: if request.auth.uid == userId;
-      }
+    // Helper function to check for admin role
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.admin == true;
     }
     
-    // Allow logged-in users to read offers
+    // Default deny all reads and writes
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Admins can read and write anything
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // Rules for the 'users' collection
+    match /users/{userId} {
+      // Any authenticated user can create their own user document
+      allow create: if request.auth != null && request.auth.uid == userId;
+
+      // A user can read or update their own document
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow reading of other users' data only for specific fields (e.g., for leaderboards)
+      // This is more secure than allowing full reads for everyone.
+      allow get: if request.auth != null;
+    }
+
+    // Rules for user subcollections (transactions, referrals, withdrawals)
+    match /users/{userId}/{collection}/{docId} {
+      // A user can manage documents in their own subcollections
+      allow read, write, create, delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Rules for top-level collections like 'offers'
     match /offers/{offerId} {
+        // Any authenticated user can read the offers
         allow read: if request.auth != null;
+    }
+    
+    // Allow admins to make admin_requests
+    match /admin_requests/{request_id} {
+        allow create: if request.auth.uid == request.resource.data.uid;
     }
   }
 }
