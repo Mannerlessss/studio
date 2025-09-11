@@ -1,70 +1,61 @@
 
 'use server';
 import 'dotenv/config';
-import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/googleai';
-import { firebase } from '@genkit-ai/firebase';
 import * as admin from 'firebase-admin';
-import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Correctly read the service account key using fs
-const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
-const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+// This script should be run from the root of the project
 
-genkit({
-  plugins: [
-    googleAI(),
-    firebase,
-  ],
-});
-
-export const setAdminClaimFlow = genkit.defineFlow(
-  {
-    name: 'setAdminClaimFlow',
-    inputSchema: z.string(),
-    outputSchema: z.object({
-      success: z.boolean(),
-      message: z.string(),
-    }),
-  },
-  async (email) => {
-    try {
-      if (admin.apps.length === 0) {
-        admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount),
-        });
-      }
-
-      const user = await admin.auth().getUserByEmail(email);
-      await admin.auth().setCustomUserClaims(user.uid, { admin: true });
-      
-      return {
-        success: true,
-        message: `Successfully set admin claim for ${email}.`,
-      };
-    } catch (error: any) {
-      console.error('Error setting custom claim:', error);
-      return {
-        success: false,
-        message: `Failed to set admin claim: ${error.message}`,
-      };
-    }
+async function setAdminClaim() {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  
+  if (!adminEmail) {
+    console.error('❌ Error: ADMIN_EMAIL not found in your .env file.');
+    console.log('Please create a .env file in the root of your project and add ADMIN_EMAIL=your-admin-email@example.com');
+    process.exit(1);
   }
-);
 
-// This is the main function that will be executed when the script is run.
-async function setAdmin() {
-  const adminEmail = 'gagansharma.gs107@gmail.com';
-  console.log(`Attempting to set admin claim for: ${adminEmail}`);
-  const result = await setAdminClaimFlow(adminEmail);
-  console.log(result.message);
-  // Exit the process so the script terminates.
-  process.exit(0);
+  try {
+    const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
+    if (!fs.existsSync(serviceAccountPath)) {
+        console.error('❌ Error: serviceAccountKey.json not found in the root of your project.');
+        console.log('Please download it from your Firebase project settings and place it in the root directory.');
+        process.exit(1);
+    }
+    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+
+    if (admin.apps.length === 0) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+    }
+
+    console.log(`⏳ Looking up user by email: ${adminEmail}...`);
+    const user = await admin.auth().getUserByEmail(adminEmail);
+    
+    if (user.customClaims && (user.customClaims as any).admin === true) {
+        console.log(`✅ User ${adminEmail} (UID: ${user.uid}) is already an admin.`);
+        return;
+    }
+
+    console.log(`Found user. UID: ${user.uid}. Setting admin claim...`);
+    await admin.auth().setCustomUserClaims(user.uid, { admin: true });
+    
+    console.log(`✅ Success! Admin claim has been set for ${adminEmail}.`);
+    console.log('It may take a few minutes to propagate. Please log out and log back in to see the changes.');
+
+  } catch (error: any) {
+    console.error('❌ Error setting custom admin claim:', error.message);
+    if (error.code === 'auth/user-not-found') {
+        console.error(`No user found with the email: ${adminEmail}. Please make sure the user exists in Firebase Authentication.`);
+    }
+  } finally {
+    process.exit(0);
+  }
 }
 
-// Check if the script is being run directly.
+// This allows the script to be run directly from the command line
 if (require.main === module) {
-  setAdmin();
+  setAdminClaim();
 }
