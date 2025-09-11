@@ -32,9 +32,9 @@ interface UserData {
     earnings: number;
     projected: number;
     referralEarnings: number;
-bonusEarnings: number;
+    bonusEarnings: number;
     investmentEarnings: number;
-    hasInvested: boolean; // New field
+    hasInvested: boolean;
     lastBonusClaim?: Timestamp;
     createdAt: any;
     lastLogin: any;
@@ -83,11 +83,15 @@ const createNewUserData = (user: User, extraData?: { name?: string, phone?: stri
 
 const handleAdminClaim = async (user: User) => {
     if (user.email === ADMIN_EMAIL) {
-        const idTokenResult = await user.getIdTokenResult(true); // Force refresh
-        if (idTokenResult.claims.admin !== true) {
-            const adminRequestRef = collection(db, "admin_requests");
-            await addDoc(adminRequestRef, { uid: user.uid, email: user.email, requestedAt: serverTimestamp() });
-            console.log('Admin role request triggered for', user.email);
+        try {
+            const idTokenResult = await user.getIdTokenResult(true);
+            if (idTokenResult.claims.admin !== true) {
+                const adminRequestRef = collection(db, "admin_requests");
+                await addDoc(adminRequestRef, { uid: user.uid, email: user.email, requestedAt: serverTimestamp() });
+                console.log('Admin role request triggered for', user.email);
+            }
+        } catch (error) {
+            console.error("Error checking or setting admin claim:", error);
         }
     }
 }
@@ -96,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [userData, setUserData] = useState<UserData | null>(null);
     const [isInitialising, setIsInitialising] = useState(true);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(false); // For actions like login/signup
     const router = useRouter();
     const pathname = usePathname();
     const { toast } = useToast();
@@ -105,7 +109,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let unsubscribeDoc: Unsubscribe | undefined;
 
         const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-            setIsInitialising(true); // Reset initialising state on user change
             if (unsubscribeDoc) {
                 unsubscribeDoc();
             }
@@ -114,16 +117,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(currentUser);
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 
-                unsubscribeDoc = onSnapshot(userDocRef, async (userDocSnap) => {
+                unsubscribeDoc = onSnapshot(userDocRef, (userDocSnap) => {
                     if (userDocSnap.exists()) {
-                        const dbData = userDocSnap.data() as UserData;
-                        setUserData(dbData);
-                        await updateDoc(userDocRef, { lastLogin: serverTimestamp() }).catch(err => console.error("Failed to update last login", err));
-                        await handleAdminClaim(currentUser); 
+                        setUserData(userDocSnap.data() as UserData);
                     } else {
-                        // If user is logged in but doc doesn't exist, it might be a new sign up.
-                        // The handleSuccessfulSignUp function will set the data.
-                        // We will set userData to null temporarily.
+                        // User exists in auth but not firestore. Could be a new signup.
                         setUserData(null);
                     }
                     setIsInitialising(false);
@@ -135,7 +133,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             } else {
                 setUser(null);
                 setUserData(null);
-                setIsInitialising(false); 
+                setIsInitialising(false);
             }
         });
 
@@ -148,33 +146,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, []);
     
     useEffect(() => {
-        if (isInitialising) {
-            return; // Wait until initial auth check is done
-        }
-    
+        if (isInitialising) return; // Wait for initial auth check
+
         const isAuthPage = pathname.startsWith('/login');
         const isAdminPage = pathname.startsWith('/admin');
         const isPublicPage = ['/terms', '/privacy', '/support'].includes(pathname);
-
-        if (user) {
-            if (userData) { // Only check for admin/redirect when userData is loaded
-                const isAdmin = userData.email === ADMIN_EMAIL; // Simple check for routing
-                 if (isAdmin) {
-                    if (!isAdminPage) router.push('/admin');
-                } else {
-                    if (isAdminPage) router.push('/');
-                }
-                if (isAuthPage) {
-                    router.push(isAdmin ? '/admin' : '/');
-                }
+        
+        if (user && userData) { // User is logged in and data is loaded
+            const isAdmin = userData.email === ADMIN_EMAIL;
+            if (isAdmin && !isAdminPage) {
+                router.push('/admin');
+            } else if (!isAdmin && isAdminPage) {
+                router.push('/');
+            } else if (isAuthPage) {
+                router.push(isAdmin ? '/admin' : '/');
             }
-            // If user exists but no userData, we wait, maybe it's being created.
-        } else {
-             if (!isAuthPage && !isPublicPage) {
+        } else if (user && !userData) {
+            // This case can happen briefly during sign up. We wait for the doc to be created.
+            // If it persists, there might be an issue. For now, we don't redirect.
+        } else { // No user logged in
+            if (!isAuthPage && !isPublicPage) {
                 router.push('/login');
             }
         }
-    
     }, [user, userData, isInitialising, pathname, router]);
 
     const handleSuccessfulSignUp = async (loggedInUser: User, extraData: { name: string, phone: string, referralCode?: string }) => {
@@ -199,7 +193,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         await setDoc(userDocRef, newUser);
-        // Snapshot listener will pick this up and set state, so no need to setUserData here.
+        setUserData(newUser); // Immediately set user data to avoid loading state issues
         await handleAdminClaim(loggedInUser);
     }
 
@@ -212,6 +206,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const userDoc = await getDoc(userDocRef);
             if (!userDoc.exists()) {
                 await handleSuccessfulSignUp(result.user, { name: result.user.displayName || 'Google User', phone: result.user.phoneNumber || '' });
+            } else {
+                 await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+                 await handleAdminClaim(result.user);
             }
         } catch (error: any) {
             if (error.code !== 'auth/popup-closed-by-user') {
@@ -245,7 +242,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signInWithEmail = async ({ email, password }: any) => {
         setLoading(true);
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const userDocRef = doc(db, 'users', userCredential.user.uid);
+            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+            await handleAdminClaim(userCredential.user);
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -261,7 +261,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             await signOut(auth);
-            router.push('/login');
+            // The onAuthStateChanged listener will handle state updates and redirection
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -405,7 +405,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    if (isInitialising || (user && !userData && !pathname.startsWith('/login'))) {
+    if (isInitialising) {
          return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <div className="text-center">
@@ -430,5 +430,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
