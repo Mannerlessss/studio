@@ -1,46 +1,40 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if the user has an 'admin' custom claim.
-    // This is a secure way to identify administrators.
+    // Helper function to check for admin custom claim
     function isAdmin() {
       return request.auth.token.admin == true;
     }
 
-    // Helper function to check if the user is the owner of the document.
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
-
-    // Rules for the entire database.
-    // Admins have full read/write access to all documents.
-    // Service accounts (request.auth == null) are also granted access.
+    // Admins can read and write all data.
+    // The service account will bypass these rules.
     match /{path=**} {
-      allow read, write: if isAdmin() || request.auth == null;
+      allow read, write: if isAdmin();
     }
 
-    // Specific rules for user-owned data to ensure non-admins can still
-    // use the application. These rules are checked after the global rule.
+    // Rules for regular users
     match /users/{userId} {
-      // Allow users to read and update their own user document.
-      // Admins can also perform these actions due to the global rule above.
-      allow read, update: if isOwner(userId);
-      
-      // Allow any authenticated user to create their own user document upon signup.
-      allow create: if request.auth != null;
-    }
+      allow read, update: if request.auth.uid == userId;
+      allow create: if request.auth.uid != null;
 
-    // Allow users to read and write to sub-collections within their own user document
-    // (e.g., transactions, withdrawals, referrals).
-    match /users/{userId}/{document=**} {
-       allow read, write: if isOwner(userId);
+      match /transactions/{transactionId} {
+        allow read, create: if request.auth.uid == userId;
+      }
+
+      match /withdrawals/{withdrawalId} {
+         allow read, create: if request.auth.uid == userId;
+      }
+      
+      match /referrals/{referralId} {
+        allow read: if request.auth.uid == userId;
+      }
     }
     
-    // Allow any authenticated user to read the offers.
     match /offers/{offerId} {
-        allow read: if request.auth != null;
+      allow read: if request.auth.uid != null;
     }
   }
 }
