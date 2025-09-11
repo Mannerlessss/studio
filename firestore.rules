@@ -2,54 +2,33 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Admin has full access to everything
+
+    // Helper function to check for admin role
+    function isAdmin() {
+      return request.auth.token.admin == true;
+    }
+
+    // Admins can do anything
     match /{document=**} {
-      allow read, write: if request.auth.token.admin == true;
+      allow read, write: if isAdmin();
     }
-
-    // Rules for the 'users' collection
+    
     match /users/{userId} {
-      // Allow a user to read their own document
-      allow read: if request.auth.uid == userId;
+      // A user can read and update their own document
+      allow read, update: if request.auth.uid == userId;
 
-      // Allow a user to update their own document (e.g., name, phone)
-      allow update: if request.auth.uid == userId;
+      // A user can create their own document (on signup)
+      allow create: if request.auth.uid == userId;
 
-      // Allow any authenticated user to create their own user document during sign-up
-      allow create: if request.auth.uid != null;
-      
-      // Prevent users from deleting their own accounts directly
-      allow delete: if false;
-
-      // Rules for user subcollections
-      match /transactions/{transactionId} {
-        allow read, create: if request.auth.uid == userId;
-        // Prevent accidental updates/deletes from client
-        allow update, delete: if false;
-      }
-
-      match /withdrawals/{withdrawalId} {
-        allow read, create: if request.auth.uid == userId;
-        // Admin handles updates (approve/reject), client should not update
-        allow update: if false; 
-        allow delete: if false;
-      }
-      
-      match /referrals/{referralId} {
-        allow read: if request.auth.uid == userId;
-        // Subcollection is managed by server logic, not client
-        allow create, update, delete: if false; 
+      // Allow access to subcollections
+      match /{collection}/{docId} {
+        allow read, write, create, delete: if request.auth.uid == userId;
       }
     }
-
-    // Rules for the 'offers' collection
+    
+    // Offer codes can be read by any authenticated user
     match /offers/{offerId} {
-      // Allow any logged-in user to read offer details
-      allow read: if request.auth.uid != null;
-      
-      // Writes are handled by admins only (covered by the global admin rule)
-      allow write: if false;
+      allow read: if request.auth != null;
     }
   }
 }
