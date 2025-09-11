@@ -16,10 +16,8 @@ const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
 genkit({
   plugins: [
     googleAI(),
-    firebase(),
+    firebase,
   ],
-  logLevel: 'debug',
-  enableTracingAndMetrics: true,
 });
 
 export const setAdminClaimFlow = genkit.defineFlow(
