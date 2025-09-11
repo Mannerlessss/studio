@@ -96,13 +96,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
     }, []);
 
+    useEffect(() => {
+        if (loading) return;
+
+        // If there is no user and they are not on the login page
+        if (!user && pathname !== '/login') {
+            router.push('/login');
+        }
+
+        // If there IS a user and they are on the login page
+        if (user && pathname === '/login') {
+            router.push('/');
+        }
+
+         // If there is a user, but they are not an admin and are trying to access admin pages
+        if (user && !isAdmin && pathname.startsWith('/admin')) {
+            router.push('/');
+        }
+
+    }, [user, loading, pathname, router, isAdmin]);
+
+
     // --- Mock Functions ---
     const signInWithGoogle = async () => {
         console.log("Mock sign in with Google");
         setLoading(true);
         setUser(mockUser);
         setUserData(mockUserData);
-        router.push('/');
+        // router.push('/'); // Let useEffect handle routing
         setLoading(false);
     };
 
@@ -111,7 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         setUser(mockUser);
         setUserData({ ...mockUserData, name: details.name, email: details.email });
-        router.push('/');
+        // router.push('/'); // Let useEffect handle routing
         setLoading(false);
     };
 
@@ -120,7 +141,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         setUser(mockUser);
         setUserData(mockUserData);
-        router.push('/');
+        // router.push('/'); // Let useEffect handle routing
         setLoading(false);
     };
 
@@ -129,7 +150,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         setUser(null);
         setUserData(null);
-        router.push('/login');
+        // router.push('/login'); // Let useEffect handle routing
         setLoading(false);
     };
     
@@ -192,52 +213,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    // While loading, show a loading screen
-    if (loading) {
+    // While loading, or if redirection is about to happen, show a loading screen.
+    if (loading || (!user && pathname !== '/login') || (user && pathname === '/login')) {
          return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <div className="text-center">
                     <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
                     <p className="text-lg text-muted-foreground">Loading...</p>
-                </div>
-            </div>
-        );
-    }
-
-    // If there is a user, but they are not an admin and are trying to access admin pages
-    if (user && !isAdmin && pathname.startsWith('/admin')) {
-        router.push('/');
-        return (
-             <div className="flex items-center justify-center min-h-screen bg-background">
-                <div className="text-center">
-                    <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
-                    <p className="text-lg text-muted-foreground">Redirecting...</p>
-                </div>
-            </div>
-        );
-    }
-    
-    // If there is no user and they are not on the login page
-    if (!user && pathname !== '/login') {
-        router.push('/login');
-         return (
-             <div className="flex items-center justify-center min-h-screen bg-background">
-                <div className="text-center">
-                    <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
-                    <p className="text-lg text-muted-foreground">Redirecting to login...</p>
-                </div>
-            </div>
-        );
-    }
-
-    // If there IS a user and they are on the login page
-    if (user && pathname === '/login') {
-        router.push('/');
-        return (
-             <div className="flex items-center justify-center min-h-screen bg-background">
-                <div className="text-center">
-                    <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
-                    <p className="text-lg text-muted-foreground">Redirecting...</p>
                 </div>
             </div>
         );
