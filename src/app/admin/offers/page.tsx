@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import {
@@ -106,14 +105,21 @@ export default function OffersPage() {
             expiresAtTimestamp = Timestamp.fromDate(expiresAtDate);
         }
 
-        const newOfferData = {
+        const newOfferData: any = {
             code: newCode.toUpperCase(),
             rewardAmount: Number(rewardAmount),
-            maxUsers: maxUsers ? Number(maxUsers) : null,
-            expiresAt: expiresAtTimestamp,
             usageCount: 0,
             createdAt: serverTimestamp(),
         };
+
+        if (maxUsers) {
+            newOfferData.maxUsers = Number(maxUsers);
+        }
+
+        if (expiresAtTimestamp) {
+            newOfferData.expiresAt = expiresAtTimestamp;
+        }
+
 
         try {
             const docRef = await addDoc(collection(db, 'offers'), newOfferData);
@@ -121,14 +127,19 @@ export default function OffersPage() {
                 title: 'Code Created!',
                 description: `New offer code "${newCode.toUpperCase()}" has been created.`,
             });
-
-            // Add new offer to local state
-            const newOffer: Offer = {
+            
+            // This is a simplified version of adding to state. For a real app, you might re-fetch or use the server timestamp.
+             const newOfferForState: Offer = {
                 id: docRef.id,
-                ...newOfferData,
-                createdAt: Timestamp.now() // Approximate timestamp for local state
+                code: newOfferData.code,
+                rewardAmount: newOfferData.rewardAmount,
+                maxUsers: newOfferData.maxUsers || null,
+                expiresAt: newOfferData.expiresAt || null,
+                usageCount: 0,
+                createdAt: Timestamp.now() // Use client-side timestamp for immediate UI update
             };
-            setOffers(prev => [newOffer, ...prev]);
+
+            setOffers(prev => [newOfferForState, ...prev]);
 
             // Reset form
             setNewCode('');
@@ -316,5 +327,3 @@ export default function OffersPage() {
     </div>
   );
 }
-
-    
