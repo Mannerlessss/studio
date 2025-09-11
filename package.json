@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "set-admin": "tsx src/lib/set-admin-claim.ts"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.14.1",
@@ -68,5 +69,3 @@
     "typescript": "^5"
   }
 }
-
-    
