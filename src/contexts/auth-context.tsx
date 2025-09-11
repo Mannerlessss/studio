@@ -61,12 +61,11 @@ const ADMIN_EMAIL = "gagansharma.gs107@gmail.com";
 
 const generateReferralCode = (name: string) => `${name.slice(0, 5).toUpperCase()}${Math.random().toString(36).substring(2, 6)}`;
 
-const createNewUserData = (user: User, extraData?: { name?: string, phone?: string, referralCode?: string }): UserData => ({
+const createNewUserData = (user: User, extraData?: { name?: string, phone?: string }): Omit<UserData, 'referralCode'> => ({
     uid: user.uid,
     name: extraData?.name || user.displayName || 'Vault User',
     email: user.email || '',
     phone: extraData?.phone || user.phoneNumber || '',
-    referralCode: generateReferralCode(extraData?.name || user.displayName || 'USER'),
     membership: 'Basic',
     rank: 'Bronze',
     totalBalance: 0,
@@ -121,7 +120,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     if (userDocSnap.exists()) {
                         setUserData(userDocSnap.data() as UserData);
                     } else {
-                        // User exists in auth but not firestore. Could be a new signup.
+                        // This case is handled by getOrCreateUserDocument, but as a fallback
                         setUserData(null);
                     }
                     setIsInitialising(false);
@@ -154,47 +153,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (user && userData) { // User is logged in and data is loaded
             const isAdmin = userData.email === ADMIN_EMAIL;
-            if (isAdmin && !isAdminPage) {
+             if (isAdmin && !isAdminPage) {
                 router.push('/admin');
             } else if (!isAdmin && isAdminPage) {
                 router.push('/');
             } else if (isAuthPage) {
                 router.push(isAdmin ? '/admin' : '/');
             }
-        } else if (user && !userData) {
-            // This case can happen briefly during sign up. We wait for the doc to be created.
-            // If it persists, there might be an issue. For now, we don't redirect.
-        } else { // No user logged in
+        } else if (user && !userData && !loading) {
+             // This might happen briefly during user creation.
+        }
+        else { // No user logged in
             if (!isAuthPage && !isPublicPage) {
                 router.push('/login');
             }
         }
-    }, [user, userData, isInitialising, pathname, router]);
+    }, [user, userData, isInitialising, pathname, router, loading]);
 
-    const handleSuccessfulSignUp = async (loggedInUser: User, extraData: { name: string, phone: string, referralCode?: string }) => {
+    const getOrCreateUserDocument = async (loggedInUser: User, extraData: { name?: string, phone?: string, referralCode?: string } = {}) => {
         const userDocRef = doc(db, 'users', loggedInUser.uid);
-        let newUser = createNewUserData(loggedInUser, extraData);
-        
-        if (extraData.referralCode) {
-             try {
-                const q = query(collection(db, "users"), where("referralCode", "==", extraData.referralCode.toUpperCase()));
-                const querySnapshot = await getDocs(q);
+        const userDoc = await getDoc(userDocRef);
 
-                if (!querySnapshot.empty) {
-                    const referrerDoc = querySnapshot.docs[0];
-                    if(referrerDoc.id !== loggedInUser.uid) {
-                        newUser.usedReferralCode = extraData.referralCode.toUpperCase();
-                        newUser.referredBy = referrerDoc.id;
+        if (userDoc.exists()) {
+            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+        } else {
+            let newUserData = createNewUserData(loggedInUser, extraData);
+            const referralCode = generateReferralCode(newUserData.name);
+            
+            let finalUserData: UserData = { ...newUserData, referralCode };
+
+            if (extraData.referralCode) {
+                 try {
+                    const q = query(collection(db, "users"), where("referralCode", "==", extraData.referralCode.toUpperCase()));
+                    const querySnapshot = await getDocs(q);
+
+                    if (!querySnapshot.empty) {
+                        const referrerDoc = querySnapshot.docs[0];
+                        if(referrerDoc.id !== loggedInUser.uid) {
+                            finalUserData.usedReferralCode = extraData.referralCode.toUpperCase();
+                            finalUserData.referredBy = referrerDoc.id;
+                        }
                     }
+                } catch (e) {
+                    console.error("Error finding referrer on signup:", e);
                 }
-            } catch (e) {
-                console.error("Error finding referrer on signup:", e);
             }
+            await setDoc(userDocRef, finalUserData);
         }
-        
-        await setDoc(userDocRef, newUser);
-        setUserData(newUser); // Immediately set user data to avoid loading state issues
-        await handleAdminClaim(loggedInUser);
+         await handleAdminClaim(loggedInUser);
     }
 
     const signInWithGoogle = async () => {
@@ -202,14 +208,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             const result = await signInWithPopup(auth, provider);
-            const userDocRef = doc(db, 'users', result.user.uid);
-            const userDoc = await getDoc(userDocRef);
-            if (!userDoc.exists()) {
-                await handleSuccessfulSignUp(result.user, { name: result.user.displayName || 'Google User', phone: result.user.phoneNumber || '' });
-            } else {
-                 await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-                 await handleAdminClaim(result.user);
-            }
+            await getOrCreateUserDocument(result.user, { name: result.user.displayName || 'Google User', phone: result.user.phoneNumber || '' });
         } catch (error: any) {
             if (error.code !== 'auth/popup-closed-by-user') {
                 toast({
@@ -227,7 +226,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            await handleSuccessfulSignUp(userCredential.user, { name, phone, referralCode });
+            await getOrCreateUserDocument(userCredential.user, { name, phone, referralCode });
         } catch (error: any) {
             toast({
                 variant: 'destructive',
@@ -243,9 +242,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const userDocRef = doc(db, 'users', userCredential.user.uid);
-            await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-            await handleAdminClaim(userCredential.user);
+            await getOrCreateUserDocument(userCredential.user);
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -430,3 +427,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
