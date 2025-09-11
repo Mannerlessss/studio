@@ -69,44 +69,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setLoading(true);
             if (currentUser) {
                 const idTokenResult = await currentUser.getIdTokenResult();
                 const userIsAdmin = !!idTokenResult.claims.admin;
-                setIsAdmin(userIsAdmin);
                 setUser(currentUser);
+                setIsAdmin(userIsAdmin);
 
-                 // If user is admin, don't set up the user data listener here.
-                 // It can be fetched on admin pages directly.
                 if (userIsAdmin) {
-                    setUserData(null); // Or some admin-specific data structure
+                    setUserData(null);
+                    setLoading(false); // Fix: Ensure loading is false for admins
                 }
-
+                // For non-admins, the data listener will set loading to false.
             } else {
                 setUser(null);
                 setUserData(null);
                 setIsAdmin(false);
+                setLoading(false);
             }
-            setLoading(false);
         });
 
         return () => unsubscribe();
     }, []);
 
     useEffect(() => {
-        if (user && !isAdmin) {
-             const userDocRef = doc(db, 'users', user.uid);
-             const unsubscribe = onSnapshot(userDocRef, (doc) => {
-                if (doc.exists()) {
-                    setUserData({ uid: doc.id, ...doc.data() } as UserData);
-                } else {
-                    // This case might happen if the user doc creation fails after signup
-                    console.log("User document does not exist!");
-                    setUserData(null);
-                }
-             });
-             return () => unsubscribe();
+        if (!user || isAdmin) {
+            return; // Don't run listener if no user, or if user is admin
         }
+        setLoading(true);
+        const userDocRef = doc(db, 'users', user.uid);
+        const unsubscribe = onSnapshot(userDocRef, (doc) => {
+            if (doc.exists()) {
+                setUserData({ uid: doc.id, ...doc.data() } as UserData);
+            } else {
+                console.log("User document does not exist!");
+                setUserData(null);
+            }
+            setLoading(false); // Set loading to false after getting data
+        }, (error) => {
+            console.error("Error listening to user document:", error);
+            setUserData(null);
+            setLoading(false);
+        });
+        return () => unsubscribe();
     }, [user, isAdmin]);
 
      useEffect(() => {
@@ -187,36 +191,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 description: error.message,
             });
         } finally {
-            setLoading(false);
+            // setLoading(false); // Auth state change will handle this
         }
     };
 
     const signInWithEmail = async ({ email, password }: any) => {
         setLoading(true);
         try {
-            await signInWithEmailAndPassword(auth, email, password);
-             const userDocRef = doc(db, 'users', auth.currentUser!.uid);
-             await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
-
+            const credential = await signInWithEmailAndPassword(auth, email, password);
+            const userDocRef = doc(db, 'users', credential.user.uid);
+            // This check avoids trying to write to an admin user's non-existent doc
+            const userDoc = await getDoc(userDocRef);
+            if (userDoc.exists()) {
+                await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+            }
         } catch (error: any) {
             toast({
                 variant: 'destructive',
                 title: 'Sign In Failed',
                 description: error.message,
             });
-        } finally {
             setLoading(false);
+        } finally {
+           // setLoading(false) is handled by the auth state listeners
         }
     };
 
     const logOut = async () => {
-        setLoading(true);
         await signOut(auth);
         setUser(null);
         setUserData(null);
         setIsAdmin(false);
-        // Let useEffect handle routing
-        setLoading(false);
     };
 
     const sendPasswordReset = async (email: string) => {
@@ -330,8 +335,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    // While loading or during redirect checks, show a full-screen loading indicator.
-    if (loading || (!user && pathname !== '/login') || (user && pathname === '/login')) {
+    if (loading) {
          return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <div className="text-center">
@@ -342,7 +346,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
     }
 
-    // Render children only when auth state is resolved and no redirection is needed.
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
