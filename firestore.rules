@@ -1,17 +1,37 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Allow users to read and write to their own data and subcollections
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    
+    // Admins have universal access.
+    match /{document=**} {
+      allow read, write: if request.auth.token.admin == true;
+    }
+
+    // Rules for the 'users' collection
+    match /users/{userId} {
+      // Users can read and update their own user document.
+      allow read, update: if request.auth.uid == userId;
+      
+      // Users can create documents in their own subcollections.
+      // This is needed for withdrawals, claiming bonuses, etc.
+      allow create: if request.auth.uid == userId;
+
+      // Users can manage documents within their own subcollections.
+      match /transactions/{transactionId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+      match /withdrawals/{withdrawalId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+       match /referrals/{referralId} {
+        allow read, write: if request.auth.uid == userId;
+      }
     }
     
-    // Grant full read/write access to admins everywhere
-    match /{path=**} {
-      allow read, write: if request.auth != null && request.auth.token.admin == true;
+    // Offer codes can be read by any authenticated user, but only created/updated by admins (covered by the universal admin rule).
+    match /offers/{offerId} {
+      allow read: if request.auth != null;
     }
   }
 }
