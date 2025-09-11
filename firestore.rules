@@ -1,24 +1,47 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Admins can read and write all data
-    match /{document=**} {
-      allow read, write: if request.auth.token.admin == true;
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
     }
 
-    // Users can access their own user document
-    match /users/{userId} {
-      allow read, update: if request.auth.uid == userId;
+    function isAdmin() {
+      return request.auth.token.admin == true;
+    }
 
-      // Users can access their own subcollections
-      match /{allChildren=**} {
-        allow read, write: if request.auth.uid == userId;
+    // Users collection
+    match /users/{userId} {
+      // Users can read and update their own document.
+      // Admins can read and write any user document.
+      allow read, update: if isOwner(userId) || isAdmin();
+      
+      // Admins can create or delete user documents.
+      allow create, delete: if isAdmin();
+      
+      // Subcollections within a user's document
+      match /{document=**} {
+        // Users can read and write to their own subcollections.
+        // Admins can read and write to any user's subcollections.
+        allow read, write: if isOwner(userId) || isAdmin();
       }
     }
-    
-    // Allow reading of offers by any authenticated user
+
+    // Offers collection: Admins can do anything, users can only read.
     match /offers/{offerId} {
       allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    
+    // Admin requests: Only authenticated users can create.
+    match /admin_requests/{requestId} {
+        allow create: if request.auth != null;
+        allow read, write: if isAdmin();
+    }
+
+    // Allow collection group queries for admins
+    match /{path=**}/withdrawals/{withdrawalId} {
+       allow read, write: if isAdmin();
     }
   }
 }
