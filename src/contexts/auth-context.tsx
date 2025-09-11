@@ -83,11 +83,12 @@ const createNewUserData = (user: User, extraData?: { name?: string, phone?: stri
 
 const handleAdminClaim = async (user: User) => {
     if (user.email === ADMIN_EMAIL) {
-        // A Cloud Function would listen for writes to this collection
-        // and grant the custom claim. This is an indirect trigger.
-        const adminRequestRef = collection(db, "admin_requests");
-        await addDoc(adminRequestRef, { uid: user.uid, email: user.email, requestedAt: serverTimestamp() });
-        console.log('Admin role request triggered for', user.email);
+        const idTokenResult = await user.getIdTokenResult(true); // Force refresh
+        if (idTokenResult.claims.admin !== true) {
+            const adminRequestRef = collection(db, "admin_requests");
+            await addDoc(adminRequestRef, { uid: user.uid, email: user.email, requestedAt: serverTimestamp() });
+            console.log('Admin role request triggered for', user.email);
+        }
     }
 }
 
@@ -110,19 +111,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             if (currentUser) {
                 setUser(currentUser);
-                await handleAdminClaim(currentUser); // Trigger admin claim on login
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 
                 unsubscribeDoc = onSnapshot(userDocRef, async (userDocSnap) => {
                     if (userDocSnap.exists()) {
                         const dbData = userDocSnap.data() as UserData;
                         setUserData(dbData);
-                         // Update last login only if data exists and user is logged in
-                        updateDoc(userDocRef, { lastLogin: serverTimestamp() }).catch(err => console.error("Failed to update last login", err));
+                        await updateDoc(userDocRef, { lastLogin: serverTimestamp() }).catch(err => console.error("Failed to update last login", err));
+                        await handleAdminClaim(currentUser); 
                     } else {
-                        // This case is for when the doc doesn't exist, which happens during signup
-                        // The user data will be created by the signup function.
-                        // We set it to null initially.
                         setUserData(null);
                     }
                     setIsInitialising(false);
@@ -147,25 +144,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         if (isInitialising) return;
+    
         const isAuthPage = pathname.startsWith('/login');
         const isAdminPage = pathname.startsWith('/admin');
-        const isPublicPage = ['/terms', '/privacy', '/support'].includes(pathname) || pathname === '/';
-
+    
         if (user) {
-             const checkAdminStatus = async () => {
-                const idTokenResult = await user.getIdTokenResult();
-                const isAdmin = idTokenResult.claims.admin === true;
-
-                if (isAdmin) {
-                    if (!isAdminPage) router.push('/admin');
-                } else {
-                    if (isAdminPage) router.push('/');
+            const checkAdminStatus = async () => {
+                try {
+                    const idTokenResult = await user.getIdTokenResult(true); // Force refresh token
+                    const isAdmin = idTokenResult.claims.admin === true;
+    
+                    if (isAdmin) {
+                        if (!isAdminPage) {
+                            router.push('/admin');
+                        }
+                    } else {
+                        if (isAdminPage) {
+                            router.push('/');
+                        }
+                    }
+    
+                    if (isAuthPage) {
+                        router.push(isAdmin ? '/admin' : '/');
+                    }
+                } catch (error) {
+                    console.error("Error checking admin status:", error);
+                    // Fallback to non-admin view if token check fails
+                    if (isAdminPage) {
+                        router.push('/');
+                    }
                 }
-                if (isAuthPage) router.push(isAdmin ? '/admin' : '/');
-             };
-             checkAdminStatus();
+            };
+            checkAdminStatus();
         } else {
-             if (!isAuthPage && !isPublicPage) {
+            const isPublicPage = ['/terms', '/privacy', '/support'].includes(pathname);
+            if (!isAuthPage && !isPublicPage) {
                 router.push('/login');
             }
         }
@@ -174,7 +187,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const handleSuccessfulSignUp = async (loggedInUser: User, extraData: { name: string, phone: string, referralCode?: string }) => {
         const userDocRef = doc(db, 'users', loggedInUser.uid);
-        const newUser = createNewUserData(loggedInUser, extraData);
+        let newUser = createNewUserData(loggedInUser, extraData);
         
         if (extraData.referralCode) {
              try {
@@ -194,7 +207,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         await setDoc(userDocRef, newUser);
-        await handleAdminClaim(loggedInUser); // Also trigger on sign up
+        setUserData(newUser); // Immediately set user data in state
+        await handleAdminClaim(loggedInUser);
     }
 
     const signInWithGoogle = async () => {
@@ -394,7 +408,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    if (isInitialising) {
+    if (isInitialising || (user && !userData)) {
         return (
              <div className="flex items-center justify-center min-h-screen bg-background">
                 <div className="text-center">
