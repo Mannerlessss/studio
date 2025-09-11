@@ -1,14 +1,17 @@
 
 'use server';
 import 'dotenv/config';
-import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/googleai';
-import {firebase} from '@genkit-ai/firebase';
+import { genkit } from 'genkit';
+import { googleAI } from '@genkit-ai/googleai';
+import { firebase } from '@genkit-ai/firebase';
 import * as admin from 'firebase-admin';
-import {z} from 'zod';
-// This assumes serviceAccountKey.json is in the root directory.
-// Make sure this file is in .gitignore and not checked into source control.
-import serviceAccount from '../../serviceAccountKey.json';
+import { z } from 'zod';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Correctly read the service account key using fs
+const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
+const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
 
 genkit({
   plugins: [
