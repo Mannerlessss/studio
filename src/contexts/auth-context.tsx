@@ -12,7 +12,7 @@ import {
     sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, Timestamp, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, getDocs, query, where, collection, updateDoc, writeBatch, Timestamp, onSnapshot, Unsubscribe, addDoc } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Gem } from 'lucide-react';
@@ -81,6 +81,15 @@ const createNewUserData = (user: User, extraData?: { name?: string, phone?: stri
     lastLogin: serverTimestamp(),
 });
 
+const handleAdminClaim = async (user: User) => {
+    if (user.email === ADMIN_EMAIL) {
+        // A Cloud Function would listen for writes to this collection
+        // and grant the custom claim. This is an indirect trigger.
+        const adminRequestRef = collection(db, "admin_requests");
+        await addDoc(adminRequestRef, { uid: user.uid, email: user.email, requestedAt: serverTimestamp() });
+        console.log('Admin role request triggered for', user.email);
+    }
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -101,6 +110,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             if (currentUser) {
                 setUser(currentUser);
+                await handleAdminClaim(currentUser); // Trigger admin claim on login
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 
                 unsubscribeDoc = onSnapshot(userDocRef, async (userDocSnap) => {
@@ -137,33 +147,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         if (isInitialising) return;
-
         const isAuthPage = pathname.startsWith('/login');
         const isAdminPage = pathname.startsWith('/admin');
-        const isPublicPage = ['/terms', '/privacy'].includes(pathname);
-        
-        if (isPublicPage) return;
+        const isPublicPage = ['/terms', '/privacy', '/support'].includes(pathname) || pathname === '/';
 
         if (user) {
-            if (user.email === ADMIN_EMAIL) {
-                if (!isAdminPage) router.push('/admin');
-            } else {
-                 if (isAdminPage) router.push('/');
-                 if (isAuthPage) router.push('/');
-            }
-        } else {
-            if (!isAuthPage) router.push('/login');
-        }
+             const checkAdminStatus = async () => {
+                const idTokenResult = await user.getIdTokenResult();
+                const isAdmin = idTokenResult.claims.admin === true;
 
-    }, [user, userData, isInitialising, pathname, router]);
+                if (isAdmin) {
+                    if (!isAdminPage) router.push('/admin');
+                } else {
+                    if (isAdminPage) router.push('/');
+                }
+                if (isAuthPage) router.push(isAdmin ? '/admin' : '/');
+             };
+             checkAdminStatus();
+        } else {
+             if (!isAuthPage && !isPublicPage) {
+                router.push('/login');
+            }
+        }
+    }, [user, isInitialising, pathname, router]);
 
 
     const handleSuccessfulSignUp = async (loggedInUser: User, extraData: { name: string, phone: string, referralCode?: string }) => {
         const userDocRef = doc(db, 'users', loggedInUser.uid);
         const newUser = createNewUserData(loggedInUser, extraData);
         
-        // This is a more secure way to handle referrals.
-        // The user now redeems the code on the settings page AFTER they are logged in.
         if (extraData.referralCode) {
              try {
                 const q = query(collection(db, "users"), where("referralCode", "==", extraData.referralCode.toUpperCase()));
@@ -182,6 +194,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         await setDoc(userDocRef, newUser);
+        await handleAdminClaim(loggedInUser); // Also trigger on sign up
     }
 
     const signInWithGoogle = async () => {
@@ -237,6 +250,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             await signOut(auth);
+            router.push('/login');
         } catch (error: any) {
              toast({
                 variant: 'destructive',
