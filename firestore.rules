@@ -2,25 +2,31 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Admins can do anything
+    
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Admins have full access to everything
     match /{document=**} {
       allow read, write: if request.auth.token.admin == true;
     }
 
+    // User-specific access
     match /users/{userId} {
-      // Allow a user to read and update their own document.
-      // Create/delete is handled by server-side functions (auth trigger).
+      // Users can read and update their own main document
       allow read, update: if request.auth.uid == userId;
-    }
+      // Users can create their own user document during signup
+      allow create: if request.auth.uid == userId;
 
-    match /users/{userId}/{subcollection}/{docId} {
-      // Allow user to manage documents in their own subcollections
-      // (e.g., creating a withdrawal request).
-      allow read, write, create, delete: if request.auth.uid == userId;
+      // Users can access their own subcollections
+      match /{subcollection}/{docId} {
+        allow read, write, create, delete: if request.auth.uid == userId;
+      }
     }
     
-    // Offers can be read by any authenticated user
+    // All authenticated users can read the 'offers' collection
     match /offers/{offerId} {
       allow read: if request.auth != null;
     }
