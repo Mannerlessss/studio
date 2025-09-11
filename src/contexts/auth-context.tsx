@@ -1,10 +1,21 @@
 
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User } from 'firebase/auth'; // Keep User type for compatibility
+import { 
+    User, 
+    onAuthStateChanged,
+    GoogleAuthProvider,
+    signInWithPopup,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut,
+    sendPasswordResetEmail
+} from 'firebase/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp } from 'firebase/firestore';
 
 interface UserData {
     uid: string;
@@ -24,7 +35,7 @@ interface UserData {
     bonusEarnings: number;
     investmentEarnings: number;
     hasInvested: boolean;
-    lastBonusClaim?: any;
+    lastBonusClaim?: Timestamp;
     createdAt: any;
     lastLogin: any;
 }
@@ -47,40 +58,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// --- MOCK DATA ---
-const mockUser: User = {
-    uid: 'mock-user-123',
-    email: 'mock.user@example.com',
-    displayName: 'Mock User',
-    phoneNumber: '123-456-7890',
-    photoURL: null,
-    providerId: 'password',
-    emailVerified: true,
-} as User;
-
-const mockUserData: UserData = {
-    uid: 'mock-user-123',
-    name: 'Gagan Sharma',
-    email: 'gagansharma.gs107@gmail.com',
-    phone: '+91 7888540806',
-    membership: 'Pro',
-    rank: 'Gold',
-    totalBalance: 7500,
-    invested: 5000,
-    earnings: 2500,
-    projected: 9000,
-    referralEarnings: 1500,
-    bonusEarnings: 200,
-    investmentEarnings: 800,
-    hasInvested: true,
-    referralCode: 'GAGANPRO',
-    usedReferralCode: 'FRIENDLY',
-    createdAt: new Date(),
-    lastLogin: new Date(),
-    lastBonusClaim: null,
-};
-// --- END MOCK DATA ---
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [userData, setUserData] = useState<UserData | null>(null);
@@ -91,110 +68,250 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { toast } = useToast();
 
     useEffect(() => {
-        // This effect will run once on mount and set the initial state.
-        // We start with a logged-out state.
-        setLoading(false);
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setLoading(true);
+            if (currentUser) {
+                const idTokenResult = await currentUser.getIdTokenResult();
+                const userIsAdmin = !!idTokenResult.claims.admin;
+                setIsAdmin(userIsAdmin);
+                setUser(currentUser);
+
+                 // If user is admin, don't set up the user data listener here.
+                 // It can be fetched on admin pages directly.
+                if (userIsAdmin) {
+                    setUserData(null); // Or some admin-specific data structure
+                }
+
+            } else {
+                setUser(null);
+                setUserData(null);
+                setIsAdmin(false);
+            }
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
+        if (user && !isAdmin) {
+             const userDocRef = doc(db, 'users', user.uid);
+             const unsubscribe = onSnapshot(userDocRef, (doc) => {
+                if (doc.exists()) {
+                    setUserData({ uid: doc.id, ...doc.data() } as UserData);
+                } else {
+                    // This case might happen if the user doc creation fails after signup
+                    console.log("User document does not exist!");
+                    setUserData(null);
+                }
+             });
+             return () => unsubscribe();
+        }
+    }, [user, isAdmin]);
+
+     useEffect(() => {
         if (loading) return;
 
-        // If there is no user and they are not on the login page
-        if (!user && pathname !== '/login') {
+        const isAuthPage = pathname === '/login';
+        const isAdminPage = pathname.startsWith('/admin');
+
+        if (!user && !isAuthPage) {
             router.push('/login');
+        } else if (user && isAuthPage) {
+            router.push(isAdmin ? '/admin' : '/');
+        } else if (user && !isAdmin && isAdminPage) {
+             router.push('/');
+        } else if (user && isAdmin && !isAdminPage) {
+            router.push('/admin');
         }
+    }, [user, isAdmin, loading, pathname, router]);
 
-        // If there IS a user and they are on the login page
-        if (user && pathname === '/login') {
-            router.push('/');
-        }
-
-         // If there is a user, but they are not an admin and are trying to access admin pages
-        if (user && !isAdmin && pathname.startsWith('/admin')) {
-            router.push('/');
-        }
-
-    }, [user, loading, pathname, router, isAdmin]);
-
-
-    // --- Mock Functions ---
     const signInWithGoogle = async () => {
-        console.log("Mock sign in with Google");
-        setLoading(true);
-        setUser(mockUser);
-        setUserData(mockUserData);
-        // router.push('/'); // Let useEffect handle routing
-        setLoading(false);
+        // To be implemented if needed
     };
 
-    const signUpWithEmail = async (details: any) => {
-        console.log("Mock sign up with email", details);
+    const signUpWithEmail = async ({ name, email, phone, password, referralCode }: any) => {
         setLoading(true);
-        setUser(mockUser);
-        setUserData({ ...mockUserData, name: details.name, email: details.email });
-        // router.push('/'); // Let useEffect handle routing
-        setLoading(false);
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const newUser = userCredential.user;
+
+            const batch = writeBatch(db);
+            const userDocRef = doc(db, 'users', newUser.uid);
+            
+            const newUserDoc: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'projected' | 'rank'> = {
+                name,
+                email,
+                phone,
+                membership: 'Basic',
+                totalBalance: 0,
+                invested: 0,
+                earnings: 0,
+                referralEarnings: 0,
+                bonusEarnings: 0,
+                investmentEarnings: 0,
+                hasInvested: false,
+                referralCode: `${name.split(' ')[0].toUpperCase()}${(Math.random() * 9000 + 1000).toFixed(0)}`,
+            };
+
+            batch.set(userDocRef, {
+                ...newUserDoc,
+                createdAt: serverTimestamp(),
+                lastLogin: serverTimestamp(),
+            });
+            
+            if (referralCode) {
+                 batch.update(userDocRef, { usedReferralCode: referralCode });
+                 const q = query(collection(db, "users"), where("referralCode", "==", referralCode));
+                 const querySnapshot = await getDocs(q);
+                 if (!querySnapshot.empty) {
+                     const referrerDoc = querySnapshot.docs[0];
+                     batch.update(userDocRef, { referredBy: referrerDoc.id });
+                     
+                     const referralSubcollectionRef = doc(collection(db, `users/${referrerDoc.id}/referrals`));
+                      batch.set(referralSubcollectionRef, {
+                         userId: newUser.uid,
+                         name: name,
+                         email: email,
+                         hasInvested: false,
+                         date: serverTimestamp()
+                     });
+                 }
+            }
+            await batch.commit();
+
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Sign Up Failed',
+                description: error.message,
+            });
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const signInWithEmail = async (details: any) => {
-        console.log("Mock sign in with email", details);
+    const signInWithEmail = async ({ email, password }: any) => {
         setLoading(true);
-        setUser(mockUser);
-        setUserData(mockUserData);
-        // router.push('/'); // Let useEffect handle routing
-        setLoading(false);
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+             const userDocRef = doc(db, 'users', auth.currentUser!.uid);
+             await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Sign In Failed',
+                description: error.message,
+            });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const logOut = async () => {
-        console.log("Mock log out");
         setLoading(true);
+        await signOut(auth);
         setUser(null);
         setUserData(null);
-        // router.push('/login'); // Let useEffect handle routing
+        setIsAdmin(false);
+        // Let useEffect handle routing
         setLoading(false);
-    };
-    
-    const redeemReferralCode = async (code: string) => {
-        if (!userData) return Promise.reject(new Error("User not found"));
-        console.log(`Mock redeeming code: ${code}`);
-        setUserData({ ...userData, usedReferralCode: code });
-        return Promise.resolve();
-    };
-    
-    const updateUserPhone = async (phone: string) => {
-        if (!userData) return Promise.reject(new Error("User not found"));
-        console.log(`Mock updating phone: ${phone}`);
-        setUserData({ ...userData, phone: phone });
-        return Promise.resolve();
-    };
-
-    const updateUserName = async (name: string) => {
-        if (!userData) return Promise.reject(new Error("User not found"));
-        console.log(`Mock updating name: ${name}`);
-        setUserData({ ...userData, name: name });
-        return Promise.resolve();
-    };
-    
-    const claimDailyBonus = async (amount: number) => {
-        if (!userData) return Promise.reject(new Error("User not found"));
-        console.log(`Mock claiming bonus: ${amount}`);
-        setUserData({ 
-            ...userData, 
-            totalBalance: userData.totalBalance + amount,
-            bonusEarnings: userData.bonusEarnings + amount,
-            lastBonusClaim: new Date(),
-        });
-        toast({ title: 'Bonus Claimed!', description: `You received ${amount} Rs.` });
-        return Promise.resolve();
     };
 
     const sendPasswordReset = async (email: string) => {
-        console.log(`Mock sending reset to: ${email}`);
-        toast({
-            title: 'Password Reset Link Sent',
-            description: `If an account with ${email} exists, a reset link has been sent.`,
+        try {
+            await sendPasswordResetEmail(auth, email);
+            toast({
+                title: 'Password Reset Link Sent',
+                description: `If an account with ${email} exists, a reset link has been sent.`,
+            });
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: error.message,
+            });
+        }
+    };
+    
+    const redeemReferralCode = async (code: string) => {
+        if (!user || !userData) throw new Error("User not found");
+        if (userData.usedReferralCode) throw new Error("You have already used a referral code.");
+        if (userData.referralCode === code) throw new Error("You cannot use your own referral code.");
+        
+        const batch = writeBatch(db);
+        const userDocRef = doc(db, 'users', user.uid);
+        
+        const q = query(collection(db, "users"), where("referralCode", "==", code));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            throw new Error("Invalid referral code.");
+        }
+        
+        const referrerDoc = querySnapshot.docs[0];
+        
+        batch.update(userDocRef, { 
+            usedReferralCode: code,
+            referredBy: referrerDoc.id
         });
-        return Promise.resolve();
+
+        const referralSubcollectionRef = doc(collection(db, `users/${referrerDoc.id}/referrals`));
+        batch.set(referralSubcollectionRef, {
+            userId: user.uid,
+            name: userData.name,
+            email: userData.email,
+            hasInvested: false,
+            date: serverTimestamp()
+        });
+
+        await batch.commit();
+    };
+    
+    const updateUserName = async (name: string) => {
+        if (!user) throw new Error("User not found");
+        await updateDoc(doc(db, 'users', user.uid), { name });
+    };
+
+    const updateUserPhone = async (phone: string) => {
+        if (!user) throw new Error("User not found");
+        await updateDoc(doc(db, 'users', user.uid), { phone });
+    };
+    
+    const claimDailyBonus = async (amount: number) => {
+        if (!user || !userData) throw new Error("User not found");
+
+        const now = Timestamp.now();
+        if (userData.lastBonusClaim) {
+            const fourHours = 4 * 60 * 60 * 1000;
+            const lastClaimMillis = userData.lastBonusClaim.toMillis();
+            if (now.toMillis() - lastClaimMillis < fourHours) {
+                throw new Error("You have already claimed your bonus recently.");
+            }
+        }
+        
+        const batch = writeBatch(db);
+        const userDocRef = doc(db, 'users', user.uid);
+        
+        batch.update(userDocRef, {
+            totalBalance: (userData.totalBalance || 0) + amount,
+            bonusEarnings: (userData.bonusEarnings || 0) + amount,
+            earnings: (userData.earnings || 0) + amount,
+            lastBonusClaim: now
+        });
+        
+        const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+        batch.set(transactionRef, {
+            type: 'bonus',
+            amount: amount,
+            description: 'Daily Bonus Claim',
+            status: 'Completed',
+            date: now
+        });
+
+        await batch.commit();
+        toast({ title: 'Bonus Claimed!', description: `You received ${amount} Rs.` });
     };
 
     const value: AuthContextType = {
@@ -213,7 +330,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    // While loading, or if redirection is about to happen, show a loading screen.
+    // While loading or during redirect checks, show a full-screen loading indicator.
     if (loading || (!user && pathname !== '/login') || (user && pathname === '/login')) {
          return (
             <div className="flex items-center justify-center min-h-screen bg-background">
@@ -225,7 +342,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
     }
 
-
+    // Render children only when auth state is resolved and no redirection is needed.
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
