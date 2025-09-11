@@ -1,40 +1,49 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check for admin custom claim
+    
+    // Function to check if the user has an admin claim
     function isAdmin() {
       return request.auth.token.admin == true;
     }
 
-    // Admins can read and write all data.
-    // The service account will bypass these rules.
-    match /{path=**} {
-      allow read, write: if isAdmin();
+    // Default deny all access to prevent unsecured collections
+    match /{document=**} {
+      allow read, write: if false;
     }
 
-    // Rules for regular users
+    // User-specific data rules
     match /users/{userId} {
-      allow read, update: if request.auth.uid == userId;
-      allow create: if request.auth.uid != null;
-
-      match /transactions/{transactionId} {
-        allow read, create: if request.auth.uid == userId;
-      }
-
-      match /withdrawals/{withdrawalId} {
-         allow read, create: if request.auth.uid == userId;
-      }
-      
-      match /referrals/{referralId} {
-        allow read: if request.auth.uid == userId;
-      }
+      // Admins can read/write any user document.
+      // Users can only read/write their own document.
+      allow read, update, delete: if isAdmin() || request.auth.uid == userId;
+      // Any authenticated user can create their own user document during signup.
+      allow create: if request.auth.uid == userId;
     }
     
+    // Transactions and other user sub-collections
+    match /users/{userId}/{collectionId}/{docId} {
+        // Admins have full access.
+        // Users can create and read their own sub-collection documents.
+        allow read, create: if isAdmin() || request.auth.uid == userId;
+        // Only admins can update or delete sub-collection documents (e.g., withdrawal status).
+        allow update, delete: if isAdmin();
+    }
+
+    // Rules for top-level collections used by the admin panel
     match /offers/{offerId} {
-      allow read: if request.auth.uid != null;
+        // Any authenticated user can read offers (e.g., to redeem them).
+        allow read: if request.auth != null;
+        // Only admins can create, update, or delete offer codes.
+        allow create, update, delete: if isAdmin();
+    }
+    
+    match /admin_requests/{requestId} {
+        // Any authenticated user can create a request.
+        allow create: if request.auth != null;
+        // Only admins can read/delete admin requests.
+        allow read, delete: if isAdmin();
     }
   }
 }
