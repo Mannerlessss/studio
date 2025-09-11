@@ -44,6 +44,7 @@ interface AuthContextType {
   user: User | null;
   userData: UserData | null;
   loading: boolean;
+  isAdmin: boolean;
   signInWithGoogle: () => Promise<void>;
   signUpWithEmail: (details: any) => Promise<void>;
   signInWithEmail: (details: any) => Promise<void>;
@@ -61,45 +62,12 @@ const ADMIN_EMAIL = "gagansharma.gs107@gmail.com";
 
 const generateReferralCode = (name: string) => `${name.slice(0, 5).toUpperCase()}${Math.random().toString(36).substring(2, 6)}`;
 
-const createNewUserData = (user: User, extraData?: { name?: string, phone?: string }): Omit<UserData, 'referralCode'> => ({
-    uid: user.uid,
-    name: extraData?.name || user.displayName || 'Vault User',
-    email: user.email || '',
-    phone: extraData?.phone || user.phoneNumber || '',
-    membership: 'Basic',
-    rank: 'Bronze',
-    totalBalance: 0,
-    invested: 0,
-    earnings: 0,
-    projected: 0,
-    referralEarnings: 0,
-    bonusEarnings: 0,
-    investmentEarnings: 0,
-    hasInvested: false,
-    createdAt: serverTimestamp(),
-    lastLogin: serverTimestamp(),
-});
-
-const handleAdminClaim = async (user: User) => {
-    if (user.email === ADMIN_EMAIL) {
-        try {
-            const idTokenResult = await user.getIdTokenResult(true);
-            if (idTokenResult.claims.admin !== true) {
-                const adminRequestRef = collection(db, "admin_requests");
-                await addDoc(adminRequestRef, { uid: user.uid, email: user.email, requestedAt: serverTimestamp() });
-                console.log('Admin role request triggered for', user.email);
-            }
-        } catch (error) {
-            console.error("Error checking or setting admin claim:", error);
-        }
-    }
-}
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [userData, setUserData] = useState<UserData | null>(null);
-    const [isInitialising, setIsInitialising] = useState(true);
-    const [loading, setLoading] = useState(false); // For actions like login/signup
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [loading, setLoading] = useState(true); // This now represents the initial auth check
+    const [actionLoading, setActionLoading] = useState(false); // For specific actions like login/logout
     const router = useRouter();
     const pathname = usePathname();
     const { toast } = useToast();
@@ -108,67 +76,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let unsubscribeDoc: Unsubscribe | undefined;
 
         const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-            if (unsubscribeDoc) {
-                unsubscribeDoc();
-            }
-
+            if (unsubscribeDoc) unsubscribeDoc();
+            
             if (currentUser) {
-                setUser(currentUser);
-                const userDocRef = doc(db, 'users', currentUser.uid);
+                const idTokenResult = await currentUser.getIdTokenResult();
+                const userIsAdmin = !!idTokenResult.claims.admin;
                 
+                setUser(currentUser);
+                setIsAdmin(userIsAdmin);
+
+                const userDocRef = doc(db, 'users', currentUser.uid);
                 unsubscribeDoc = onSnapshot(userDocRef, (userDocSnap) => {
                     if (userDocSnap.exists()) {
                         setUserData(userDocSnap.data() as UserData);
-                    } else {
-                        // This case is handled by getOrCreateUserDocument, but as a fallback
-                        setUserData(null);
                     }
-                    setIsInitialising(false);
+                    setLoading(false);
                 }, (error) => {
                     console.error("Auth Snapshot Error:", error);
                     setUserData(null);
-                    setIsInitialising(false);
+                    setLoading(false);
                 });
+
             } else {
                 setUser(null);
                 setUserData(null);
-                setIsInitialising(false);
+                setIsAdmin(false);
+                if (unsubscribeDoc) unsubscribeDoc();
+                setLoading(false);
             }
         });
 
         return () => {
             unsubscribeAuth();
-            if (unsubscribeDoc) {
-                unsubscribeDoc();
-            }
+            if (unsubscribeDoc) unsubscribeDoc();
         };
     }, []);
     
     useEffect(() => {
-        if (isInitialising) return; // Wait for initial auth check
+        if (loading) return; // Wait for initial auth state to be resolved
 
         const isAuthPage = pathname.startsWith('/login');
         const isAdminPage = pathname.startsWith('/admin');
         const isPublicPage = ['/terms', '/privacy', '/support'].includes(pathname);
-        
-        if (user && userData) { // User is logged in and data is loaded
-            const isAdmin = userData.email === ADMIN_EMAIL;
-             if (isAdmin && !isAdminPage) {
+
+        if (user) { // User is logged in
+            if (isAdmin && !isAdminPage) {
                 router.push('/admin');
             } else if (!isAdmin && isAdminPage) {
                 router.push('/');
             } else if (isAuthPage) {
                 router.push(isAdmin ? '/admin' : '/');
             }
-        } else if (user && !userData && !loading) {
-             // This might happen briefly during user creation.
-        }
-        else { // No user logged in
+        } else { // No user is logged in
             if (!isAuthPage && !isPublicPage) {
                 router.push('/login');
             }
         }
-    }, [user, userData, isInitialising, pathname, router, loading]);
+    }, [user, isAdmin, loading, pathname, router]);
 
     const getOrCreateUserDocument = async (loggedInUser: User, extraData: { name?: string, phone?: string, referralCode?: string } = {}) => {
         const userDocRef = doc(db, 'users', loggedInUser.uid);
@@ -177,10 +141,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userDoc.exists()) {
             await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
         } else {
-            let newUserData = createNewUserData(loggedInUser, extraData);
-            const referralCode = generateReferralCode(newUserData.name);
+             const newName = extraData.name || loggedInUser.displayName || 'Vault User';
+             const referralCode = generateReferralCode(newName);
             
-            let finalUserData: UserData = { ...newUserData, referralCode };
+            let newUserData: Omit<UserData, 'referralCode' | 'usedReferralCode' | 'referredBy' | 'hasInvested' | 'lastBonusClaim' | 'projected' | 'earnings' | 'investmentEarnings'> & {referralCode: string, usedReferralCode?: string, referredBy?: string} = {
+                uid: loggedInUser.uid,
+                name: newName,
+                email: loggedInUser.email || '',
+                phone: extraData.phone || loggedInUser.phoneNumber || '',
+                membership: 'Basic',
+                rank: 'Bronze',
+                totalBalance: 0,
+                invested: 0,
+                referralEarnings: 0,
+                bonusEarnings: 0,
+                createdAt: serverTimestamp(),
+                lastLogin: serverTimestamp(),
+                referralCode
+            };
 
             if (extraData.referralCode) {
                  try {
@@ -190,25 +168,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     if (!querySnapshot.empty) {
                         const referrerDoc = querySnapshot.docs[0];
                         if(referrerDoc.id !== loggedInUser.uid) {
-                            finalUserData.usedReferralCode = extraData.referralCode.toUpperCase();
-                            finalUserData.referredBy = referrerDoc.id;
+                            newUserData.usedReferralCode = extraData.referralCode.toUpperCase();
+                            newUserData.referredBy = referrerDoc.id;
                         }
                     }
                 } catch (e) {
                     console.error("Error finding referrer on signup:", e);
                 }
             }
-            await setDoc(userDocRef, finalUserData);
+            await setDoc(userDocRef, newUserData);
         }
-         await handleAdminClaim(loggedInUser);
+         // Request admin claim if email matches
+        if (loggedInUser.email === ADMIN_EMAIL) {
+            const adminRequestRef = collection(db, "admin_requests");
+            await addDoc(adminRequestRef, { uid: loggedInUser.uid, email: loggedInUser.email, requestedAt: serverTimestamp() });
+        }
     }
 
     const signInWithGoogle = async () => {
         const provider = new GoogleAuthProvider();
-        setLoading(true);
+        setActionLoading(true);
         try {
             const result = await signInWithPopup(auth, provider);
-            await getOrCreateUserDocument(result.user, { name: result.user.displayName || 'Google User', phone: result.user.phoneNumber || '' });
+            await getOrCreateUserDocument(result.user, { name: result.user.displayName || undefined, phone: result.user.phoneNumber || undefined });
         } catch (error: any) {
             if (error.code !== 'auth/popup-closed-by-user') {
                 toast({
@@ -218,12 +200,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 });
             }
         } finally {
-            setLoading(false);
+            setActionLoading(false);
         }
     };
 
     const signUpWithEmail = async ({ name, email, password, phone, referralCode }: any) => {
-        setLoading(true);
+        setActionLoading(true);
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await getOrCreateUserDocument(userCredential.user, { name, phone, referralCode });
@@ -233,13 +215,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign-Up Failed',
                 description: error.message,
             });
-        } finally {
-            setLoading(false);
+            setActionLoading(false); // only on error
         }
+        // No finally here, as onAuthStateChanged will handle loading state
     };
 
     const signInWithEmail = async ({ email, password }: any) => {
-        setLoading(true);
+        setActionLoading(true);
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             await getOrCreateUserDocument(userCredential.user);
@@ -249,16 +231,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Login Failed',
                 description: error.message,
             });
-        } finally {
-            setLoading(false);
+             setActionLoading(false); // only on error
         }
+        // No finally here, as onAuthStateChanged will handle loading state
     };
 
     const logOut = async () => {
-        setLoading(true);
+        setActionLoading(true);
         try {
             await signOut(auth);
-            // The onAuthStateChanged listener will handle state updates and redirection
+            // onAuthStateChanged handles the state updates
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -266,7 +248,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 description: error.message,
             });
         } finally {
-            setLoading(false);
+            setActionLoading(false);
         }
     };
 
@@ -305,70 +287,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const updateUserName = async (name: string) => {
         if (!user) throw new Error("No user is logged in.");
-        try {
-            const userDocRef = doc(db, 'users', user.uid);
-            await updateDoc(userDocRef, { name });
-        } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Update Failed',
-                description: error.message,
-            });
-            throw error;
-        }
+        const userDocRef = doc(db, 'users', user.uid);
+        await updateDoc(userDocRef, { name });
     };
 
     const updateUserPhone = async (phone: string) => {
         if (!user) throw new Error("No user is logged in.");
-        try {
-            const userDocRef = doc(db, 'users', user.uid);
-            await updateDoc(userDocRef, { phone });
-        } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Update Failed',
-                description: error.message,
-            });
-            throw error;
-        }
+        const userDocRef = doc(db, 'users', user.uid);
+        await updateDoc(userDocRef, { phone });
     };
     
     const claimDailyBonus = async (amount: number) => {
         if (!user || !userData) return;
         
-        try {
-            const batch = writeBatch(db);
-            const userDocRef = doc(db, 'users', user.uid);
-            
-            batch.update(userDocRef, {
-                totalBalance: (userData.totalBalance || 0) + amount,
-                bonusEarnings: (userData.bonusEarnings || 0) + amount,
-                earnings: (userData.earnings || 0) + amount,
-                lastBonusClaim: serverTimestamp(),
-            });
-            
-            const transactionsColRef = collection(db, `users/${user.uid}/transactions`);
-            batch.set(doc(transactionsColRef), {
-                type: 'bonus',
-                amount: amount,
-                description: 'Daily Bonus Claim',
-                status: 'Completed',
-                date: serverTimestamp(),
-            });
+        const batch = writeBatch(db);
+        const userDocRef = doc(db, 'users', user.uid);
+        
+        batch.update(userDocRef, {
+            totalBalance: (userData.totalBalance || 0) + amount,
+            bonusEarnings: (userData.bonusEarnings || 0) + amount,
+            earnings: (userData.earnings || 0) + amount,
+            lastBonusClaim: serverTimestamp(),
+        });
+        
+        const transactionsColRef = collection(db, `users/${user.uid}/transactions`);
+        batch.set(doc(transactionsColRef), {
+            type: 'bonus',
+            amount: amount,
+            description: 'Daily Bonus Claim',
+            status: 'Completed',
+            date: serverTimestamp(),
+        });
 
-            await batch.commit();
-
-            toast({
-                title: 'Bonus Claimed!',
-                description: `You've received ${amount} Rs.`,
-            });
-        } catch (error: any) {
-             toast({
-                variant: 'destructive',
-                title: 'Claim Failed',
-                description: 'Could not update your balance. Please try again.',
-            });
-        }
+        await batch.commit();
+        toast({
+            title: 'Bonus Claimed!',
+            description: `You've received ${amount} Rs.`,
+        });
     }
     
     const sendPasswordReset = async (email: string) => {
@@ -390,7 +345,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const value: AuthContextType = {
         user,
         userData,
-        loading: isInitialising || loading,
+        loading: actionLoading, // Use actionLoading for button states etc.
+        isAdmin,
         signInWithGoogle,
         signUpWithEmail,
         signInWithEmail,
@@ -402,7 +358,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    if (isInitialising) {
+    if (loading) { // This is the initial, full-page loading screen
          return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <div className="text-center">
