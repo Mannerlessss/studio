@@ -113,25 +113,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, []);
     
     useEffect(() => {
-        if (loading) return; // Wait for initial auth state to be resolved
+        if (loading) return;
 
-        const isAuthPage = pathname.startsWith('/login');
-        const isAdminPage = pathname.startsWith('/admin');
-        const isPublicPage = ['/terms', '/privacy', '/support'].includes(pathname);
+        const protectedRoutes = ['/', '/investment', '/refer', '/settings', '/support'];
+        const adminRoutes = ['/admin', '/admin/users', '/admin/withdrawals', '/admin/offers'];
+        const authRoutes = ['/login'];
 
-        if (user) { // User is logged in
-            if (isAdmin && !isAdminPage) {
+        if (!user && (protectedRoutes.includes(pathname) || adminRoutes.includes(pathname))) {
+            router.push('/login');
+        }
+
+        if (user && authRoutes.includes(pathname)) {
+            router.push(isAdmin ? '/admin' : '/');
+        }
+
+        if (user && !isAdmin && adminRoutes.includes(pathname)) {
+            router.push('/');
+        }
+
+        if (user && isAdmin && !adminRoutes.includes(pathname)) {
+             // Exception for pages that admins might need to see
+            if (!['/terms', '/privacy'].includes(pathname)) {
                 router.push('/admin');
-            } else if (!isAdmin && isAdminPage) {
-                router.push('/');
-            } else if (isAuthPage) {
-                router.push(isAdmin ? '/admin' : '/');
-            }
-        } else { // No user is logged in
-            if (!isAuthPage && !isPublicPage) {
-                router.push('/login');
             }
         }
+
     }, [user, isAdmin, loading, pathname, router]);
 
     const getOrCreateUserDocument = async (loggedInUser: User, extraData: { name?: string, phone?: string, referralCode?: string } = {}) => {
@@ -383,5 +389,7 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
 
     
