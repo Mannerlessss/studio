@@ -113,31 +113,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, []);
     
     useEffect(() => {
-        if (loading) return;
+        if (loading) return; // Wait until authentication state is resolved
 
-        const protectedRoutes = ['/', '/investment', '/refer', '/settings', '/support'];
-        const adminRoutes = ['/admin', '/admin/users', '/admin/withdrawals', '/admin/offers'];
-        const authRoutes = ['/login'];
+        const isAuthPage = pathname === '/login';
+        const isUserPage = !isAuthPage && !pathname.startsWith('/admin');
+        const isAdminPage = pathname.startsWith('/admin');
 
-        if (!user && (protectedRoutes.includes(pathname) || adminRoutes.includes(pathname))) {
-            router.push('/login');
+        // If not logged in, redirect from protected pages to login
+        if (!user) {
+            if (isUserPage || isAdminPage) {
+                router.push('/login');
+            }
+            return;
         }
 
-        if (user && authRoutes.includes(pathname)) {
+        // If logged in, handle redirects
+        if (isAuthPage) {
             router.push(isAdmin ? '/admin' : '/');
-        }
-
-        if (user && !isAdmin && adminRoutes.includes(pathname)) {
+        } else if (isAdminPage && !isAdmin) {
             router.push('/');
-        }
-
-        if (user && isAdmin && !adminRoutes.includes(pathname)) {
-             // Exception for pages that admins might need to see
-            if (!['/terms', '/privacy'].includes(pathname)) {
-                router.push('/admin');
+        } else if (isUserPage && isAdmin) {
+            if (!['/terms', '/privacy', '/support'].includes(pathname)) {
+                 router.push('/admin');
             }
         }
-
     }, [user, isAdmin, loading, pathname, router]);
 
     const getOrCreateUserDocument = async (loggedInUser: User, extraData: { name?: string, phone?: string, referralCode?: string } = {}) => {
@@ -389,7 +388,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
-
-    
