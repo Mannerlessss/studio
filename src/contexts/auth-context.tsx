@@ -87,10 +87,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             if (docSnap.exists()) {
                                 setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
                             } else {
-                                // This case might happen if user is deleted from DB but not Auth
                                 setUserData(null);
                             }
-                            setLoading(false); // Set loading to false once we get user data
+                            setLoading(false); // Moved here to ensure it runs even if doc doesn't exist
                         },
                         (error) => {
                             console.error("Error fetching user data:", error);
@@ -99,7 +98,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             setLoading(false);
                         }
                     );
-                    // We return this cleanup function from the auth listener
                     return () => unsubFromDoc(); 
                 }
             } else {
@@ -110,7 +108,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
-        // The main unsubscribe for the auth listener
         return () => unsubscribe();
     }, [toast]);
 
@@ -144,7 +141,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const batch = writeBatch(db);
             const userDocRef = doc(db, 'users', newUser.uid);
             
-            const newUserDoc: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'projected' | 'rank'> = {
+            const newUserDoc: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'projected' | 'rank' | 'lastBonusClaim'> = {
                 name,
                 email,
                 phone,
@@ -200,10 +197,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             const credential = await signInWithEmailAndPassword(auth, email, password);
-            const userDocRef = doc(db, 'users', credential.user.uid);
             // This check avoids trying to write to an admin user's non-existent doc
-            const userDoc = await getDoc(userDocRef);
-            if (userDoc.exists()) {
+            const idTokenResult = await credential.user.getIdTokenResult();
+            if (!idTokenResult.claims.admin) {
+                const userDocRef = doc(db, 'users', credential.user.uid);
                 await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
             }
         } catch (error: any) {
@@ -221,10 +218,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logOut = async () => {
         setLoading(true);
         await signOut(auth);
-        setUser(null);
-        setUserData(null);
-        setIsAdmin(false);
-        // No need to set loading to false, auth state listener will handle it.
     };
 
     const sendPasswordReset = async (email: string) => {
