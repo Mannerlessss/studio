@@ -72,14 +72,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (currentUser) {
                 const idTokenResult = await currentUser.getIdTokenResult();
                 const userIsAdmin = !!idTokenResult.claims.admin;
+
                 setUser(currentUser);
                 setIsAdmin(userIsAdmin);
 
                 if (userIsAdmin) {
-                    setUserData(null);
-                    setLoading(false); // Fix: Ensure loading is false for admins
+                    setUserData(null); // Admins don't have a user document in 'users'
+                    setLoading(false);
+                } else {
+                    // It's a regular user, set up the listener for their data
+                    const userDocRef = doc(db, 'users', currentUser.uid);
+                    const unsubFromDoc = onSnapshot(userDocRef, 
+                        (docSnap) => {
+                            if (docSnap.exists()) {
+                                setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
+                            } else {
+                                // This case might happen if user is deleted from DB but not Auth
+                                setUserData(null);
+                            }
+                            setLoading(false); // Set loading to false once we get user data
+                        },
+                        (error) => {
+                            console.error("Error fetching user data:", error);
+                            toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile." });
+                            setUserData(null);
+                            setLoading(false);
+                        }
+                    );
+                    // We return this cleanup function from the auth listener
+                    return () => unsubFromDoc(); 
                 }
-                // For non-admins, the data listener will set loading to false.
             } else {
                 setUser(null);
                 setUserData(null);
@@ -88,30 +110,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
+        // The main unsubscribe for the auth listener
         return () => unsubscribe();
-    }, []);
-
-    useEffect(() => {
-        if (!user || isAdmin) {
-            return; // Don't run listener if no user, or if user is admin
-        }
-        setLoading(true);
-        const userDocRef = doc(db, 'users', user.uid);
-        const unsubscribe = onSnapshot(userDocRef, (doc) => {
-            if (doc.exists()) {
-                setUserData({ uid: doc.id, ...doc.data() } as UserData);
-            } else {
-                console.log("User document does not exist!");
-                setUserData(null);
-            }
-            setLoading(false); // Set loading to false after getting data
-        }, (error) => {
-            console.error("Error listening to user document:", error);
-            setUserData(null);
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, [user, isAdmin]);
+    }, [toast]);
 
      useEffect(() => {
         if (loading) return;
@@ -191,7 +192,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 description: error.message,
             });
         } finally {
-            // setLoading(false); // Auth state change will handle this
+            // Auth state change will handle setting loading to false
         }
     };
 
@@ -211,17 +212,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign In Failed',
                 description: error.message,
             });
-            setLoading(false);
+            setLoading(false); // Explicitly set loading false on error
         } finally {
-           // setLoading(false) is handled by the auth state listeners
+           // Auth state change will handle setting loading to false on success
         }
     };
 
     const logOut = async () => {
+        setLoading(true);
         await signOut(auth);
         setUser(null);
         setUserData(null);
         setIsAdmin(false);
+        // No need to set loading to false, auth state listener will handle it.
     };
 
     const sendPasswordReset = async (email: string) => {
