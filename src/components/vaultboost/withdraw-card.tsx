@@ -37,7 +37,7 @@ export function WithdrawCard() {
              <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                    Minimum withdrawal is 1000 Rs. Withdrawal will be transferred within 24 to 48 hours.
+                    Minimum withdrawal is 100 Rs. Withdrawal will be transferred within 24 to 48 hours.
                 </AlertDescription>
             </Alert>
              {userData?.name && (
@@ -83,7 +83,7 @@ export function WithdrawCard() {
                 </div>
               </div>
             )}
-            <Button className="w-full" disabled={(userData?.totalBalance || 0) < 1000}>Submit Request</Button>
+            <Button className="w-full" disabled={(userData?.totalBalance || 0) < 100}>Submit Request</Button>
           </div>
         )}
       </CardContent>

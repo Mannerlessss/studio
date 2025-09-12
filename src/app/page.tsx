@@ -1,4 +1,3 @@
-
 'use client';
 import type { NextPage } from 'next';
 import { WelcomeCard } from '@/components/vaultboost/welcome-card';
@@ -13,6 +12,7 @@ import { Header } from '@/components/vaultboost/header';
 import { useAuth } from '@/contexts/auth-context';
 import { GuidedTour } from '@/components/vaultboost/guided-tour';
 import { ProfileCompletionCard } from '@/components/vaultboost/profile-completion-card';
+import { AnnouncementPopup } from '@/components/vaultboost/announcement-popup';
 
 
 const Dashboard: NextPage = () => {
@@ -36,6 +36,7 @@ const Dashboard: NextPage = () => {
   return (
     <div className="bg-background min-h-full">
       <Header />
+      <AnnouncementPopup />
       <GuidedTour />
       <div className="p-4 space-y-6">
         <div id="welcome-card">

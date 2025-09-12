@@ -166,16 +166,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const batch = writeBatch(db);
             const userDocRef = doc(db, 'users', newUser.uid);
             
+            const signupBonus = 200;
+
             const newUserDoc: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'projected' | 'rank' | 'lastBonusClaim' | 'claimedMilestones'> = {
                 name,
                 email,
                 phone,
                 membership: 'Basic',
-                totalBalance: 0,
+                totalBalance: signupBonus,
                 invested: 0,
-                earnings: 0,
+                earnings: signupBonus,
                 referralEarnings: 0,
-                bonusEarnings: 0,
+                bonusEarnings: signupBonus,
                 investmentEarnings: 0,
                 hasInvested: false,
                 referralCode: `${name.split(' ')[0].toUpperCase()}${(Math.random() * 9000 + 1000).toFixed(0)}`,
@@ -188,6 +190,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 claimedMilestones: [],
             });
             
+            // Add signup bonus transaction
+            const signupBonusTransactionRef = doc(collection(db, `users/${newUser.uid}/transactions`));
+            batch.set(signupBonusTransactionRef, {
+                type: 'bonus',
+                amount: signupBonus,
+                description: 'Sign-up Bonus',
+                status: 'Completed',
+                date: serverTimestamp(),
+            });
+
+
             if (referralCode) {
                  batch.update(userDocRef, { usedReferralCode: referralCode });
                  const q = query(collection(db, "users"), where("referralCode", "==", referralCode));
@@ -369,5 +382,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
