@@ -93,9 +93,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const userDoc = await transaction.get(userDocRef);
 
                 if (!userDoc.exists()) {
-                    // This is a race condition guard. If the doc doesn't exist,
-                    // the onSnapshot listener further down will handle it.
-                    // We just need to not crash here.
                     console.warn("processDailyEarnings: User document not found, skipping transaction.");
                     return;
                 }
@@ -191,7 +188,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         } else {
                             console.warn(`No Firestore document found for user ${currentUser.uid}. Waiting for it to be created...`);
                         }
-                        setLoading(false); 
                     },
                     (error) => {
                         console.error("Error fetching user data:", error);
@@ -203,8 +199,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(null);
                 setUserData(null);
                 setIsAdmin(false);
-                setLoading(false);
             }
+            setLoading(false);
         });
 
         return () => {
@@ -310,11 +306,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             const credential = await signInWithEmailAndPassword(auth, email, password);
-            const idTokenResult = await credential.user.getIdTokenResult();
-            if (!idTokenResult.claims.admin) {
-                const userDocRef = doc(db, 'users', credential.user.uid);
-                await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
-            }
+            const userDocRef = doc(db, 'users', credential.user.uid);
+            await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
         } catch (error: any) {
             toast({
                 variant: 'destructive',
