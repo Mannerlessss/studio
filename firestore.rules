@@ -2,42 +2,43 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper function to check if the user is an admin
+    
+    // Helper function to check for admin role
     function isAdmin() {
-      return request.auth != null && request.auth.token.admin == true;
+      return request.auth.token.admin == true;
     }
 
-    // Helper function to check if the user is the owner of the data
+    // Helper function to check if the user is the owner of the document
     function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
+    // Default Deny: No one can access anything unless explicitly allowed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Admins have god-mode access to everything
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+    
     // Rules for the 'users' collection
     match /users/{userId} {
-      // Admins can do anything.
-      // Users can create their own document on signup.
-      // Users can only GET their own document.
-      // Users can only UPDATE their own document.
+      allow get, update, delete: if isOwner(userId);
       allow create: if request.auth != null;
-      allow get, update: if isOwner(userId) || isAdmin();
-      
-      // Allow LIST for authenticated users to enable queries (e.g., checking referral codes),
-      // but the 'get' rule above prevents them from reading other users' full documents.
-      allow list: if request.auth != null || isAdmin();
-
-      // Rules for all subcollections under a user document
-      match /{allPaths=**} {
-        allow read, write: if isOwner(userId) || isAdmin();
-      }
+      allow list: if request.auth != null;
     }
 
+    // Rules for all subcollections within a user's document
+    match /users/{userId}/{subcollection}/{docId} {
+        allow read, write, create, delete: if isOwner(userId);
+    }
+    
     // Rules for the 'offers' collection
     match /offers/{offerId} {
-      // Admins can do anything.
-      // Any authenticated user can read offer documents.
-      allow read: if request.auth != null || isAdmin();
-      allow write: if isAdmin();
+      allow read: if request.auth != null;
+      // Write access for offers is handled by admin rule
     }
   }
 }
