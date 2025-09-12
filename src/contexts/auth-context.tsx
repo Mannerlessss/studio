@@ -87,15 +87,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             if (docSnap.exists()) {
                                 setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
                             } else {
+                                // User is authenticated, but no data exists.
                                 setUserData(null);
                             }
-                            setLoading(false); // Moved here to ensure it runs even if doc doesn't exist
+                            setLoading(false); // This ensures loading stops even if no doc exists.
                         },
                         (error) => {
                             console.error("Error fetching user data:", error);
                             toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile." });
                             setUserData(null);
-                            setLoading(false);
+                            setLoading(false); // Also stop loading on error.
                         }
                     );
                     return () => unsubFromDoc(); 
@@ -352,3 +353,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
