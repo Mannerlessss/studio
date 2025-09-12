@@ -19,6 +19,8 @@ export function WithdrawCard() {
     setShowWithdrawForm(true);
   };
 
+  const hasInvested = (userData?.invested || 0) > 0;
+
   return (
     <Card>
       <CardHeader>
@@ -83,7 +85,9 @@ export function WithdrawCard() {
                 </div>
               </div>
             )}
-            <Button className="w-full" disabled={(userData?.totalBalance || 0) < 100}>Submit Request</Button>
+            <Button className="w-full" disabled={!hasInvested || (userData?.totalBalance || 0) < 100}>
+              {!hasInvested ? 'First Investment Required' : 'Submit Request'}
+            </Button>
           </div>
         )}
       </CardContent>
