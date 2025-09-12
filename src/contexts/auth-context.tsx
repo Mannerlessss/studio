@@ -149,9 +149,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         let unsubFromDoc: (() => void) | undefined;
+        let loadingTimeout: NodeJS.Timeout;
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (unsubFromDoc) unsubFromDoc();
+            clearTimeout(loadingTimeout);
 
             if (currentUser) {
                 setLoading(true);
@@ -195,9 +197,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
+        // Set a timeout to prevent infinite loading screen
+        loadingTimeout = setTimeout(() => {
+            if (loading) {
+                console.warn("Auth state check timed out. Forcing loading to finish.");
+                setLoading(false);
+            }
+        }, 30000); // 30 seconds
+
         return () => {
             if (unsubFromDoc) unsubFromDoc();
             unsubscribe();
+            clearTimeout(loadingTimeout);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -313,7 +324,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const idTokenResult = await credential.user.getIdTokenResult();
             if (!idTokenResult.claims.admin) {
                 const userDocRef = doc(db, 'users', credential.user.uid);
-                await updateDoc(userDocRef, { lastLogin: serverTimestamp() });
+                // Use set with merge to create doc if it doesn't exist, or update it if it does.
+                await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
             }
         } catch (error: any) {
             toast({
@@ -458,5 +470,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
