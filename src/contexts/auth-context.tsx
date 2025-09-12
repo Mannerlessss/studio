@@ -13,7 +13,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, collectionGroup } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
 
 interface UserData {
     uid: string;
@@ -35,6 +35,7 @@ interface UserData {
     hasInvested: boolean;
     lastBonusClaim?: Timestamp;
     claimedMilestones?: number[];
+    lastInvestmentUpdate?: Timestamp;
     createdAt: any;
     lastLogin: any;
 }
@@ -81,14 +82,94 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    // Function to simulate daily investment earnings
+    const processDailyEarnings = async (currentUserData: UserData, currentUserId: string) => {
+        if (!currentUserData.invested || currentUserData.invested <= 0) return;
+
+        const now = Timestamp.now();
+        const lastUpdate = currentUserData.lastInvestmentUpdate || currentUserData.createdAt;
+        
+        const hoursSinceLastUpdate = (now.toMillis() - lastUpdate.toMillis()) / (1000 * 60 * 60);
+        const daysToProcess = Math.floor(hoursSinceLastUpdate / 24);
+
+        if (daysToProcess <= 0) return;
+        
+        try {
+            await runTransaction(db, async (transaction) => {
+                const userDocRef = doc(db, 'users', currentUserId);
+                const userDoc = await transaction.get(userDocRef);
+
+                if (!userDoc.exists()) {
+                    throw "Document does not exist!";
+                }
+
+                const data = userDoc.data() as UserData;
+                
+                // Recalculate based on fresh data to avoid race conditions
+                const freshLastUpdate = data.lastInvestmentUpdate || data.createdAt;
+                const freshHoursSinceUpdate = (now.toMillis() - freshLastUpdate.toMillis()) / (1000 * 60 * 60);
+                const freshDaysToProcess = Math.floor(freshHoursSinceUpdate / 24);
+
+                if (freshDaysToProcess <= 0) {
+                    console.log("Earnings already processed for today.");
+                    return;
+                }
+                
+                // Determine days left in cycle
+                const investmentStartDate = data.lastInvestmentUpdate || now; // Simplified assumption
+                const daysElapsedSinceStart = Math.ceil((now.toMillis() - investmentStartDate.toMillis()) / (1000 * 60 * 60 * 24));
+                const daysRemainingInCycle = 30 - daysElapsedSinceStart;
+                
+                const daysToActuallyProcess = Math.min(freshDaysToProcess, daysRemainingInCycle > 0 ? daysRemainingInCycle : 0);
+
+                if (daysToActuallyProcess <= 0) {
+                     console.log("Investment cycle complete.");
+                     return;
+                }
+
+                const dailyReturnRate = data.membership === 'Pro' ? 0.13 : 0.10;
+                const dailyEarning = data.invested * dailyReturnRate;
+                const totalEarningsToAdd = dailyEarning * daysToActuallyProcess;
+
+                const newInvestmentEarnings = (data.investmentEarnings || 0) + totalEarningsToAdd;
+                const newTotalBalance = (data.totalBalance || 0) + totalEarningsToAdd;
+                const newTotalEarnings = (data.earnings || 0) + totalEarningsToAdd;
+                
+                transaction.update(userDocRef, {
+                    investmentEarnings: newInvestmentEarnings,
+                    totalBalance: newTotalBalance,
+                    earnings: newTotalEarnings,
+                    lastInvestmentUpdate: now,
+                });
+
+                for (let i = 0; i < daysToActuallyProcess; i++) {
+                    const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
+                    transaction.set(transactionRef, {
+                        type: 'earning',
+                        amount: dailyEarning,
+                        description: `Investment Earning`,
+                        status: 'Completed',
+                        date: Timestamp.fromMillis(freshLastUpdate.toMillis() + (i + 1) * 24 * 60 * 60 * 1000),
+                    });
+                }
+            });
+            console.log(`Processed ${daysToProcess} day(s) of investment earnings.`);
+        } catch (error) {
+            console.error("Error processing daily earnings: ", error);
+        }
+    };
+
+
     useEffect(() => {
+        let unsubFromDoc: (() => void) | undefined;
         let loadingTimeout: NodeJS.Timeout;
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setLoading(true);
+            if (unsubFromDoc) unsubFromDoc();
+
             loadingTimeout = setTimeout(() => {
                 if (loading) {
-                    console.warn("Auth loading timed out after 30 seconds. Logging out.");
                     toast({
                         variant: 'destructive',
                         title: 'Loading Timeout',
@@ -113,15 +194,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 const userDocRef = doc(db, 'users', currentUser.uid);
-                const unsubFromDoc = onSnapshot(userDocRef, 
-                    (docSnap) => {
+                unsubFromDoc = onSnapshot(userDocRef, 
+                    async (docSnap) => {
                         if (docSnap.exists()) {
-                            setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
+                            const latestUserData = { uid: docSnap.id, ...docSnap.data() } as UserData;
+                            await processDailyEarnings(latestUserData, currentUser.uid);
+                            // Re-fetch after processing to get the absolute latest state
+                            const finalDoc = await getDoc(userDocRef);
+                            if (finalDoc.exists()) {
+                                setUserData({ uid: finalDoc.id, ...finalDoc.data() } as UserData);
+                            } else {
+                                setUserData(latestUserData); // fallback to pre-processed data
+                            }
+
                         } else {
-                            // User is authenticated but has no doc, might be a new signup
-                            // Or an error during creation. Log them out to be safe.
                             console.warn(`No Firestore document found for user ${currentUser.uid}. Logging out.`);
-                            setUserData(null);
                             logOut();
                         }
                         setLoading(false); 
@@ -130,13 +217,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     (error) => {
                         console.error("Error fetching user data:", error);
                         toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile. Logging out." });
-                        setUserData(null);
+                        logOut();
                         setLoading(false);
                         clearTimeout(loadingTimeout);
-                        logOut();
                     }
                 );
-                return () => unsubFromDoc(); 
             } else {
                 setUser(null);
                 setUserData(null);
@@ -148,8 +233,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         return () => {
             if (loadingTimeout) clearTimeout(loadingTimeout);
+            if (unsubFromDoc) unsubFromDoc();
             unsubscribe();
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
      useEffect(() => {
@@ -184,7 +271,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             const signupBonus = 200;
 
-            const newUserDoc: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'projected' | 'rank' | 'lastBonusClaim' | 'claimedMilestones'> = {
+            const newUserDoc: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'projected' | 'rank' | 'lastBonusClaim' | 'claimedMilestones' | 'lastInvestmentUpdate'> = {
                 name,
                 email,
                 phone,
@@ -406,5 +493,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    

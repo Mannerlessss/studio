@@ -114,11 +114,15 @@ export default function UsersPage() {
             const batch = writeBatch(db);
 
             const newInvestedAmount = (user.invested || 0) + amount;
-            const newProjectedAmount = (user.projected || 0) + (amount * 0.1 * 30);
+            const dailyReturnRate = user.membership === 'Pro' ? 0.13 : 0.10;
+            const newProjectedAmount = newInvestedAmount * dailyReturnRate * 30;
             
             batch.update(userDocRef, { 
                 invested: newInvestedAmount,
                 projected: newProjectedAmount,
+                // Reset investment earnings if they are re-investing
+                investmentEarnings: user.hasInvested ? (user.investmentEarnings || 0) : 0, 
+                lastInvestmentUpdate: serverTimestamp(),
             });
 
             const transactionRef = doc(collection(db, `users/${user.id}/transactions`));
@@ -209,7 +213,7 @@ export default function UsersPage() {
                 title: `Investment Credited`,
                 description: `${amount} Rs. has been credited for user ${user.name}.`,
             });
-            setUsers(prevUsers => prevUsers.map(u => u.id === user.id ? { ...u, hasInvested: true, invested: newInvestedAmount, projected: newProjectedAmount } : u));
+            setUsers(prevUsers => prevUsers.map(u => u.id === user.id ? { ...u, hasInvested: true, invested: newInvestedAmount, projected: newProjectedAmount, investmentEarnings: 0 } : u));
             setCreditAmount('');
         } catch (error: any) {
              toast({

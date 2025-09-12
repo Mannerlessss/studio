@@ -5,33 +5,24 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
+import { Timestamp } from 'firebase/firestore';
 
 export const ActiveInvestmentsCard: FC = () => {
     const { userData } = useAuth();
 
     const investedAmount = userData?.invested || 0;
     const investmentEarnings = userData?.investmentEarnings || 0;
-    const totalEarned = investedAmount + investmentEarnings;
     const dailyReturnRate = userData?.membership === 'Pro' ? 0.13 : 0.10;
     const dailyEarning = investedAmount * dailyReturnRate;
     
-    const investmentStartDate = useMemo(() => {
-        // This is a simplification. In a real app, you'd store and retrieve the actual start date.
-        // For now, we'll estimate based on earnings.
-        if (dailyEarning <= 0) return null;
-        const daysElapsed = Math.floor(investmentEarnings / dailyEarning);
-        const date = new Date();
-        date.setDate(date.getDate() - daysElapsed);
-        return date;
-    }, [investmentEarnings, dailyEarning]);
+    const investmentStartDate = userData?.lastInvestmentUpdate ? userData.lastInvestmentUpdate : null;
     
     const daysElapsed = useMemo(() => {
-        if (!investmentStartDate) return 0;
-        const today = new Date();
-        const diffTime = Math.abs(today.getTime() - investmentStartDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return Math.min(diffDays, 30); // Cap at 30 days
-    }, [investmentStartDate]);
+        if (!investmentStartDate || dailyEarning <= 0) return 0;
+        // Calculate days elapsed based on earnings to be precise
+        const elapsed = Math.floor(investmentEarnings / dailyEarning);
+        return Math.min(elapsed, 30); // Cap at 30 days
+    }, [investmentEarnings, dailyEarning, investmentStartDate]);
 
     const progress = (daysElapsed / 30) * 100;
 
@@ -53,7 +44,7 @@ export const ActiveInvestmentsCard: FC = () => {
                         <p className="text-sm text-muted-foreground">Investment Active</p>
                     </div>
                     <div className='text-right'>
-                        <p className="text-2xl font-bold text-green-500">{totalEarned.toLocaleString()} Rs.</p>
+                        <p className="text-2xl font-bold text-green-500">{investmentEarnings.toLocaleString()} Rs.</p>
                         <p className="text-sm text-muted-foreground">Total Earned</p>
                     </div>
                 </div>
