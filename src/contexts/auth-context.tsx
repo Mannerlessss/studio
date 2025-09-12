@@ -363,12 +363,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await batch.commit();
 
         } catch (error: any) {
-            console.error("--- DEBUG: Referral Redemption Error ---");
-            console.error("Timestamp:", new Date().toISOString());
-            console.error("User UID:", user.uid);
-            console.error("Attempted Code:", formattedCode);
             console.error("Full Error Object:", error);
-            console.error("--- END DEBUG ---");
             throw new Error(error.message || "Invalid referral code.");
         }
     };
@@ -485,3 +480,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
