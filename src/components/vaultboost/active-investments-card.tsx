@@ -49,11 +49,11 @@ export const ActiveInvestmentsCard: FC = () => {
           <div className="p-4 rounded-lg bg-muted/50 border relative">
                 <div className="grid grid-cols-2 gap-y-4">
                     <div>
-                        <p className="text-2xl font-bold text-primary">₹{investedAmount.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-primary">{investedAmount.toLocaleString()} Rs.</p>
                         <p className="text-sm text-muted-foreground">Investment Active</p>
                     </div>
                     <div className='text-right'>
-                        <p className="text-2xl font-bold text-green-500">₹{totalEarned.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-green-500">{totalEarned.toLocaleString()} Rs.</p>
                         <p className="text-sm text-muted-foreground">Total Earned</p>
                     </div>
                 </div>
@@ -70,7 +70,7 @@ export const ActiveInvestmentsCard: FC = () => {
                     <Progress value={progress} />
                         <div className="flex justify-between items-center text-xs text-muted-foreground">
                         <p>Day {daysElapsed} of 30</p>
-                        <p>Daily: ₹{dailyEarning.toLocaleString()}</p>
+                        <p>Daily: {dailyEarning.toLocaleString()} Rs.</p>
                     </div>
                 </div>
           </div>

@@ -210,7 +210,7 @@ export default function OffersPage() {
             <Input id="code" placeholder="e.g., WELCOME100" value={newCode} onChange={e => setNewCode(e.target.value.toUpperCase())} disabled={isSubmitting}/>
         </div>
          <div className="space-y-2">
-            <Label htmlFor="reward">Reward Amount (₹)</Label>
+            <Label htmlFor="reward">Reward Amount (Rs.)</Label>
             <Input id="reward" type="number" placeholder="e.g., 100" value={rewardAmount} onChange={e => setRewardAmount(e.target.value)} disabled={isSubmitting}/>
         </div>
          <div className="space-y-2">
