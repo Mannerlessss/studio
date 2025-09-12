@@ -9,7 +9,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Gift, Award, Zap, Users, Send, CheckCircle } from 'lucide-react';
+import { Gift, CheckCircle, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export function AnnouncementPopup() {
@@ -59,13 +59,13 @@ export function AnnouncementPopup() {
           </div>
           <div className="flex items-start gap-3">
             <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 shrink-0" />
-            <p><span className="font-semibold">Fast Withdrawals:</span> Get your earnings processed quickly.</p>
+            <p><span className="font-semibold">Fast Withdrawals:</span> Get your earnings processed quickly and easily.</p>
           </div>
         </div>
         <div className="flex flex-col gap-3">
-          <Link href="https://t.me/yourchannel" target="_blank" className="w-full">
-            <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white">
-              <Send className="mr-2" /> Join our Telegram
+          <Link href="https://wa.me/7888540806" target="_blank" className="w-full">
+            <Button className="w-full bg-green-500 hover:bg-green-600 text-white">
+              <MessageCircle className="mr-2" /> Chat on WhatsApp
             </Button>
           </Link>
           <Button variant="outline" onClick={handleClose}>
