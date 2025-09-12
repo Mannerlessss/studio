@@ -92,47 +92,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 if (!userDoc.exists()) throw "Document does not exist!";
                 
                 const data = userDoc.data() as UserData;
-                if (!data.invested || data.invested <= 0) return;
+                if (!data.invested || data.invested <= 0 || !data.lastInvestmentUpdate) return;
 
                 const now = Timestamp.now();
-                const lastUpdate = data.lastInvestmentUpdate || data.createdAt;
+                const lastUpdate = data.lastInvestmentUpdate;
                 
-                const hoursSinceLastUpdate = (now.toMillis() - lastUpdate.toMillis()) / (1000 * 60 * 60);
-                if (hoursSinceLastUpdate < 24) return;
+                // Total days elapsed since the investment started
+                const investmentStartDate = data.lastInvestmentUpdate;
+                const totalDaysSinceStart = Math.floor((now.toMillis() - investmentStartDate.toMillis()) / (1000 * 60 * 60 * 24));
                 
-                const daysToProcess = Math.floor(hoursSinceLastUpdate / 24);
-
-                const investmentStartDate = data.lastInvestmentUpdate || now; 
-                const daysElapsedSinceStart = Math.ceil((now.toMillis() - investmentStartDate.toMillis()) / (1000 * 60 * 60 * 24));
-                const daysRemainingInCycle = 30 - daysElapsedSinceStart;
-                
-                const daysToActuallyProcess = Math.min(daysToProcess, daysRemainingInCycle >= 0 ? daysRemainingInCycle : 0);
-
-                if (daysToActuallyProcess <= 0) {
-                     console.log("Investment cycle complete or no full day passed.");
-                     return;
-                }
-
+                // Days already processed is based on current earnings
                 const dailyReturnRate = data.membership === 'Pro' ? 0.13 : 0.10;
                 const dailyEarning = data.invested * dailyReturnRate;
+                const daysAlreadyProcessed = dailyEarning > 0 ? Math.floor((data.investmentEarnings || 0) / dailyEarning) : 0;
+                
+                if (daysAlreadyProcessed >= 30) return; // Cycle complete
+
+                const daysToProcess = totalDaysSinceStart - daysAlreadyProcessed;
+
+                if (daysToProcess <= 0) return; // No full day passed since last processing
+
+                const daysToActuallyProcess = Math.min(daysToProcess, 30 - daysAlreadyProcessed);
+                
+                if (daysToActuallyProcess <= 0) return;
+
                 const totalEarningsToAdd = dailyEarning * daysToActuallyProcess;
 
                 const newInvestmentEarnings = (data.investmentEarnings || 0) + totalEarningsToAdd;
                 const newTotalBalance = (data.totalBalance || 0) + totalEarningsToAdd;
                 const newTotalEarnings = (data.earnings || 0) + totalEarningsToAdd;
                 
-                const newLastInvestmentUpdate = Timestamp.fromMillis(lastUpdate.toMillis() + daysToActuallyProcess * 24 * 60 * 60 * 1000);
-
                 transaction.update(userDocRef, {
                     investmentEarnings: newInvestmentEarnings,
                     totalBalance: newTotalBalance,
                     earnings: newTotalEarnings,
-                    lastInvestmentUpdate: newLastInvestmentUpdate,
                 });
 
                 for (let i = 0; i < daysToActuallyProcess; i++) {
                     const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                    const transactionDate = Timestamp.fromMillis(lastUpdate.toMillis() + (i + 1) * 24 * 60 * 60 * 1000);
+                    const transactionDate = Timestamp.fromMillis(lastUpdate.toMillis() + (daysAlreadyProcessed + i + 1) * 24 * 60 * 60 * 1000);
                     transaction.set(transactionRef, {
                         type: 'earning',
                         amount: dailyEarning,
@@ -151,7 +149,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         let unsubFromDoc: (() => void) | undefined;
-        let loadingTimeout: NodeJS.Timeout;
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (unsubFromDoc) unsubFromDoc();

@@ -117,12 +117,18 @@ export default function UsersPage() {
             const dailyReturnRate = user.membership === 'Pro' ? 0.13 : 0.10;
             const newProjectedAmount = newInvestedAmount * dailyReturnRate * 30;
             
-            batch.update(userDocRef, { 
+            const updates: any = { 
                 invested: newInvestedAmount,
                 projected: newProjectedAmount,
-                investmentEarnings: user.hasInvested ? (user.investmentEarnings || 0) : 0, 
                 lastInvestmentUpdate: serverTimestamp(),
-            });
+            };
+
+            // Only reset investmentEarnings if it's the user's first investment ever.
+            if (!user.hasInvested) {
+                updates.investmentEarnings = 0;
+            }
+
+            batch.update(userDocRef, updates);
 
             const transactionRef = doc(collection(db, `users/${user.id}/transactions`));
             batch.set(transactionRef, {
@@ -203,7 +209,7 @@ export default function UsersPage() {
             // --- End Referral & Milestone Logic ---
             
              if (!user.hasInvested && amount >= 100) {
-                  batch.update(userDocRef, { hasInvested: true, investmentEarnings: 0 });
+                  batch.update(userDocRef, { hasInvested: true });
              }
 
             await batch.commit();
@@ -212,7 +218,13 @@ export default function UsersPage() {
                 title: `Investment Credited`,
                 description: `${amount} Rs. has been credited for user ${user.name}.`,
             });
-            setUsers(prevUsers => prevUsers.map(u => u.id === user.id ? { ...u, hasInvested: true, invested: newInvestedAmount, projected: newProjectedAmount, investmentEarnings: user.hasInvested ? u.investmentEarnings : 0 } : u));
+            setUsers(prevUsers => prevUsers.map(u => u.id === user.id ? { 
+                ...u, 
+                hasInvested: true, 
+                invested: newInvestedAmount, 
+                projected: newProjectedAmount, 
+                investmentEarnings: !user.hasInvested ? 0 : u.investmentEarnings 
+            } : u));
             setCreditAmount('');
         } catch (error: any) {
              toast({
@@ -388,7 +400,5 @@ export default function UsersPage() {
     </>
   );
 }
-
-    
 
     
