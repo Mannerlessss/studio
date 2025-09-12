@@ -59,7 +59,7 @@ export function AnnouncementPopup() {
           </div>
           <div className="flex items-start gap-3">
             <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 shrink-0" />
-            <p><span className="font-semibold">Fast Withdrawals:</span> Minimum withdrawal is only 100 Rs. and is processed quickly.</p>
+            <p><span className="font-semibold">Fast Withdrawals:</span> Get your earnings processed quickly.</p>
           </div>
         </div>
         <div className="flex flex-col gap-3">
