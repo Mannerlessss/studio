@@ -332,7 +332,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         try {
-            // Securely look up the code in the 'referralCodes' collection
             const referralCodeRef = doc(db, "referralCodes", formattedCode);
             const referralCodeDoc = await getDoc(referralCodeRef);
 
