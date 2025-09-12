@@ -3,20 +3,21 @@
 import type { FC } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { HandCoins, Users, Gift } from 'lucide-react';
+import { HandCoins, Users, Gift, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export const AdminBottomNav: FC = () => {
   const pathname = usePathname();
   const navItems = [
+    { href: '/admin', icon: Home, label: 'Dashboard' },
     { href: '/admin/withdrawals', icon: HandCoins, label: 'Withdrawals' },
     { href: '/admin/users', icon: Users, label: 'Users' },
     { href: '/admin/offers', icon: Gift, label: 'Offers' },
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-t-lg z-10">
+    <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-t-lg z-10 md:hidden">
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => {
            const isActive = pathname === item.href;
