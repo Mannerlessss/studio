@@ -203,7 +203,7 @@ export default function UsersPage() {
             // --- End Referral & Milestone Logic ---
             
              if (!user.hasInvested && amount >= 100) {
-                  batch.update(userDocRef, { hasInvested: true });
+                  batch.update(userDocRef, { hasInvested: true, investmentEarnings: 0 });
              }
 
             await batch.commit();
@@ -388,5 +388,7 @@ export default function UsersPage() {
     </>
   );
 }
+
+    
 
     

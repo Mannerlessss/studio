@@ -77,53 +77,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setUser(null);
             setUserData(null);
             setIsAdmin(false);
-            setLoading(false);
             router.push('/login');
+            setLoading(false); // Ensure loading is false after redirect
         }
     };
 
     // Function to simulate daily investment earnings
-    const processDailyEarnings = async (currentUserData: UserData, currentUserId: string) => {
-        if (!currentUserData.invested || currentUserData.invested <= 0) return;
-
-        const now = Timestamp.now();
-        const lastUpdate = currentUserData.lastInvestmentUpdate || currentUserData.createdAt;
-        
-        const hoursSinceLastUpdate = (now.toMillis() - lastUpdate.toMillis()) / (1000 * 60 * 60);
-        const daysToProcess = Math.floor(hoursSinceLastUpdate / 24);
-
-        if (daysToProcess <= 0) return;
-        
+    const processDailyEarnings = async (currentUserId: string) => {
         try {
             await runTransaction(db, async (transaction) => {
                 const userDocRef = doc(db, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
 
-                if (!userDoc.exists()) {
-                    throw "Document does not exist!";
-                }
-
+                if (!userDoc.exists()) throw "Document does not exist!";
+                
                 const data = userDoc.data() as UserData;
-                
-                // Recalculate based on fresh data to avoid race conditions
-                const freshLastUpdate = data.lastInvestmentUpdate || data.createdAt;
-                const freshHoursSinceUpdate = (now.toMillis() - freshLastUpdate.toMillis()) / (1000 * 60 * 60);
-                const freshDaysToProcess = Math.floor(freshHoursSinceUpdate / 24);
+                if (!data.invested || data.invested <= 0) return;
 
-                if (freshDaysToProcess <= 0) {
-                    console.log("Earnings already processed for today.");
-                    return;
-                }
+                const now = Timestamp.now();
+                const lastUpdate = data.lastInvestmentUpdate || data.createdAt;
                 
-                // Determine days left in cycle
-                const investmentStartDate = data.lastInvestmentUpdate || now; // Simplified assumption
+                const hoursSinceLastUpdate = (now.toMillis() - lastUpdate.toMillis()) / (1000 * 60 * 60);
+                if (hoursSinceLastUpdate < 24) return;
+                
+                const daysToProcess = Math.floor(hoursSinceLastUpdate / 24);
+
+                const investmentStartDate = data.lastInvestmentUpdate || now; 
                 const daysElapsedSinceStart = Math.ceil((now.toMillis() - investmentStartDate.toMillis()) / (1000 * 60 * 60 * 24));
                 const daysRemainingInCycle = 30 - daysElapsedSinceStart;
                 
-                const daysToActuallyProcess = Math.min(freshDaysToProcess, daysRemainingInCycle > 0 ? daysRemainingInCycle : 0);
+                const daysToActuallyProcess = Math.min(daysToProcess, daysRemainingInCycle >= 0 ? daysRemainingInCycle : 0);
 
                 if (daysToActuallyProcess <= 0) {
-                     console.log("Investment cycle complete.");
+                     console.log("Investment cycle complete or no full day passed.");
                      return;
                 }
 
@@ -135,25 +121,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const newTotalBalance = (data.totalBalance || 0) + totalEarningsToAdd;
                 const newTotalEarnings = (data.earnings || 0) + totalEarningsToAdd;
                 
+                const newLastInvestmentUpdate = Timestamp.fromMillis(lastUpdate.toMillis() + daysToActuallyProcess * 24 * 60 * 60 * 1000);
+
                 transaction.update(userDocRef, {
                     investmentEarnings: newInvestmentEarnings,
                     totalBalance: newTotalBalance,
                     earnings: newTotalEarnings,
-                    lastInvestmentUpdate: now,
+                    lastInvestmentUpdate: newLastInvestmentUpdate,
                 });
 
                 for (let i = 0; i < daysToActuallyProcess; i++) {
                     const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
+                    const transactionDate = Timestamp.fromMillis(lastUpdate.toMillis() + (i + 1) * 24 * 60 * 60 * 1000);
                     transaction.set(transactionRef, {
                         type: 'earning',
                         amount: dailyEarning,
                         description: `Investment Earning`,
                         status: 'Completed',
-                        date: Timestamp.fromMillis(freshLastUpdate.toMillis() + (i + 1) * 24 * 60 * 60 * 1000),
+                        date: transactionDate,
                     });
                 }
+                 console.log(`Processed ${daysToActuallyProcess} day(s) of investment earnings.`);
             });
-            console.log(`Processed ${daysToProcess} day(s) of investment earnings.`);
         } catch (error) {
             console.error("Error processing daily earnings: ", error);
         }
@@ -165,21 +154,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let loadingTimeout: NodeJS.Timeout;
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setLoading(true);
             if (unsubFromDoc) unsubFromDoc();
 
-            loadingTimeout = setTimeout(() => {
-                if (loading) {
-                    toast({
-                        variant: 'destructive',
-                        title: 'Loading Timeout',
-                        description: 'Could not connect to the server. Please try again.',
-                    });
-                    logOut();
-                }
-            }, 30000);
-
             if (currentUser) {
+                setLoading(true);
                 const idTokenResult = await currentUser.getIdTokenResult();
                 const userIsAdmin = !!idTokenResult.claims.admin;
                 
@@ -189,37 +167,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 if (userIsAdmin) {
                     setUserData(null);
                     setLoading(false);
-                    clearTimeout(loadingTimeout);
                     return;
                 }
+                
+                await processDailyEarnings(currentUser.uid);
 
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 unsubFromDoc = onSnapshot(userDocRef, 
-                    async (docSnap) => {
+                    (docSnap) => {
                         if (docSnap.exists()) {
-                            const latestUserData = { uid: docSnap.id, ...docSnap.data() } as UserData;
-                            await processDailyEarnings(latestUserData, currentUser.uid);
-                            // Re-fetch after processing to get the absolute latest state
-                            const finalDoc = await getDoc(userDocRef);
-                            if (finalDoc.exists()) {
-                                setUserData({ uid: finalDoc.id, ...finalDoc.data() } as UserData);
-                            } else {
-                                setUserData(latestUserData); // fallback to pre-processed data
-                            }
-
+                            setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
                         } else {
                             console.warn(`No Firestore document found for user ${currentUser.uid}. Logging out.`);
                             logOut();
                         }
                         setLoading(false); 
-                        clearTimeout(loadingTimeout);
                     },
                     (error) => {
                         console.error("Error fetching user data:", error);
                         toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile. Logging out." });
                         logOut();
                         setLoading(false);
-                        clearTimeout(loadingTimeout);
                     }
                 );
             } else {
@@ -227,12 +195,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUserData(null);
                 setIsAdmin(false);
                 setLoading(false);
-                clearTimeout(loadingTimeout);
             }
         });
 
         return () => {
-            if (loadingTimeout) clearTimeout(loadingTimeout);
             if (unsubFromDoc) unsubFromDoc();
             unsubscribe();
         };
@@ -338,7 +304,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign Up Failed',
                 description: error.message,
             });
-             setLoading(false);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -357,6 +324,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign In Failed',
                 description: error.message,
             });
+        } finally {
             setLoading(false);
         }
     };
@@ -493,3 +461,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
