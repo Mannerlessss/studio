@@ -4,8 +4,6 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { 
     User, 
     onAuthStateChanged,
-    GoogleAuthProvider,
-    signInWithPopup,
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signOut,
@@ -72,31 +70,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (currentUser) {
                 const idTokenResult = await currentUser.getIdTokenResult();
                 const userIsAdmin = !!idTokenResult.claims.admin;
-
+                
                 setUser(currentUser);
                 setIsAdmin(userIsAdmin);
 
                 if (userIsAdmin) {
-                    setUserData(null); // Admins don't have a user document in 'users'
+                    setUserData(null);
                     setLoading(false);
                 } else {
-                    // It's a regular user, set up the listener for their data
                     const userDocRef = doc(db, 'users', currentUser.uid);
                     const unsubFromDoc = onSnapshot(userDocRef, 
                         (docSnap) => {
                             if (docSnap.exists()) {
                                 setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
                             } else {
-                                // User is authenticated, but no data exists.
+                                // Handles case where user is auth'd but doc isn't created yet (e.g., during signup).
                                 setUserData(null);
                             }
-                            setLoading(false); // This ensures loading stops even if no doc exists.
+                            setLoading(false); // Always stop loading after attempt.
                         },
                         (error) => {
                             console.error("Error fetching user data:", error);
                             toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile." });
                             setUserData(null);
-                            setLoading(false); // Also stop loading on error.
+                            setLoading(false); // Stop loading on error too.
                         }
                     );
                     return () => unsubFromDoc(); 
@@ -189,8 +186,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign Up Failed',
                 description: error.message,
             });
-        } finally {
-            // Auth state change will handle setting loading to false
+             setLoading(false);
         }
     };
 
@@ -198,7 +194,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             const credential = await signInWithEmailAndPassword(auth, email, password);
-            // This check avoids trying to write to an admin user's non-existent doc
             const idTokenResult = await credential.user.getIdTokenResult();
             if (!idTokenResult.claims.admin) {
                 const userDocRef = doc(db, 'users', credential.user.uid);
@@ -210,9 +205,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign In Failed',
                 description: error.message,
             });
-            setLoading(false); // Explicitly set loading false on error
-        } finally {
-           // Auth state change will handle setting loading to false on success
+            setLoading(false);
         }
     };
 
@@ -353,5 +346,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
