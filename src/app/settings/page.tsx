@@ -183,7 +183,7 @@ const SettingsPage: NextPage = () => {
                     placeholder="e.g., FRIEND123"
                     value={referralCodeInput}
                     onChange={(e) =>
-                      setReferralCodeInput(e.target.value.toUpperCase())
+                      setReferralCodeInput(e.target.value)
                     }
                     disabled={isRedeeming}
                   />
@@ -272,5 +272,3 @@ const SettingsPage: NextPage = () => {
 };
 
 export default SettingsPage;
-
-    

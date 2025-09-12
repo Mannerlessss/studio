@@ -312,17 +312,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     const redeemReferralCode = async (code: string) => {
-        if (!user || !userData) throw new Error("User not found");
+        if (!user || !userData) throw new Error("User not authenticated");
         if (userData.usedReferralCode) throw new Error("You have already used a referral code.");
 
-        const upperCaseCode = code.toUpperCase();
-        if (userData.referralCode === upperCaseCode) throw new Error("You cannot use your own referral code.");
+        const formattedCode = code.trim().toUpperCase();
+
+        if (userData.referralCode === formattedCode) {
+            throw new Error("You cannot use your own referral code.");
+        }
         
-        const q = query(collection(db, "users"), where("referralCode", "==", upperCaseCode));
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("referralCode", "==", formattedCode));
 
         try {
-            // This query will fail due to Firestore security rules, which is expected.
-            // The catch block will handle the error gracefully.
             const querySnapshot = await getDocs(q);
 
             if (querySnapshot.empty) {
@@ -336,7 +338,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const userDocRef = doc(db, 'users', user.uid);
 
             batch.update(userDocRef, { 
-                usedReferralCode: upperCaseCode,
+                usedReferralCode: formattedCode,
                 referredBy: referrerId
             });
 
@@ -352,10 +354,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await batch.commit();
 
         } catch (error: any) {
-            console.error("Referral Error:", error);
-            // This is the crucial part: we catch the likely permissions error and convert it
-            // into a user-friendly message. The correct long-term solution is a Cloud Function.
-            throw new Error("Invalid referral code.");
+            console.error("--- DEBUG: Referral Redemption Error ---");
+            console.error("Timestamp:", new Date().toISOString());
+            console.error("User UID:", user.uid);
+            console.error("Attempted Code:", formattedCode);
+            console.error("Full Error Object:", error);
+            console.error("--- END DEBUG ---");
+
+            if (error.code === 'permission-denied') {
+                 throw new Error("Invalid referral code. The query was blocked by security rules.");
+            }
+            throw new Error(error.message || "Invalid referral code.");
         }
     };
     
@@ -471,5 +480,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
