@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import type { NextPage } from 'next';
@@ -106,7 +107,7 @@ const SettingsPage: NextPage = () => {
             toast({
                 variant: 'destructive',
                 title: 'No Code Entered',
-                description: 'Please enter a referral code.',
+                description: 'Please enter an offer code.',
             });
             return;
         }
@@ -165,12 +166,12 @@ const SettingsPage: NextPage = () => {
           <CardHeader>
             <div className="flex items-center gap-3">
               <Gift className="w-6 h-6 text-accent" />
-              <CardTitle>Redeem a Code</CardTitle>
+              <CardTitle>Redeem an Offer Code</CardTitle>
             </div>
             <CardDescription>
               {userData?.usedReferralCode 
                 ? "You have already redeemed a referral code." 
-                : "Enter a friend's referral code to get started."}
+                : "Have a referral code? Enter it here to get a bonus on your first investment."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -179,7 +180,7 @@ const SettingsPage: NextPage = () => {
               <div className="flex gap-2">
                 <Input 
                   id="offer-code" 
-                  placeholder="FRIENDSCODE" 
+                  placeholder={userData?.usedReferralCode || "FRIENDSCODE"} 
                   value={referralCodeInput}
                   onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
                   disabled={!!userData?.usedReferralCode || isRedeeming}

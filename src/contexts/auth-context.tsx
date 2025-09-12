@@ -238,13 +238,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // To be implemented if needed
     };
 
-    const signUpWithEmail = async ({ name, email, phone, password, referralCode }: any) => {
+    const signUpWithEmail = async ({ name, email, phone, password }: any) => {
         setLoading(true);
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const newUser = userCredential.user;
 
-            // --- Step 1: Create the user document first ---
             const userDocRef = doc(db, 'users', newUser.uid);
             const newUserDoc: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'projected' | 'rank' | 'lastBonusClaim' | 'claimedMilestones' | 'lastInvestmentUpdate'> = {
                 name,
@@ -269,51 +268,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 claimedMilestones: [],
             });
             
-            // --- Step 2: Handle referral logic separately after user is created ---
-            if (referralCode) {
-                try {
-                    const q = query(collection(db, "users"), where("referralCode", "==", referralCode));
-                    const querySnapshot = await getDocs(q);
-                    
-                    if (!querySnapshot.empty) {
-                        const referrerDoc = querySnapshot.docs[0];
-                        const batch = writeBatch(db);
-
-                        // Update new user with who referred them
-                        batch.update(userDocRef, { 
-                            usedReferralCode: referralCode,
-                            referredBy: referrerDoc.id 
-                        });
-                        
-                        // Add new user to referrer's subcollection
-                        const referralSubcollectionRef = doc(collection(db, `users/${referrerDoc.id}/referrals`));
-                        batch.set(referralSubcollectionRef, {
-                            userId: newUser.uid,
-                            name: name,
-                            email: email,
-                            hasInvested: false,
-                            date: serverTimestamp()
-                        });
-                        
-                        await batch.commit();
-                    } else {
-                         console.warn(`Referral code "${referralCode}" not found.`);
-                    }
-                } catch (referralError) {
-                    // Log the error but don't fail the whole signup
-                    console.error("Error processing referral code, but user was created successfully:", referralError);
-                }
-            }
-
         } catch (error: any) {
              toast({
                 variant: 'destructive',
                 title: 'Sign Up Failed',
                 description: error.message,
             });
-            setLoading(false); // Make sure to stop loading on error
-        } finally {
-            // onAuthStateChanged will handle redirect and final loading state
+            setLoading(false);
         }
     };
 
@@ -331,8 +292,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 description: error.message,
             });
              setLoading(false);
-        } finally {
-            // onAuthStateChanged will handle redirect
         }
     };
 
@@ -353,7 +312,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     const redeemReferralCode = async (code: string) => {
-        const userData = (await getDoc(doc(db, 'users', user!.uid))).data() as UserData;
         if (!user || !userData) throw new Error("User not found");
         if (userData.usedReferralCode) throw new Error("You have already used a referral code.");
         if (userData.referralCode === code) throw new Error("You cannot use your own referral code.");
@@ -398,7 +356,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     const claimDailyBonus = async (amount: number) => {
-        const userData = (await getDoc(doc(db, 'users', user!.uid))).data() as UserData;
         if (!user || !userData) throw new Error("User not found");
 
         const now = Timestamp.now();
@@ -414,9 +371,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, 'users', user.uid);
         
         batch.update(userDocRef, {
-            totalBalance: (userData.totalBalance || 0) + amount,
-            bonusEarnings: (userData.bonusEarnings || 0) + amount,
-            earnings: (userData.earnings || 0) + amount,
+            totalBalance: userData.totalBalance + amount,
+            bonusEarnings: userData.bonusEarnings + amount,
+            earnings: userData.earnings + amount,
             lastBonusClaim: now
         });
         
@@ -434,7 +391,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const collectSignupBonus = async () => {
-         const userData = (await getDoc(doc(db, 'users', user!.uid))).data() as UserData;
         if (!user || !userData) throw new Error("User not found");
         if (userData.hasCollectedSignupBonus) throw new Error("Sign-up bonus already collected.");
 
@@ -444,9 +400,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, 'users', user.uid);
         
         batch.update(userDocRef, {
-            totalBalance: (userData.totalBalance || 0) + signupBonusAmount,
-            bonusEarnings: (userData.bonusEarnings || 0) + signupBonusAmount,
-            earnings: (userData.earnings || 0) + signupBonusAmount,
+            totalBalance: userData.totalBalance + signupBonusAmount,
+            bonusEarnings: userData.bonusEarnings + signupBonusAmount,
+            earnings: userData.earnings + signupBonusAmount,
             hasCollectedSignupBonus: true,
         });
         

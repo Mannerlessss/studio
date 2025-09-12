@@ -37,7 +37,6 @@ export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
-    const [referralCode, setReferralCode] = useState('');
 
     // Login state
     const [loginEmail, setLoginEmail] = useState('');
@@ -56,7 +55,7 @@ export default function LoginPage() {
             });
             return;
         }
-        await signUpWithEmail({ name, email, phone, password, referralCode });
+        await signUpWithEmail({ name, email, phone, password });
     };
 
      const handleSignIn = async () => {
@@ -175,13 +174,6 @@ export default function LoginPage() {
                     <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                         <Input id="password" type="password" placeholder="••••••••" className="pl-10" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading}/>
-                    </div>
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="referral">Referral Code (Optional)</Label>
-                    <div className="relative">
-                        <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                        <Input id="referral" placeholder="FRIENDSCODE" className="pl-10" value={referralCode} onChange={(e) => setReferralCode(e.target.value.toUpperCase())} disabled={loading}/>
                     </div>
                 </div>
                 </CardContent>
