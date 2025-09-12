@@ -57,7 +57,17 @@ interface User {
     hasInvested?: boolean;
     referredBy?: string;
     invested?: number;
+    claimedMilestones?: number[];
 }
+
+const referralMilestones: { [key: number]: number } = {
+  5: 250,
+  10: 500,
+  20: 1000,
+  30: 1500,
+  40: 2000,
+  50: 2500,
+};
 
 export default function UsersPage() {
     const { toast } = useToast();
@@ -117,28 +127,27 @@ export default function UsersPage() {
                 date: serverTimestamp(),
             });
 
+            // --- Referral & Milestone Logic ---
             if (!user.hasInvested && amount >= 100 && user.referredBy) {
-                const bonusAmount = 75;
                 const referrerDocRef = doc(db, 'users', user.referredBy);
                 const referrerDoc = await getDoc(referrerDocRef);
 
                 if (referrerDoc.exists()) {
-                    const referrerData = referrerDoc.data();
+                    const referrerData = referrerDoc.data() as User;
+                    const bonusAmount = 75; // Standard referral bonus
+                    
+                    // 1. Give welcome bonus to the new investor
                     batch.update(userDocRef, {
                         totalBalance: (user.totalBalance || 0) + bonusAmount,
                         bonusEarnings: (user.bonusEarnings || 0) + bonusAmount,
                         earnings: ((user as any).earnings || 0) + bonusAmount,
-                        hasInvested: true
                     });
                     const userBonusTransactionRef = doc(collection(db, `users/${user.id}/transactions`));
                     batch.set(userBonusTransactionRef, {
-                        type: 'bonus',
-                        amount: bonusAmount,
-                        description: `Welcome referral bonus!`,
-                        status: 'Completed',
-                        date: serverTimestamp(),
+                        type: 'bonus', amount: bonusAmount, description: `Welcome referral bonus!`, status: 'Completed', date: serverTimestamp(),
                     });
-                    
+
+                    // 2. Give standard referral bonus to the referrer
                     batch.update(referrerDocRef, {
                         totalBalance: (referrerData.totalBalance || 0) + bonusAmount,
                         referralEarnings: (referrerData.referralEarnings || 0) + bonusAmount,
@@ -146,13 +155,10 @@ export default function UsersPage() {
                     });
                     const referrerBonusTransactionRef = doc(collection(db, `users/${user.referredBy}/transactions`));
                      batch.set(referrerBonusTransactionRef, {
-                        type: 'bonus',
-                        amount: bonusAmount,
-                        description: `Referral bonus from ${user.name}`,
-                        status: 'Completed',
-                        date: serverTimestamp(),
+                        type: 'referral', amount: bonusAmount, description: `Referral bonus from ${user.name}`, status: 'Completed', date: serverTimestamp(),
                     });
 
+                    // 3. Mark the referred user as "invested" in the referrer's subcollection
                     const referrerReferralsRef = collection(db, 'users', user.referredBy, 'referrals');
                     const q = query(referrerReferralsRef, where("userId", "==", user.id));
                     const referredUserDocs = await getDocs(q);
@@ -160,8 +166,35 @@ export default function UsersPage() {
                         const referredUserDocRef = referredUserDocs.docs[0].ref;
                         batch.update(referredUserDocRef, { hasInvested: true });
                     }
+
+                    // 4. Check for referral milestones for the referrer
+                    const referralsQuery = query(collection(db, `users/${user.referredBy}/referrals`), where("hasInvested", "==", true));
+                    const investedReferralsSnapshot = await getDocs(referralsQuery);
+                    const newInvestedCount = investedReferralsSnapshot.size + 1; // +1 for the current user
+                    
+                    for (const milestone of Object.keys(referralMilestones).map(Number)) {
+                        const reward = referralMilestones[milestone];
+                        const alreadyClaimed = referrerData.claimedMilestones?.includes(milestone);
+
+                        if (newInvestedCount >= milestone && !alreadyClaimed) {
+                            // Add reward to referrer's balance
+                            batch.update(referrerDocRef, {
+                                totalBalance: (referrerData.totalBalance || 0) + bonusAmount + reward, // Add the standard bonus again since it's deferred until commit
+                                referralEarnings: (referrerData.referralEarnings || 0) + bonusAmount + reward,
+                                earnings: (referrerData.earnings || 0) + bonusAmount + reward,
+                                claimedMilestones: [...(referrerData.claimedMilestones || []), milestone]
+                            });
+
+                            // Create transaction for milestone bonus
+                            const milestoneTransactionRef = doc(collection(db, `users/${user.referredBy}/transactions`));
+                            batch.set(milestoneTransactionRef, {
+                                type: 'referral', amount: reward, description: `Referral Milestone: ${milestone} users!`, status: 'Completed', date: serverTimestamp(),
+                            });
+                        }
+                    }
                 }
             }
+            // --- End Referral & Milestone Logic ---
             
              if (!user.hasInvested && amount >= 100) {
                   batch.update(userDocRef, { hasInvested: true });
@@ -265,7 +298,7 @@ export default function UsersPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Credit Investment for {user.name}</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Enter the amount to credit. This will trigger referral bonuses on first investment.
+                                Enter the amount to credit. This will trigger referral bonuses and milestones on first investment.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <div className="space-y-2">

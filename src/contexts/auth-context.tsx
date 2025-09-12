@@ -13,7 +13,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, collectionGroup } from 'firebase/firestore';
 
 interface UserData {
     uid: string;
@@ -34,6 +34,7 @@ interface UserData {
     investmentEarnings: number;
     hasInvested: boolean;
     lastBonusClaim?: Timestamp;
+    claimedMilestones?: number[];
     createdAt: any;
     lastLogin: any;
 }
@@ -92,34 +93,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(currentUser);
                 setIsAdmin(userIsAdmin);
 
-                if (userIsAdmin) {
-                    setUserData(null);
-                    setLoading(false);
-                } else {
-                    const userDocRef = doc(db, 'users', currentUser.uid);
-                    const unsubFromDoc = onSnapshot(userDocRef, 
-                        (docSnap) => {
-                            if (docSnap.exists()) {
-                                setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
-                            } else {
-                                setUserData(null);
-                            }
-                            setLoading(false); 
-                        },
-                        (error) => {
-                            console.error("Error fetching user data:", error);
-                            toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile." });
+                const userDocRef = doc(db, 'users', currentUser.uid);
+                const unsubFromDoc = onSnapshot(userDocRef, 
+                    (docSnap) => {
+                         if (userIsAdmin) {
                             setUserData(null);
                             setLoading(false);
+                            clearTimeout(loadingTimeout);
+                            return;
                         }
-                    );
-                    return () => unsubFromDoc(); 
-                }
+
+                        if (docSnap.exists()) {
+                            setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
+                        } else {
+                            // User is authenticated but has no doc, might be a new signup
+                            setUserData(null);
+                        }
+                        setLoading(false); 
+                        clearTimeout(loadingTimeout);
+                    },
+                    (error) => {
+                        console.error("Error fetching user data:", error);
+                        toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile." });
+                        setUserData(null);
+                        setLoading(false);
+                        clearTimeout(loadingTimeout);
+                    }
+                );
+                return () => unsubFromDoc(); 
             } else {
                 setUser(null);
                 setUserData(null);
                 setIsAdmin(false);
                 setLoading(false);
+                clearTimeout(loadingTimeout);
             }
         });
 
@@ -127,7 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             clearTimeout(loadingTimeout);
             unsubscribe();
         };
-    }, [toast]);
+    }, []); // Removed toast and logOut from dependencies to prevent re-running
 
      useEffect(() => {
         if (loading) return;
@@ -159,7 +166,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const batch = writeBatch(db);
             const userDocRef = doc(db, 'users', newUser.uid);
             
-            const newUserDoc: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'projected' | 'rank' | 'lastBonusClaim'> = {
+            const newUserDoc: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'projected' | 'rank' | 'lastBonusClaim' | 'claimedMilestones'> = {
                 name,
                 email,
                 phone,
@@ -178,6 +185,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 ...newUserDoc,
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
+                claimedMilestones: [],
             });
             
             if (referralCode) {

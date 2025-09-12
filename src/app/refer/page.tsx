@@ -6,7 +6,7 @@ import { Header } from '@/components/vaultboost/header';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Copy, Gift, Users, Star, Share2, MessageCircle } from 'lucide-react';
+import { Copy, Gift, Users, Star, Share2, MessageCircle, Trophy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
@@ -14,6 +14,7 @@ import { LeaderboardCard } from '@/components/vaultboost/leaderboard-card';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ReferralMilestonesCard } from '@/components/vaultboost/referral-milestones-card';
 
 interface ReferredUser {
     id: string;
@@ -168,6 +169,8 @@ const ReferPage: NextPage = () => {
         </Card>
         
         <LeaderboardCard />
+
+        <ReferralMilestonesCard successfullyInvested={referralStats.successfullyInvested} />
 
          <Card className="text-left shadow-lg">
             <CardHeader>
