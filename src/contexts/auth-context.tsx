@@ -314,9 +314,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const redeemReferralCode = async (code: string) => {
         if (!user || !userData) throw new Error("User not found");
         if (userData.usedReferralCode) throw new Error("You have already used a referral code.");
-        if (userData.referralCode === code) throw new Error("You cannot use your own referral code.");
+
+        const upperCaseCode = code.toUpperCase();
+        if (userData.referralCode === upperCaseCode) throw new Error("You cannot use your own referral code.");
         
-        const q = query(collection(db, "users"), where("referralCode", "==", code));
+        const q = query(collection(db, "users"), where("referralCode", "==", upperCaseCode));
 
         try {
             const querySnapshot = await getDocs(q);
@@ -326,16 +328,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             
             const referrerDoc = querySnapshot.docs[0];
+            const referrerId = referrerDoc.id;
             
             const batch = writeBatch(db);
             const userDocRef = doc(db, 'users', user.uid);
 
             batch.update(userDocRef, { 
-                usedReferralCode: code,
-                referredBy: referrerDoc.id
+                usedReferralCode: upperCaseCode,
+                referredBy: referrerId
             });
 
-            const referralSubcollectionRef = doc(collection(db, `users/${referrerDoc.id}/referrals`));
+            const referralSubcollectionRef = doc(collection(db, `users/${referrerId}/referrals`));
             batch.set(referralSubcollectionRef, {
                 userId: user.uid,
                 name: userData.name,
@@ -348,10 +351,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         } catch (error: any) {
             console.error("Referral Error:", error);
-            if (error.code === 'permission-denied') {
-                 throw new Error("This referral code is not valid.");
+            if (error instanceof Error) {
+                 throw error; // Re-throw known errors
             }
-            throw error;
+            // Handle cases where the query might fail due to permissions
+            throw new Error("Invalid referral code.");
         }
     };
     
