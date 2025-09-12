@@ -89,13 +89,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const userDocRef = doc(db, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
 
-                if (!userDoc.exists()) throw "Document does not exist!";
+                if (!userDoc.exists()) {
+                    // This is a race condition guard. If the doc doesn't exist,
+                    // the onSnapshot listener further down will handle it.
+                    // We just need to not crash here.
+                    return;
+                }
                 
                 const data = userDoc.data() as UserData;
-                if (!data.invested || data.invested <= 0 || !data.lastInvestmentUpdate) return;
+                if (!data.invested || data.invested <= 0 || !data.lastInvestmentUpdate) {
+                    return; // No active investment to process
+                }
 
                 const now = Timestamp.now();
-                const lastUpdate = data.lastInvestmentUpdate;
                 
                 // Total days elapsed since the investment started
                 const investmentStartDate = data.lastInvestmentUpdate;
@@ -130,7 +136,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                 for (let i = 0; i < daysToActuallyProcess; i++) {
                     const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                    const transactionDate = Timestamp.fromMillis(lastUpdate.toMillis() + (daysAlreadyProcessed + i + 1) * 24 * 60 * 60 * 1000);
+                    // Calculate date for each transaction to avoid all having the same timestamp
+                    const transactionDate = Timestamp.fromMillis(investmentStartDate.toMillis() + (daysAlreadyProcessed + i + 1) * 24 * 60 * 60 * 1000);
                     transaction.set(transactionRef, {
                         type: 'earning',
                         amount: dailyEarning,
@@ -142,7 +149,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                  console.log(`Processed ${daysToActuallyProcess} day(s) of investment earnings.`);
             });
         } catch (error) {
-            console.error("Error processing daily earnings: ", error);
+            // This error is expected if the document doesn't exist yet, so we can console.warn or ignore.
+             if (String(error).includes("Document does not exist")) {
+                console.warn("processDailyEarnings: User document not found, skipping. This is expected during signup race conditions.");
+            } else {
+                console.error("Error processing daily earnings: ", error);
+            }
         }
     };
 
@@ -177,8 +189,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         if (docSnap.exists()) {
                             setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
                         } else {
-                            console.warn(`No Firestore document found for user ${currentUser.uid}. Logging out.`);
-                            logOut();
+                            // This might happen in a race condition during signup.
+                            // We don't log out here, because the user might just have been created.
+                            // Instead, we wait to see if the doc appears. If not, login logic should handle it.
+                            console.warn(`No Firestore document found for user ${currentUser.uid}. Waiting for it to be created...`);
                         }
                         setLoading(false); 
                     },
@@ -186,7 +200,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         console.error("Error fetching user data:", error);
                         toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile. Logging out." });
                         logOut();
-                        setLoading(false);
                     }
                 );
             } else {
@@ -313,7 +326,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 description: error.message,
             });
         } finally {
-            setLoading(false);
+            // Don't set loading to false here, let the onAuthStateChanged listener handle it
         }
     };
 
@@ -333,8 +346,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign In Failed',
                 description: error.message,
             });
+             setLoading(false);
         } finally {
-            setLoading(false);
+            // Don't set loading to false here, let onAuthStateChanged handle it
         }
     };
 
@@ -470,3 +484,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
