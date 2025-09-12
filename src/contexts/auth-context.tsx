@@ -51,7 +51,7 @@ interface AuthContextType {
   redeemReferralCode: (code: string) => Promise<void>;
   updateUserPhone: (phone: string) => Promise<void>;
   updateUserName: (name: string) => Promise<void>;
-  claimDailyBonus: (amount: string) => Promise<void>;
+  claimDailyBonus: (amount: number) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
 }
 
