@@ -1,39 +1,50 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
+
     // Helper function to check for admin role
     function isAdmin() {
       return request.auth.token.admin == true;
     }
+
+    // Helper function to check if user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
     
-    // Helper function to check if user is the owner of the document
+    // Helper function to check if the user is the owner of the document
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
-    // Admins can do anything
-    match /{document=**} {
-      allow read, write: if isAdmin();
-    }
-
     // Rules for the 'users' collection
     match /users/{userId} {
-      allow read, update: if isOwner(userId);
-      allow create: if request.auth != null;
+      // Admins can do anything.
+      // Users can create their own doc (signup).
+      // Users can read and update their own doc.
+      // Authenticated users can list the collection (for queries like referral codes).
+      allow read: if isAdmin() || isOwner(userId);
+      allow list: if isAdmin() || isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || isOwner(userId);
+      allow delete: if isAdmin();
       
-      // Rules for all subcollections under a user document
+      // Rules for all subcollections within a user document
       match /{allPaths=**} {
-        allow read, write: if isOwner(userId);
+        // Admins can do anything.
+        // The owner of the parent user document has full access to subcollections.
+        allow read, write: if isAdmin() || isOwner(userId);
       }
     }
-    
+
     // Rules for the 'offers' collection
     match /offers/{offerId} {
-        // Any authenticated user can read offers.
-        // Only admins can create, update, or delete them (covered by the admin rule above).
-        allow read: if request.auth != null;
+        // Admins have full access.
+        // Any authenticated user can read/list offers.
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
     }
   }
 }
