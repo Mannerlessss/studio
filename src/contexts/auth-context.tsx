@@ -93,7 +93,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const userDoc = await transaction.get(userDocRef);
 
                 if (!userDoc.exists()) {
-                    // This is the guard clause. If the document doesn't exist, stop.
                     console.warn("processDailyEarnings: User document not found, skipping transaction.");
                     return;
                 }
@@ -105,11 +104,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                 const now = Timestamp.now();
                 
-                // Total days elapsed since the investment started
                 const investmentStartDate = data.lastInvestmentUpdate;
                 const totalDaysSinceStart = Math.floor((now.toMillis() - investmentStartDate.toMillis()) / (1000 * 60 * 60 * 24));
                 
-                // Days already processed is based on current earnings
                 const dailyReturnRate = data.membership === 'Pro' ? 0.13 : 0.10;
                 const dailyEarning = data.invested * dailyReturnRate;
                 const daysAlreadyProcessed = dailyEarning > 0 ? Math.floor((data.investmentEarnings || 0) / dailyEarning) : 0;
@@ -138,7 +135,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                 for (let i = 0; i < daysToActuallyProcess; i++) {
                     const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                    // Calculate date for each transaction to avoid all having the same timestamp
                     const transactionDate = Timestamp.fromMillis(investmentStartDate.toMillis() + (daysAlreadyProcessed + i + 1) * 24 * 60 * 60 * 1000);
                     transaction.set(transactionRef, {
                         type: 'earning',
@@ -151,7 +147,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                  console.log(`Processed ${daysToActuallyProcess} day(s) of investment earnings.`);
             });
         } catch (error) {
-            // This catch block will handle the "document does not exist" error during the transaction.
              if (String(error).includes("document does not exist")) {
                 console.warn("processDailyEarnings transaction failed because user document doesn't exist. This is expected during signup race conditions.");
             } else {
@@ -183,7 +178,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     unsubFromDoc = onSnapshot(userDocRef, 
                         async (docSnap) => {
                              if (docSnap.exists()) {
-                                // Only process earnings AFTER we confirm the doc exists.
                                 await processDailyEarnings(currentUser.uid);
                                 setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
                             } else {
@@ -248,7 +242,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const newUser = userCredential.user;
 
             const userDocRef = doc(db, 'users', newUser.uid);
-            const newUserDoc: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'projected' | 'rank' | 'lastBonusClaim' | 'claimedMilestones' | 'lastInvestmentUpdate'> = {
+            
+            // Step 1: Create the essential user document first.
+            const newUserDoc = {
+                uid: newUser.uid,
                 name,
                 email,
                 phone,
@@ -262,21 +259,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 hasInvested: false,
                 hasCollectedSignupBonus: false,
                 referralCode: `${name.split(' ')[0].toUpperCase()}${(Math.random() * 9000 + 1000).toFixed(0)}`,
-            };
-
-             await setDoc(userDocRef, {
-                ...newUserDoc,
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
                 claimedMilestones: [],
-            });
-            
+            };
+            await setDoc(userDocRef, newUserDoc);
+
         } catch (error: any) {
              toast({
                 variant: 'destructive',
                 title: 'Sign Up Failed',
                 description: error.message,
             });
+            // Do not set loading to false here, as the onAuthStateChanged will handle it.
+        } finally {
+            // No matter what, stop loading. If successful, onAuthStateChanged will take over.
+            // If failed, user needs to be able to try again.
             setLoading(false);
         }
     };
@@ -286,7 +284,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const credential = await signInWithEmailAndPassword(auth, email, password);
             const userDocRef = doc(db, 'users', credential.user.uid);
-            // Use set with merge to create the doc if it's missing, or update if it exists.
             await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
         } catch (error: any) {
             toast({
@@ -319,8 +316,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userData.usedReferralCode) throw new Error("You have already used a referral code.");
         if (userData.referralCode === code) throw new Error("You cannot use your own referral code.");
         
+        const q = query(collection(db, "users"), where("referralCode", "==", code));
+
         try {
-            const q = query(collection(db, "users"), where("referralCode", "==", code));
             const querySnapshot = await getDocs(q);
 
             if (querySnapshot.empty) {
@@ -350,12 +348,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         } catch (error: any) {
             console.error("Referral Error:", error);
-            // This is the key change: we give a user-friendly error regardless of the technical reason.
-            // Firestore permission errors are caught here, and the user just sees "Invalid code".
             if (error.code === 'permission-denied') {
                  throw new Error("This referral code is not valid.");
             }
-            // Re-throw other errors (like the ones we manually throw)
             throw error;
         }
     };

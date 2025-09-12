@@ -107,7 +107,7 @@ const SettingsPage: NextPage = () => {
             toast({
                 variant: 'destructive',
                 title: 'No Code Entered',
-                description: 'Please enter an offer code.',
+                description: 'Please enter a referral code.',
             });
             return;
         }
@@ -166,17 +166,17 @@ const SettingsPage: NextPage = () => {
           <CardHeader>
             <div className="flex items-center gap-3">
               <Gift className="w-6 h-6 text-accent" />
-              <CardTitle>Redeem an Offer Code</CardTitle>
+              <CardTitle>Used a Referral Code?</CardTitle>
             </div>
             <CardDescription>
               {userData?.usedReferralCode 
-                ? "You have already redeemed a referral code." 
-                : "Have a referral code? Enter it here to get a bonus on your first investment."}
+                ? "You have already redeemed a friend's referral code." 
+                : "If a friend referred you, enter their code here to link your accounts."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="offer-code">Referral Code</Label>
+              <Label htmlFor="offer-code">Friend's Referral Code</Label>
               <div className="flex gap-2">
                 <Input 
                   id="offer-code" 
@@ -237,7 +237,7 @@ const SettingsPage: NextPage = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>Code Redeemed Successfully!</AlertDialogTitle>
               <AlertDialogDescription>
-                That's a great start! Now, make your first investment to get your 75 Rs. welcome bonus.
+                Your account is now linked to your friend. Make your first investment to get your welcome bonus!
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
