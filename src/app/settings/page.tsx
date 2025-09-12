@@ -162,6 +162,44 @@ const SettingsPage: NextPage = () => {
           </CardContent>
         </Card>
 
+        {userData && !userData.usedReferralCode && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Gift className="w-6 h-6 text-primary" />
+                <CardTitle>Used a Referral Code?</CardTitle>
+              </div>
+              <CardDescription>
+                If a friend referred you, enter their code here to link your
+                accounts.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="referral-code">Friend's Referral Code</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="referral-code"
+                    placeholder="e.g., FRIEND123"
+                    value={referralCodeInput}
+                    onChange={(e) =>
+                      setReferralCodeInput(e.target.value.toUpperCase())
+                    }
+                    disabled={isRedeeming}
+                  />
+                  <Button onClick={handleRedeem} disabled={isRedeeming}>
+                    {isRedeeming ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      'Redeem'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -185,6 +223,22 @@ const SettingsPage: NextPage = () => {
                 </div>
                 {userData?.referralCode && <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 border-blue-500/20">Active</Badge>}
             </div>
+             {userData?.usedReferralCode && (
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Referred By Code
+                  </p>
+                  <p className="font-semibold">{userData.usedReferralCode}</p>
+                </div>
+                <Badge
+                  variant="secondary"
+                  className="bg-purple-500/10 text-purple-500 border-purple-500/20"
+                >
+                  Applied
+                </Badge>
+              </div>
+            )}
           </CardContent>
         </Card>
 
