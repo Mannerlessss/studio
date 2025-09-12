@@ -5,65 +5,57 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Helper functions
-    function isUserAuthenticated() {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    function isAuthenticated() {
       return request.auth != null;
     }
-
-    function isUserProfileOwner(userId) {
-      return request.auth.uid == userId;
-    }
-    
     function isAdmin() {
-      return request.auth.token.admin == true;
+      return isAuthenticated() && request.auth.token.admin == true;
     }
 
-    // Admins can read/write anything
-    match /{document=**} {
-      allow read, write: if isAdmin();
-    }
-    
-    // Rules for the 'users' collection
+    // USER DATA
     match /users/{userId} {
-      // A user can read their own profile
-      allow read: if isUserAuthenticated() && isUserProfileOwner(userId);
-
-      // A user can create their own profile during signup
-      allow create: if isUserAuthenticated() && isUserProfileOwner(userId);
+      // READ: Authenticated users can read all user profiles (needed for referral code lookup)
+      allow read: if isAuthenticated();
       
-      // A user can update their own profile, but cannot change sensitive fields
-      allow update: if isUserAuthenticated() && isUserProfileOwner(userId)
-                    && request.resource.data.uid == request.auth.uid
-                    && request.resource.data.email == resource.data.email
-                    && request.resource.data.referralCode == resource.data.referralCode
-                    && request.resource.data.membership == resource.data.membership;
-      
-      // Nobody can delete user profiles
-      allow delete: if false;
+      // WRITE: Users can only create, update, or delete their OWN document.
+      allow write: if isOwner(userId);
 
-      // Rules for user subcollections
-      match /{subcollection}/{docId} {
-        allow read, write: if isUserAuthenticated() && isUserProfileOwner(userId);
+      // TRANSACTIONS (Subcollection)
+      match /transactions/{transactionId} {
+        // READ/WRITE: Only the owner of the parent user document can access their transactions.
+        allow read, write: if isOwner(userId);
+      }
+      
+      // REFERRALS (Subcollection)
+      match /referrals/{referralId} {
+         // READ/WRITE: Only the owner can manage their list of referred users.
+         allow read, write: if isOwner(userId);
+      }
+
+       // WITHDRAWALS (Subcollection)
+      match /withdrawals/{withdrawalId} {
+         // READ/WRITE: Owner can create, admin can read/update.
+         allow read, update: if isAdmin() || isOwner(userId);
+         allow create: if isOwner(userId);
+         allow delete: if isAdmin();
       }
     }
     
-    // Rules for the 'referralCodes' collection
-    // This collection is used for public lookup of referral codes
-    match /referralCodes/{code} {
-        // Any authenticated user can read a referral code to validate it
-        allow get: if isUserAuthenticated();
-
-        // Only a user can create their own referral code document during signup
-        // This is handled by backend/transaction logic, but we restrict writes.
-        allow write: if isUserAuthenticated(); 
-        allow list, delete: if false;
+    // OFFER CODES (Managed by Admin)
+    match /offers/{offerId} {
+      // READ: All authenticated users can read offer codes.
+      allow read: if isAuthenticated();
+      // WRITE: Only admins can create, update, or delete offer codes.
+      allow write: if isAdmin();
     }
     
-    // Rules for the 'offers' collection
-    match /offers/{offerId} {
-      allow read: if isUserAuthenticated();
-      allow write, delete, create: if isAdmin();
+    // WITHDRAWALS (Collection Group for Admin query)
+    match /{path=**}/withdrawals/{withdrawalId} {
+      // READ: Admins can read all withdrawal requests across all users.
+      allow read: if isAdmin();
     }
   }
 }
-
-    

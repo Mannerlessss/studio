@@ -243,10 +243,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             const referralCode = `${name.split(' ')[0].toUpperCase()}${(Math.random() * 9000 + 1000).toFixed(0)}`;
             
-            // Use a batch to write to both collections atomically
-            const batch = writeBatch(db);
-
-            // 1. Create the user document in 'users' collection
             const userDocRef = doc(db, 'users', newUser.uid);
             const newUserDoc = {
                 uid: newUser.uid,
@@ -267,13 +263,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 lastLogin: serverTimestamp(),
                 claimedMilestones: [],
             };
-            batch.set(userDocRef, newUserDoc);
-
-            // 2. Create the code lookup document in 'referralCodes' collection
-            const referralCodeRef = doc(db, 'referralCodes', referralCode);
-            batch.set(referralCodeRef, { uid: newUser.uid });
-
-            await batch.commit();
+            await setDoc(userDocRef, newUserDoc);
 
         } catch (error: any) {
              toast({
@@ -332,14 +322,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         try {
-            const referralCodeRef = doc(db, "referralCodes", formattedCode);
-            const referralCodeDoc = await getDoc(referralCodeRef);
+            const usersRef = collection(db, "users");
+            const q = query(usersRef, where("referralCode", "==", formattedCode));
+            
+            const querySnapshot = await getDocs(q);
 
-            if (!referralCodeDoc.exists()) {
+            if (querySnapshot.empty) {
                 throw new Error("Invalid referral code.");
             }
             
-            const referrerId = referralCodeDoc.data().uid;
+            const referrerDoc = querySnapshot.docs[0];
+            const referrerId = referrerDoc.id;
             
             const batch = writeBatch(db);
             const userDocRef = doc(db, 'users', user.uid);
@@ -362,7 +355,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await batch.commit();
 
         } catch (error: any) {
-            console.error("Full Error Object:", error);
+            console.error("--- DEBUG: Referral Redemption Error ---");
+            console.error("Timestamp:", new Date().toISOString());
+            console.error("User UID:", user.uid);
+            console.error("Attempted Code:", formattedCode);
+            console.error("Error Object:", error);
+            console.error("--- END DEBUG ---");
             throw new Error(error.message || "Invalid referral code.");
         }
     };
@@ -479,5 +477,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
