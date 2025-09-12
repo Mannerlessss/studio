@@ -45,7 +45,6 @@ const Dashboard: NextPage = () => {
           <WelcomeCard name={userData.name} membership={`${userData.membership} Member`} />
         </div>
         <ProfileCompletionCard />
-        <ActiveInvestmentsCard />
         <div className="grid grid-cols-2 gap-4" id="info-cards">
           <InfoCard
             title="Invested"
@@ -68,6 +67,7 @@ const Dashboard: NextPage = () => {
             icon={<Users className="h-6 w-6 text-primary" />}
           />
         </div>
+        <ActiveInvestmentsCard />
         <DailyBonusCard onBonusClaim={handleBonusClaim} />
         <div id="withdraw-card">
             <WithdrawCard />
