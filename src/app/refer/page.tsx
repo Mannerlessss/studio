@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import type { NextPage } from 'next';
@@ -10,7 +9,6 @@ import { Copy, Gift, Users, Star, Share2, MessageCircle, Trophy } from 'lucide-r
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
-import { LeaderboardCard } from '@/components/vaultboost/leaderboard-card';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -168,8 +166,6 @@ const ReferPage: NextPage = () => {
             </CardContent>
         </Card>
         
-        <LeaderboardCard />
-
         <ReferralMilestonesCard successfullyInvested={referralStats.successfullyInvested} />
 
          <Card className="text-left shadow-lg">
