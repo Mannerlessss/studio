@@ -93,6 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const userDoc = await transaction.get(userDocRef);
 
                 if (!userDoc.exists()) {
+                    // This is the guard clause. If the document doesn't exist, stop.
                     console.warn("processDailyEarnings: User document not found, skipping transaction.");
                     return;
                 }
@@ -150,6 +151,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                  console.log(`Processed ${daysToActuallyProcess} day(s) of investment earnings.`);
             });
         } catch (error) {
+            // This catch block will handle the "document does not exist" error during the transaction.
              if (String(error).includes("document does not exist")) {
                 console.warn("processDailyEarnings transaction failed because user document doesn't exist. This is expected during signup race conditions.");
             } else {
@@ -164,7 +166,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let authTimeout: NodeJS.Timeout;
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            clearTimeout(authTimeout); // Clear timeout if auth state changes
+            clearTimeout(authTimeout); 
             if (unsubFromDoc) unsubFromDoc();
             
             if (currentUser) {
@@ -175,12 +177,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setIsAdmin(userIsAdmin);
 
                 if (userIsAdmin) {
-                    setUserData(null);
+                     setUserData(null);
                 } else {
                     const userDocRef = doc(db, 'users', currentUser.uid);
                     unsubFromDoc = onSnapshot(userDocRef, 
                         async (docSnap) => {
-                            if (docSnap.exists()) {
+                             if (docSnap.exists()) {
+                                // Only process earnings AFTER we confirm the doc exists.
                                 await processDailyEarnings(currentUser.uid);
                                 setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
                             } else {
@@ -207,7 +210,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 console.warn("Auth state change timed out after 10 seconds. Forcing loading to false.");
                 setLoading(false);
             }
-        }, 10000); // 10 seconds
+        }, 10000); 
 
         return () => {
             if (unsubFromDoc) unsubFromDoc();
@@ -283,7 +286,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const credential = await signInWithEmailAndPassword(auth, email, password);
             const userDocRef = doc(db, 'users', credential.user.uid);
-            // Use set with merge to create the doc if it's missing
+            // Use set with merge to create the doc if it's missing, or update if it exists.
             await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
         } catch (error: any) {
             toast({
@@ -316,33 +319,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userData.usedReferralCode) throw new Error("You have already used a referral code.");
         if (userData.referralCode === code) throw new Error("You cannot use your own referral code.");
         
-        const batch = writeBatch(db);
-        const userDocRef = doc(db, 'users', user.uid);
-        
-        const q = query(collection(db, "users"), where("referralCode", "==", code));
-        const querySnapshot = await getDocs(q);
+        try {
+            const q = query(collection(db, "users"), where("referralCode", "==", code));
+            const querySnapshot = await getDocs(q);
 
-        if (querySnapshot.empty) {
-            throw new Error("Invalid referral code.");
+            if (querySnapshot.empty) {
+                throw new Error("Invalid referral code.");
+            }
+            
+            const referrerDoc = querySnapshot.docs[0];
+            
+            const batch = writeBatch(db);
+            const userDocRef = doc(db, 'users', user.uid);
+
+            batch.update(userDocRef, { 
+                usedReferralCode: code,
+                referredBy: referrerDoc.id
+            });
+
+            const referralSubcollectionRef = doc(collection(db, `users/${referrerDoc.id}/referrals`));
+            batch.set(referralSubcollectionRef, {
+                userId: user.uid,
+                name: userData.name,
+                email: userData.email,
+                hasInvested: false,
+                date: serverTimestamp()
+            });
+
+            await batch.commit();
+
+        } catch (error: any) {
+            console.error("Referral Error:", error);
+            // This is the key change: we give a user-friendly error regardless of the technical reason.
+            // Firestore permission errors are caught here, and the user just sees "Invalid code".
+            if (error.code === 'permission-denied') {
+                 throw new Error("This referral code is not valid.");
+            }
+            // Re-throw other errors (like the ones we manually throw)
+            throw error;
         }
-        
-        const referrerDoc = querySnapshot.docs[0];
-        
-        batch.update(userDocRef, { 
-            usedReferralCode: code,
-            referredBy: referrerDoc.id
-        });
-
-        const referralSubcollectionRef = doc(collection(db, `users/${referrerDoc.id}/referrals`));
-        batch.set(referralSubcollectionRef, {
-            userId: user.uid,
-            name: userData.name,
-            email: userData.email,
-            hasInvested: false,
-            date: serverTimestamp()
-        });
-
-        await batch.commit();
     };
     
     const updateUserName = async (name: string) => {
