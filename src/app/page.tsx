@@ -15,6 +15,7 @@ import { GuidedTour } from '@/components/vaultboost/guided-tour';
 import { ProfileCompletionCard } from '@/components/vaultboost/profile-completion-card';
 import { AnnouncementPopup } from '@/components/vaultboost/announcement-popup';
 import { ActiveInvestmentsCard } from '@/components/vaultboost/active-investments-card';
+import { CollectBonusCard } from '@/components/vaultboost/collect-bonus-card';
 
 
 const Dashboard: NextPage = () => {
@@ -44,6 +45,7 @@ const Dashboard: NextPage = () => {
         <div id="welcome-card">
           <WelcomeCard name={userData.name} membership={`${userData.membership} Member`} />
         </div>
+        <CollectBonusCard />
         <ProfileCompletionCard />
         <div className="grid grid-cols-2 gap-4" id="info-cards">
           <InfoCard

@@ -17,14 +17,15 @@ export function AnnouncementPopup() {
   const POPUP_STORAGE_KEY = 'vaultboost-announcement-seen';
 
   useEffect(() => {
-    const hasSeenPopup = localStorage.getItem(POPUP_STORAGE_KEY);
+    // Use sessionStorage to show popup once per session
+    const hasSeenPopup = sessionStorage.getItem(POPUP_STORAGE_KEY);
     if (!hasSeenPopup) {
       setIsOpen(true);
     }
   }, []);
 
   const handleClose = () => {
-    localStorage.setItem(POPUP_STORAGE_KEY, 'true');
+    sessionStorage.setItem(POPUP_STORAGE_KEY, 'true');
     setIsOpen(false);
   };
 

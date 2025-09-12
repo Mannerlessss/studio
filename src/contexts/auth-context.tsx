@@ -33,6 +33,7 @@ interface UserData {
     bonusEarnings: number;
     investmentEarnings: number;
     hasInvested: boolean;
+    hasCollectedSignupBonus: boolean;
     lastBonusClaim?: Timestamp;
     claimedMilestones?: number[];
     lastInvestmentUpdate?: Timestamp;
@@ -53,6 +54,7 @@ interface AuthContextType {
   updateUserPhone: (phone: string) => Promise<void>;
   updateUserName: (name: string) => Promise<void>;
   claimDailyBonus: (amount: number) => Promise<void>;
+  collectSignupBonus: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
 }
 
@@ -71,6 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             await signOut(auth);
+            sessionStorage.removeItem('vaultboost-announcement-seen');
         } catch (error) {
             console.error("Error signing out: ", error);
         } finally {
@@ -255,21 +258,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             const batch = writeBatch(db);
             const userDocRef = doc(db, 'users', newUser.uid);
-            
-            const signupBonus = 200;
 
             const newUserDoc: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'projected' | 'rank' | 'lastBonusClaim' | 'claimedMilestones' | 'lastInvestmentUpdate'> = {
                 name,
                 email,
                 phone,
                 membership: 'Basic',
-                totalBalance: signupBonus,
+                totalBalance: 0, // Start with 0, bonus is collectable
                 invested: 0,
-                earnings: signupBonus,
+                earnings: 0,
                 referralEarnings: 0,
-                bonusEarnings: signupBonus,
+                bonusEarnings: 0,
                 investmentEarnings: 0,
                 hasInvested: false,
+                hasCollectedSignupBonus: false,
                 referralCode: `${name.split(' ')[0].toUpperCase()}${(Math.random() * 9000 + 1000).toFixed(0)}`,
             };
 
@@ -279,17 +281,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 lastLogin: serverTimestamp(),
                 claimedMilestones: [],
             });
-            
-            // Add signup bonus transaction
-            const signupBonusTransactionRef = doc(collection(db, `users/${newUser.uid}/transactions`));
-            batch.set(signupBonusTransactionRef, {
-                type: 'bonus',
-                amount: signupBonus,
-                description: 'Sign-up Bonus',
-                status: 'Completed',
-                date: serverTimestamp(),
-            });
-
 
             if (referralCode) {
                 try {
@@ -447,6 +438,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: 'Bonus Claimed!', description: `You received ${amount} Rs.` });
     };
 
+    const collectSignupBonus = async () => {
+        if (!user || !userData) throw new Error("User not found");
+        if (userData.hasCollectedSignupBonus) throw new Error("Sign-up bonus already collected.");
+
+        const signupBonusAmount = 200;
+        
+        const batch = writeBatch(db);
+        const userDocRef = doc(db, 'users', user.uid);
+        
+        batch.update(userDocRef, {
+            totalBalance: (userData.totalBalance || 0) + signupBonusAmount,
+            bonusEarnings: (userData.bonusEarnings || 0) + signupBonusAmount,
+            earnings: (userData.earnings || 0) + signupBonusAmount,
+            hasCollectedSignupBonus: true,
+        });
+        
+        const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+        batch.set(transactionRef, {
+            type: 'bonus',
+            amount: signupBonusAmount,
+            description: 'Sign-up Bonus',
+            status: 'Completed',
+            date: serverTimestamp()
+        });
+
+        await batch.commit();
+        toast({ title: 'Bonus Collected!', description: `You received ${signupBonusAmount} Rs.` });
+    }
+
     const value: AuthContextType = {
         user,
         userData,
@@ -460,6 +480,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         updateUserPhone,
         updateUserName,
         claimDailyBonus,
+        collectSignupBonus,
         sendPasswordReset,
     };
     
@@ -484,5 +505,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
