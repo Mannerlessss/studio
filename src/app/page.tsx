@@ -1,3 +1,4 @@
+
 'use client';
 import type { NextPage } from 'next';
 import { WelcomeCard } from '@/components/vaultboost/welcome-card';
@@ -13,6 +14,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { GuidedTour } from '@/components/vaultboost/guided-tour';
 import { ProfileCompletionCard } from '@/components/vaultboost/profile-completion-card';
 import { AnnouncementPopup } from '@/components/vaultboost/announcement-popup';
+import { ActiveInvestmentsCard } from '@/components/vaultboost/active-investments-card';
 
 
 const Dashboard: NextPage = () => {
@@ -43,6 +45,7 @@ const Dashboard: NextPage = () => {
           <WelcomeCard name={userData.name} membership={`${userData.membership} Member`} />
         </div>
         <ProfileCompletionCard />
+        <ActiveInvestmentsCard />
         <div className="grid grid-cols-2 gap-4" id="info-cards">
           <InfoCard
             title="Invested"

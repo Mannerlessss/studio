@@ -57,6 +57,7 @@ interface User {
     hasInvested?: boolean;
     referredBy?: string;
     invested?: number;
+    projected?: number;
     claimedMilestones?: number[];
 }
 
@@ -113,16 +114,18 @@ export default function UsersPage() {
             const batch = writeBatch(db);
 
             const newInvestedAmount = (user.invested || 0) + amount;
+            const newProjectedAmount = (user.projected || 0) + (amount * 0.1 * 30);
             
             batch.update(userDocRef, { 
                 invested: newInvestedAmount,
+                projected: newProjectedAmount,
             });
 
             const transactionRef = doc(collection(db, `users/${user.id}/transactions`));
             batch.set(transactionRef, {
                 type: 'investment',
                 amount,
-                description: `Admin Credit: ${amount} Rs.`,
+                description: `Investment Added`,
                 status: 'Completed',
                 date: serverTimestamp(),
             });
@@ -206,7 +209,7 @@ export default function UsersPage() {
                 title: `Investment Credited`,
                 description: `${amount} Rs. has been credited for user ${user.name}.`,
             });
-            setUsers(prevUsers => prevUsers.map(u => u.id === user.id ? { ...u, hasInvested: true, invested: newInvestedAmount } : u));
+            setUsers(prevUsers => prevUsers.map(u => u.id === user.id ? { ...u, hasInvested: true, invested: newInvestedAmount, projected: newProjectedAmount } : u));
             setCreditAmount('');
         } catch (error: any) {
              toast({

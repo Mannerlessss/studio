@@ -136,8 +136,8 @@ export function TransactionHistoryCard() {
                             </div>
                         </div>
                         <div className='text-right'>
-                            <p className={cn("font-bold", ['investment', 'withdrawal'].includes(transaction.type) ? 'text-red-500' : 'text-green-500')}>
-                                {['investment', 'withdrawal'].includes(transaction.type) ? '-' : '+'}{transaction.amount.toFixed(2)} Rs.
+                            <p className={cn("font-bold", transaction.type === 'withdrawal' ? 'text-red-500' : 'text-green-500')}>
+                                {transaction.type === 'withdrawal' ? '-' : '+'}{transaction.amount.toFixed(2)} Rs.
                             </p>
                             <Badge variant={getStatusBadgeVariant(transaction.status)} 
                                 className={cn({
