@@ -62,7 +62,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [setUserData] = useState<UserData | null>(null);
+    const [userData, setUserData] = useState<UserData | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
@@ -176,36 +176,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                 if (userIsAdmin) {
                     setUserData(null);
-                    setLoading(false);
-                    return;
-                }
-                
-                const userDocRef = doc(db, 'users', currentUser.uid);
-                unsubFromDoc = onSnapshot(userDocRef, 
-                    async (docSnap) => {
-                        if (docSnap.exists()) {
-                            await processDailyEarnings(currentUser.uid);
-                            setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
-                        } else {
-                            console.warn(`No Firestore document found for user ${currentUser.uid}. Waiting for it to be created...`);
+                } else {
+                    const userDocRef = doc(db, 'users', currentUser.uid);
+                    unsubFromDoc = onSnapshot(userDocRef, 
+                        async (docSnap) => {
+                            if (docSnap.exists()) {
+                                await processDailyEarnings(currentUser.uid);
+                                setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
+                            } else {
+                                console.warn(`No Firestore document found for user ${currentUser.uid}. Waiting for it to be created...`);
+                            }
+                        },
+                        (error) => {
+                            console.error("Error fetching user data:", error);
+                            toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile. Logging out." });
+                            logOut();
                         }
-                        setLoading(false); // Set loading to false once we get a database response (or lack thereof)
-                    },
-                    (error) => {
-                        console.error("Error fetching user data:", error);
-                        toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile. Logging out." });
-                        logOut();
-                    }
-                );
+                    );
+                }
             } else {
                 setUser(null);
                 setUserData(null);
                 setIsAdmin(false);
-                setLoading(false);
             }
+            setLoading(false);
         });
 
-        // Set a timeout to force loading to false if auth takes too long
         authTimeout = setTimeout(() => {
             if (loading) {
                 console.warn("Auth state change timed out after 10 seconds. Forcing loading to false.");
@@ -469,7 +465,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const value: AuthContextType = {
         user,
-        userData: (useContext(AuthContext) as any)?.userData, // This will be provided by onSnapshot
+        userData,
         loading,
         isAdmin,
         signInWithGoogle,
@@ -495,28 +491,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
     }
 
-    // Need to manage a local state for userData to feed the provider
-    const [localUserData, setLocalUserData] = useState<UserData | null>(null);
-
-    // Update local state based on what onSnapshot provides
-    useEffect(() => {
-        if (!user || isAdmin) {
-            setLocalUserData(null);
-            return;
-        }
-        const userDocRef = doc(db, 'users', user.uid);
-        const unsub = onSnapshot(userDocRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setLocalUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
-            }
-        });
-        return () => unsub();
-    }, [user, isAdmin]);
-
-    const providerValue = { ...value, userData: localUserData };
-
-
-    return <AuthContext.Provider value={providerValue}>{children}</AuthContext.Provider>;
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {
