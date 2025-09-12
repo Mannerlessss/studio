@@ -82,19 +82,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     useEffect(() => {
-        const loadingTimeout = setTimeout(() => {
-            if (loading) {
-                console.warn("Auth loading timed out after 30 seconds. Logging out.");
-                toast({
-                    variant: 'destructive',
-                    title: 'Loading Timeout',
-                    description: 'Could not connect to the server. Please try again.',
-                });
-                logOut();
-            }
-        }, 30000); // 30 seconds
+        let loadingTimeout: NodeJS.Timeout;
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setLoading(true);
+            loadingTimeout = setTimeout(() => {
+                if (loading) {
+                    console.warn("Auth loading timed out after 30 seconds. Logging out.");
+                    toast({
+                        variant: 'destructive',
+                        title: 'Loading Timeout',
+                        description: 'Could not connect to the server. Please try again.',
+                    });
+                    logOut();
+                }
+            }, 30000);
+
             if (currentUser) {
                 const idTokenResult = await currentUser.getIdTokenResult();
                 const userIsAdmin = !!idTokenResult.claims.admin;
@@ -102,31 +105,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(currentUser);
                 setIsAdmin(userIsAdmin);
 
+                if (userIsAdmin) {
+                    setUserData(null);
+                    setLoading(false);
+                    clearTimeout(loadingTimeout);
+                    return;
+                }
+
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 const unsubFromDoc = onSnapshot(userDocRef, 
                     (docSnap) => {
-                         if (userIsAdmin) {
-                            setUserData(null);
-                            setLoading(false);
-                            clearTimeout(loadingTimeout);
-                            return;
-                        }
-
                         if (docSnap.exists()) {
                             setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
                         } else {
                             // User is authenticated but has no doc, might be a new signup
+                            // Or an error during creation. Log them out to be safe.
+                            console.warn(`No Firestore document found for user ${currentUser.uid}. Logging out.`);
                             setUserData(null);
+                            logOut();
                         }
                         setLoading(false); 
                         clearTimeout(loadingTimeout);
                     },
                     (error) => {
                         console.error("Error fetching user data:", error);
-                        toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile." });
+                        toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile. Logging out." });
                         setUserData(null);
                         setLoading(false);
                         clearTimeout(loadingTimeout);
+                        logOut();
                     }
                 );
                 return () => unsubFromDoc(); 
@@ -140,10 +147,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
 
         return () => {
-            clearTimeout(loadingTimeout);
+            if (loadingTimeout) clearTimeout(loadingTimeout);
             unsubscribe();
         };
-    }, []); // Removed toast and logOut from dependencies to prevent re-running
+    }, []);
 
      useEffect(() => {
         if (loading) return;
@@ -212,12 +219,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             if (referralCode) {
                 try {
-                    batch.update(userDocRef, { usedReferralCode: referralCode });
                     const q = query(collection(db, "users"), where("referralCode", "==", referralCode));
                     const querySnapshot = await getDocs(q);
                     if (!querySnapshot.empty) {
                         const referrerDoc = querySnapshot.docs[0];
-                        batch.update(userDocRef, { referredBy: referrerDoc.id });
+                        batch.update(userDocRef, { 
+                            usedReferralCode: referralCode,
+                            referredBy: referrerDoc.id 
+                        });
                         
                         const referralSubcollectionRef = doc(collection(db, `users/${referrerDoc.id}/referrals`));
                          batch.set(referralSubcollectionRef, {
