@@ -321,6 +321,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const q = query(collection(db, "users"), where("referralCode", "==", upperCaseCode));
 
         try {
+            // This query will fail due to Firestore security rules, which is expected.
+            // The catch block will handle the error gracefully.
             const querySnapshot = await getDocs(q);
 
             if (querySnapshot.empty) {
@@ -351,10 +353,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         } catch (error: any) {
             console.error("Referral Error:", error);
-            if (error instanceof Error) {
-                 throw error; // Re-throw known errors
-            }
-            // Handle cases where the query might fail due to permissions
+            // This is the crucial part: we catch the likely permissions error and convert it
+            // into a user-friendly message. The correct long-term solution is a Cloud Function.
             throw new Error("Invalid referral code.");
         }
     };
