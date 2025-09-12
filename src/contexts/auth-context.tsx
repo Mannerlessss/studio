@@ -51,7 +51,7 @@ interface AuthContextType {
   redeemReferralCode: (code: string) => Promise<void>;
   updateUserPhone: (phone: string) => Promise<void>;
   updateUserName: (name: string) => Promise<void>;
-  claimDailyBonus: (amount: number) => Promise<void>;
+  claimDailyBonus: (amount: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
 }
 
@@ -68,8 +68,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const logOut = async () => {
         setLoading(true);
-        await signOut(auth);
-        // State will be cleared by onAuthStateChanged listener
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.error("Error signing out: ", error);
+        } finally {
+            setUser(null);
+            setUserData(null);
+            setIsAdmin(false);
+            setLoading(false);
+            router.push('/login');
+        }
     };
 
     useEffect(() => {
@@ -202,22 +211,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
             if (referralCode) {
-                 batch.update(userDocRef, { usedReferralCode: referralCode });
-                 const q = query(collection(db, "users"), where("referralCode", "==", referralCode));
-                 const querySnapshot = await getDocs(q);
-                 if (!querySnapshot.empty) {
-                     const referrerDoc = querySnapshot.docs[0];
-                     batch.update(userDocRef, { referredBy: referrerDoc.id });
-                     
-                     const referralSubcollectionRef = doc(collection(db, `users/${referrerDoc.id}/referrals`));
-                      batch.set(referralSubcollectionRef, {
-                         userId: newUser.uid,
-                         name: name,
-                         email: email,
-                         hasInvested: false,
-                         date: serverTimestamp()
-                     });
-                 }
+                try {
+                    batch.update(userDocRef, { usedReferralCode: referralCode });
+                    const q = query(collection(db, "users"), where("referralCode", "==", referralCode));
+                    const querySnapshot = await getDocs(q);
+                    if (!querySnapshot.empty) {
+                        const referrerDoc = querySnapshot.docs[0];
+                        batch.update(userDocRef, { referredBy: referrerDoc.id });
+                        
+                        const referralSubcollectionRef = doc(collection(db, `users/${referrerDoc.id}/referrals`));
+                         batch.set(referralSubcollectionRef, {
+                            userId: newUser.uid,
+                            name: name,
+                            email: email,
+                            hasInvested: false,
+                            date: serverTimestamp()
+                        });
+                    } else {
+                         console.warn(`Referral code "${referralCode}" not found.`);
+                    }
+                } catch (referralError) {
+                    console.error("Error processing referral code, but user will still be created:", referralError);
+                }
             }
             await batch.commit();
 
@@ -382,3 +397,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
