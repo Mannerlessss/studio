@@ -241,9 +241,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const newUser = userCredential.user;
 
-            const userDocRef = doc(db, 'users', newUser.uid);
+            const referralCode = `${name.split(' ')[0].toUpperCase()}${(Math.random() * 9000 + 1000).toFixed(0)}`;
             
-            // Step 1: Create the essential user document first.
+            // Use a batch to write to both collections atomically
+            const batch = writeBatch(db);
+
+            // 1. Create the user document in 'users' collection
+            const userDocRef = doc(db, 'users', newUser.uid);
             const newUserDoc = {
                 uid: newUser.uid,
                 name,
@@ -258,12 +262,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 investmentEarnings: 0,
                 hasInvested: false,
                 hasCollectedSignupBonus: false,
-                referralCode: `${name.split(' ')[0].toUpperCase()}${(Math.random() * 9000 + 1000).toFixed(0)}`,
+                referralCode: referralCode,
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
                 claimedMilestones: [],
             };
-            await setDoc(userDocRef, newUserDoc);
+            batch.set(userDocRef, newUserDoc);
+
+            // 2. Create the code lookup document in 'referralCodes' collection
+            const referralCodeRef = doc(db, 'referralCodes', referralCode);
+            batch.set(referralCodeRef, { uid: newUser.uid });
+
+            await batch.commit();
 
         } catch (error: any) {
              toast({
@@ -321,18 +331,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw new Error("You cannot use your own referral code.");
         }
         
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("referralCode", "==", formattedCode));
-
         try {
-            const querySnapshot = await getDocs(q);
+            // Securely look up the code in the 'referralCodes' collection
+            const referralCodeRef = doc(db, "referralCodes", formattedCode);
+            const referralCodeDoc = await getDoc(referralCodeRef);
 
-            if (querySnapshot.empty) {
+            if (!referralCodeDoc.exists()) {
                 throw new Error("Invalid referral code.");
             }
             
-            const referrerDoc = querySnapshot.docs[0];
-            const referrerId = referrerDoc.id;
+            const referrerId = referralCodeDoc.data().uid;
             
             const batch = writeBatch(db);
             const userDocRef = doc(db, 'users', user.uid);
@@ -342,6 +350,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 referredBy: referrerId
             });
 
+            // Create a doc in the referrer's 'referrals' subcollection
             const referralSubcollectionRef = doc(collection(db, `users/${referrerId}/referrals`));
             batch.set(referralSubcollectionRef, {
                 userId: user.uid,
@@ -360,10 +369,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             console.error("Attempted Code:", formattedCode);
             console.error("Full Error Object:", error);
             console.error("--- END DEBUG ---");
-
-            if (error.code === 'permission-denied') {
-                 throw new Error("Invalid referral code. The query was blocked by security rules.");
-            }
             throw new Error(error.message || "Invalid referral code.");
         }
     };
