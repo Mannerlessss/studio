@@ -65,7 +65,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const pathname = usePathname();
     const { toast } = useToast();
 
+    const logOut = async () => {
+        setLoading(true);
+        await signOut(auth);
+        // State will be cleared by onAuthStateChanged listener
+    };
+
     useEffect(() => {
+        const loadingTimeout = setTimeout(() => {
+            if (loading) {
+                console.warn("Auth loading timed out after 30 seconds. Logging out.");
+                toast({
+                    variant: 'destructive',
+                    title: 'Loading Timeout',
+                    description: 'Could not connect to the server. Please try again.',
+                });
+                logOut();
+            }
+        }, 30000); // 30 seconds
+
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 const idTokenResult = await currentUser.getIdTokenResult();
@@ -84,16 +102,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             if (docSnap.exists()) {
                                 setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
                             } else {
-                                // Handles case where user is auth'd but doc isn't created yet (e.g., during signup).
                                 setUserData(null);
                             }
-                            setLoading(false); // Always stop loading after attempt.
+                            setLoading(false); 
                         },
                         (error) => {
                             console.error("Error fetching user data:", error);
                             toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile." });
                             setUserData(null);
-                            setLoading(false); // Stop loading on error too.
+                            setLoading(false);
                         }
                     );
                     return () => unsubFromDoc(); 
@@ -106,7 +123,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
-        return () => unsubscribe();
+        return () => {
+            clearTimeout(loadingTimeout);
+            unsubscribe();
+        };
     }, [toast]);
 
      useEffect(() => {
@@ -207,11 +227,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
             setLoading(false);
         }
-    };
-
-    const logOut = async () => {
-        setLoading(true);
-        await signOut(auth);
     };
 
     const sendPasswordReset = async (email: string) => {
@@ -346,3 +361,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
