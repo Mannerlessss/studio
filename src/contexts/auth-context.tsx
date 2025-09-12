@@ -161,12 +161,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         let unsubFromDoc: (() => void) | undefined;
+        let authTimeout: NodeJS.Timeout;
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            clearTimeout(authTimeout); // Clear timeout if auth state changes
             if (unsubFromDoc) unsubFromDoc();
             
             if (currentUser) {
-                setLoading(true);
                 const idTokenResult = await currentUser.getIdTokenResult();
                 const userIsAdmin = !!idTokenResult.claims.admin;
                 
@@ -203,9 +204,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(false);
         });
 
+        // Set a timeout to force loading to false if auth takes too long
+        authTimeout = setTimeout(() => {
+            if (loading) {
+                console.warn("Auth state change timed out after 10 seconds. Forcing loading to false.");
+                setLoading(false);
+            }
+        }, 10000); // 10 seconds
+
         return () => {
             if (unsubFromDoc) unsubFromDoc();
             unsubscribe();
+            clearTimeout(authTimeout);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
