@@ -1,44 +1,31 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check for admin role
-    function isAdmin() {
-      return request.auth.token.admin == true;
-    }
 
-    // Helper function to check if the user is the owner of the document
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    // Default Deny: No one can access anything unless explicitly allowed.
+    // Admins have full access to everything. This rule is checked first.
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if request.auth != null && request.auth.token.admin == true;
     }
 
-    // Admins have god-mode access to everything
-    match /{document=**} {
-      allow read, write: if isAdmin();
-    }
-    
     // Rules for the 'users' collection
     match /users/{userId} {
-      allow get, update, delete: if isOwner(userId);
+      // A user can create their own document on signup.
       allow create: if request.auth != null;
+      // A user can only get, update, or delete their own document.
+      allow get, update, delete: if request.auth != null && request.auth.uid == userId;
+      // Any authenticated user can query/list the users collection (needed for referral code checks).
       allow list: if request.auth != null;
     }
 
     // Rules for all subcollections within a user's document
-    match /users/{userId}/{subcollection}/{docId} {
-        allow read, write, create, delete: if isOwner(userId);
+    match /users/{userId}/{collection}/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
+
     // Rules for the 'offers' collection
     match /offers/{offerId} {
-      allow read: if request.auth != null;
-      // Write access for offers is handled by admin rule
+        // Any authenticated user can read offers.
+        allow read: if request.auth != null;
     }
   }
 }
