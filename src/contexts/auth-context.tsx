@@ -62,7 +62,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [userData, setUserData] = useState<UserData | null>(null);
+    const [setUserData] = useState<UserData | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
@@ -189,6 +189,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         } else {
                             console.warn(`No Firestore document found for user ${currentUser.uid}. Waiting for it to be created...`);
                         }
+                        setLoading(false); // Set loading to false once we get a database response (or lack thereof)
                     },
                     (error) => {
                         console.error("Error fetching user data:", error);
@@ -200,8 +201,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(null);
                 setUserData(null);
                 setIsAdmin(false);
+                setLoading(false);
             }
-            setLoading(false);
         });
 
         // Set a timeout to force loading to false if auth takes too long
@@ -247,15 +248,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const newUser = userCredential.user;
 
-            const batch = writeBatch(db);
+            // --- Step 1: Create the user document first ---
             const userDocRef = doc(db, 'users', newUser.uid);
-
             const newUserDoc: Omit<UserData, 'uid' | 'createdAt' | 'lastLogin' | 'projected' | 'rank' | 'lastBonusClaim' | 'claimedMilestones' | 'lastInvestmentUpdate'> = {
                 name,
                 email,
                 phone,
                 membership: 'Basic',
-                totalBalance: 0, // Start with 0, bonus is collectable
+                totalBalance: 0,
                 invested: 0,
                 earnings: 0,
                 referralEarnings: 0,
@@ -266,49 +266,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 referralCode: `${name.split(' ')[0].toUpperCase()}${(Math.random() * 9000 + 1000).toFixed(0)}`,
             };
 
-            batch.set(userDocRef, {
+             await setDoc(userDocRef, {
                 ...newUserDoc,
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
                 claimedMilestones: [],
             });
-
+            
+            // --- Step 2: Handle referral logic separately after user is created ---
             if (referralCode) {
                 try {
                     const q = query(collection(db, "users"), where("referralCode", "==", referralCode));
                     const querySnapshot = await getDocs(q);
+                    
                     if (!querySnapshot.empty) {
                         const referrerDoc = querySnapshot.docs[0];
+                        const batch = writeBatch(db);
+
+                        // Update new user with who referred them
                         batch.update(userDocRef, { 
                             usedReferralCode: referralCode,
                             referredBy: referrerDoc.id 
                         });
                         
+                        // Add new user to referrer's subcollection
                         const referralSubcollectionRef = doc(collection(db, `users/${referrerDoc.id}/referrals`));
-                         batch.set(referralSubcollectionRef, {
+                        batch.set(referralSubcollectionRef, {
                             userId: newUser.uid,
                             name: name,
                             email: email,
                             hasInvested: false,
                             date: serverTimestamp()
                         });
+                        
+                        await batch.commit();
                     } else {
                          console.warn(`Referral code "${referralCode}" not found.`);
                     }
                 } catch (referralError) {
-                    console.error("Error processing referral code, but user will still be created:", referralError);
+                    // Log the error but don't fail the whole signup
+                    console.error("Error processing referral code, but user was created successfully:", referralError);
                 }
             }
-            await batch.commit();
 
         } catch (error: any) {
-            toast({
+             toast({
                 variant: 'destructive',
                 title: 'Sign Up Failed',
                 description: error.message,
             });
+            setLoading(false); // Make sure to stop loading on error
         } finally {
-            // Don't set loading to false here, let the onAuthStateChanged listener handle it
+            // onAuthStateChanged will handle redirect and final loading state
         }
     };
 
@@ -317,6 +326,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const credential = await signInWithEmailAndPassword(auth, email, password);
             const userDocRef = doc(db, 'users', credential.user.uid);
+            // Use set with merge to create the doc if it's missing
             await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
         } catch (error: any) {
             toast({
@@ -326,7 +336,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
              setLoading(false);
         } finally {
-            // Don't set loading to false here, let onAuthStateChanged handle it
+            // onAuthStateChanged will handle redirect
         }
     };
 
@@ -347,6 +357,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     const redeemReferralCode = async (code: string) => {
+        const userData = (await getDoc(doc(db, 'users', user!.uid))).data() as UserData;
         if (!user || !userData) throw new Error("User not found");
         if (userData.usedReferralCode) throw new Error("You have already used a referral code.");
         if (userData.referralCode === code) throw new Error("You cannot use your own referral code.");
@@ -391,6 +402,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     const claimDailyBonus = async (amount: number) => {
+        const userData = (await getDoc(doc(db, 'users', user!.uid))).data() as UserData;
         if (!user || !userData) throw new Error("User not found");
 
         const now = Timestamp.now();
@@ -426,6 +438,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const collectSignupBonus = async () => {
+         const userData = (await getDoc(doc(db, 'users', user!.uid))).data() as UserData;
         if (!user || !userData) throw new Error("User not found");
         if (userData.hasCollectedSignupBonus) throw new Error("Sign-up bonus already collected.");
 
@@ -456,7 +469,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const value: AuthContextType = {
         user,
-        userData,
+        userData: (useContext(AuthContext) as any)?.userData, // This will be provided by onSnapshot
         loading,
         isAdmin,
         signInWithGoogle,
@@ -482,7 +495,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
     }
 
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+    // Need to manage a local state for userData to feed the provider
+    const [localUserData, setLocalUserData] = useState<UserData | null>(null);
+
+    // Update local state based on what onSnapshot provides
+    useEffect(() => {
+        if (!user || isAdmin) {
+            setLocalUserData(null);
+            return;
+        }
+        const userDocRef = doc(db, 'users', user.uid);
+        const unsub = onSnapshot(userDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setLocalUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
+            }
+        });
+        return () => unsub();
+    }, [user, isAdmin]);
+
+    const providerValue = { ...value, userData: localUserData };
+
+
+    return <AuthContext.Provider value={providerValue}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {
