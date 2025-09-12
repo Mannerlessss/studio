@@ -96,6 +96,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     // This is a race condition guard. If the doc doesn't exist,
                     // the onSnapshot listener further down will handle it.
                     // We just need to not crash here.
+                    console.warn("processDailyEarnings: User document not found, skipping transaction.");
                     return;
                 }
                 
@@ -152,9 +153,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                  console.log(`Processed ${daysToActuallyProcess} day(s) of investment earnings.`);
             });
         } catch (error) {
-            // This error is expected if the document doesn't exist yet, so we can console.warn or ignore.
-             if (String(error).includes("Document does not exist")) {
-                console.warn("processDailyEarnings: User document not found, skipping. This is expected during signup race conditions.");
+             if (String(error).includes("document does not exist")) {
+                console.warn("processDailyEarnings transaction failed because user document doesn't exist. This is expected during signup race conditions.");
             } else {
                 console.error("Error processing daily earnings: ", error);
             }
@@ -184,17 +184,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     return;
                 }
                 
-                await processDailyEarnings(currentUser.uid);
-
                 const userDocRef = doc(db, 'users', currentUser.uid);
                 unsubFromDoc = onSnapshot(userDocRef, 
-                    (docSnap) => {
+                    async (docSnap) => {
                         if (docSnap.exists()) {
+                            await processDailyEarnings(currentUser.uid);
                             setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
                         } else {
-                            // This might happen in a race condition during signup.
-                            // We don't log out here, because the user might just have been created.
-                            // Instead, we wait to see if the doc appears. If not, login logic should handle it.
                             console.warn(`No Firestore document found for user ${currentUser.uid}. Waiting for it to be created...`);
                         }
                         setLoading(false); 
@@ -328,7 +324,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const idTokenResult = await credential.user.getIdTokenResult();
             if (!idTokenResult.claims.admin) {
                 const userDocRef = doc(db, 'users', credential.user.uid);
-                // Use set with merge to create doc if it doesn't exist, or update it if it does.
                 await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
             }
         } catch (error: any) {
