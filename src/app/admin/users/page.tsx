@@ -120,7 +120,6 @@ export default function UsersPage() {
             batch.update(userDocRef, { 
                 invested: newInvestedAmount,
                 projected: newProjectedAmount,
-                // Reset investment earnings only if they are investing for the first time.
                 investmentEarnings: user.hasInvested ? (user.investmentEarnings || 0) : 0, 
                 lastInvestmentUpdate: serverTimestamp(),
             });
