@@ -162,41 +162,6 @@ const SettingsPage: NextPage = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-accent">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <Gift className="w-6 h-6 text-accent" />
-              <CardTitle>Used a Referral Code?</CardTitle>
-            </div>
-            <CardDescription>
-              {userData?.usedReferralCode 
-                ? "You have already redeemed a friend's referral code." 
-                : "If a friend referred you, enter their code here to link your accounts."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="offer-code">Friend's Referral Code</Label>
-              <div className="flex gap-2">
-                <Input 
-                  id="offer-code" 
-                  placeholder={userData?.usedReferralCode || "FRIENDSCODE"} 
-                  value={referralCodeInput}
-                  onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
-                  disabled={!!userData?.usedReferralCode || isRedeeming}
-                />
-                <Button 
-                  variant="secondary"
-                  onClick={handleRedeem}
-                  disabled={!!userData?.usedReferralCode || isRedeeming || !referralCodeInput}
-                >
-                  {isRedeeming ? <Loader2 className="animate-spin"/> : 'Redeem'}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
