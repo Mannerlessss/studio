@@ -47,7 +47,6 @@ export const ActiveInvestmentsCard: FC = () => {
       </CardHeader>
       <CardContent>
           <div className="p-4 rounded-lg bg-muted/50 border relative">
-                <Badge className="absolute -top-3 right-4 bg-blue-500 text-white">{dailyReturnRate * 100}% Daily</Badge>
                 <div className="grid grid-cols-2 gap-y-4">
                     <div>
                         <p className="text-2xl font-bold text-primary">₹{investedAmount.toLocaleString()}</p>
@@ -57,17 +56,21 @@ export const ActiveInvestmentsCard: FC = () => {
                         <p className="text-2xl font-bold text-green-500">₹{totalEarned.toLocaleString()}</p>
                         <p className="text-sm text-muted-foreground">Total Earned</p>
                     </div>
+                </div>
 
-                    <div className="col-span-2 space-y-2">
-                        <div className="flex justify-between items-center text-sm">
-                            <p>Progress</p>
-                            <p>{progress.toFixed(1)}%</p>
-                        </div>
-                        <Progress value={progress} />
-                         <div className="flex justify-between items-center text-xs text-muted-foreground">
-                            <p>Day {daysElapsed} of 30</p>
-                            <p>Daily: ₹{dailyEarning.toLocaleString()}</p>
-                        </div>
+                <div className="absolute top-4 left-1/2 -translate-x-1/2">
+                    <Badge className="bg-blue-500 text-white shadow-lg">{dailyReturnRate * 100}% Daily</Badge>
+                </div>
+
+                <div className="mt-4 col-span-2 space-y-2">
+                    <div className="flex justify-between items-center text-sm">
+                        <p>Progress</p>
+                        <p>{progress.toFixed(1)}%</p>
+                    </div>
+                    <Progress value={progress} />
+                        <div className="flex justify-between items-center text-xs text-muted-foreground">
+                        <p>Day {daysElapsed} of 30</p>
+                        <p>Daily: ₹{dailyEarning.toLocaleString()}</p>
                     </div>
                 </div>
           </div>
