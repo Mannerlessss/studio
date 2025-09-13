@@ -99,15 +99,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Function to process earnings for all active investments for a user
     const processInvestmentEarnings = async (currentUserId: string) => {
         try {
-            const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
-            const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
-            const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
+             await runTransaction(db, async (transaction) => {
+                const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
+                const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
+                const activeInvestmentsSnapshot = await transaction.get(activeInvestmentsQuery);
 
-            if (activeInvestmentsSnapshot.empty) {
-                return; // No active investments to process
-            }
+                if (activeInvestmentsSnapshot.empty) {
+                    return; // No active investments to process
+                }
 
-            await runTransaction(db, async (transaction) => {
                 const userDocRef = doc(db, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
 
@@ -496,5 +496,7 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
 
     
