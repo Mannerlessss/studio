@@ -12,7 +12,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-// Genkit's firebase plugin initializes the app, so we just need to get the instance.
+// The Genkit Firebase plugin initializes the admin app, so we can just get the firestore instance.
 const db = getFirestore();
 
 export const RedeemReferralInputSchema = z.object({
