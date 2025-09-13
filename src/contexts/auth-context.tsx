@@ -515,6 +515,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw new Error('You have already redeemed this offer code.');
         }
 
+        let rewardAmount = 0;
+
         await runTransaction(db, async (transaction) => {
             const offerQuery = query(collection(db, 'offers'), where('code', '==', code));
             const offerSnapshot = await getDocs(offerQuery);
@@ -526,6 +528,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const offerDoc = offerSnapshot.docs[0];
             const offerData = offerDoc.data();
             const offerRef = offerDoc.ref;
+            rewardAmount = offerData.rewardAmount; // Capture reward amount
 
             // Check if expired by date
             if (offerData.expiresAt && offerData.expiresAt.toMillis() < Date.now()) {
@@ -541,9 +544,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             // Give reward to user
             transaction.update(userRef, {
-                totalBalance: increment(offerData.rewardAmount),
-                totalBonusEarnings: increment(offerData.rewardAmount),
-                totalEarnings: increment(offerData.rewardAmount),
+                totalBalance: increment(rewardAmount),
+                totalBonusEarnings: increment(rewardAmount),
+                totalEarnings: increment(rewardAmount),
                 redeemedOfferCodes: arrayUnion(code),
             });
 
@@ -556,7 +559,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const userTransactionRef = doc(collection(db, `users/${user.uid}/transactions`));
             transaction.set(userTransactionRef, {
                  type: 'bonus',
-                 amount: offerData.rewardAmount,
+                 amount: rewardAmount,
                  description: `Redeemed offer code: ${code}`,
                  status: 'Completed',
                  date: serverTimestamp(),
@@ -565,7 +568,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         toast({
             title: 'Code Redeemed!',
-            description: `You have successfully received ${offerData.rewardAmount} Rs.`,
+            description: `You have successfully received ${rewardAmount} Rs.`,
         });
     };
 
@@ -608,3 +611,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
