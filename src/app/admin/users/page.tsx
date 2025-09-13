@@ -37,12 +37,12 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2 } from 'lucide-react';
+import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, getDocs, updateDoc, writeBatch, serverTimestamp, query, where, addDoc, increment, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, updateDoc, writeBatch, serverTimestamp, query, where, addDoc, increment, Timestamp, deleteDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     Select,
@@ -99,6 +99,26 @@ export default function UsersPage() {
 
         fetchUsers();
     }, [toast]);
+
+    const handleDeleteUser = async (userId: string) => {
+        setIsSubmitting(userId);
+        try {
+            await deleteDoc(doc(db, 'users', userId));
+            toast({
+                title: 'User Deleted',
+                description: 'The user\'s data has been removed from Firestore.',
+            });
+            setUsers(prevUsers => prevUsers.filter(u => u.id !== userId));
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Deletion Failed',
+                description: error.message,
+            });
+        } finally {
+            setIsSubmitting(null);
+        }
+    };
 
     const handleCredit = async (user: User) => {
         setIsSubmitting(user.id);
@@ -359,6 +379,28 @@ export default function UsersPage() {
                                 <Crown className='w-4 h-4 mr-1' /> Upgrade
                             </Button>
                         )}
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" disabled={!!isSubmitting}>
+                                    <Trash2 className='w-4 h-4 mr-1' /> Delete
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete User: {user.name}?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This action cannot be undone. This will permanently delete the user's data from Firestore, but it will NOT delete their authentication account. Are you sure?
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel disabled={!!isSubmitting}>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteUser(user.id)} disabled={isSubmitting === user.id}>
+                                         {isSubmitting === user.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Yes, delete data
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                     </div>
                 </TableCell>
               </TableRow>
