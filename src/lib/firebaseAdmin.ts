@@ -7,6 +7,7 @@ export function getFirebaseAdmin() {
     try {
       admin.initializeApp({
         // The SDK will automatically pick up credentials from the environment.
+        // In a deployed environment, this is handled automatically.
         // In a local environment, it will look for the GOOGLE_APPLICATION_CREDENTIALS
         // environment variable pointing to the serviceAccountKey.json file.
       });
