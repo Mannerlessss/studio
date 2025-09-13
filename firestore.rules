@@ -2,26 +2,34 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Users can only read/write their own data.
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Allow users to create a referral document for another user.
+      match /referrals/{referralId} {
+        allow create: if request.auth != null;
+      }
+    }
+    
+    // Referral codes are public for validation purposes.
+    match /referralCodes/{code} {
       allow read: if request.auth != null;
     }
 
-    match /users/{referrerId}/referrals/{referralId} {
-      allow create: if request.auth != null;
-    }
-
+    // Offers are public for all to see.
     match /offers/{offerId} {
       allow read: if true;
-      allow write: if false; // Admin only
     }
 
-    match /withdrawals/{withdrawalId} {
-        allow read, write: if false; // Can only be accessed via subcollections
-    }
-
-    match /transactions/{transactionId} {
-        allow read, write: if false; // Can only be accessed via subcollections
+    // Admins can access all data (useful for a back-office app).
+    // Note: This rule is broad. For production, you'd want more granular admin rules.
+    // However, this approach is fine for admin panels that have trusted users.
+    match /{document=**} {
+      allow read, write: if request.auth != null && request.auth.token.admin == true;
     }
   }
 }
+
+    

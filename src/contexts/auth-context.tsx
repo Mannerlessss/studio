@@ -243,6 +243,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             const referralCode = `${name.split(' ')[0].toUpperCase()}${(Math.random() * 9000 + 1000).toFixed(0)}`;
             
+            const batch = writeBatch(db);
+            
+            // 1. Create user document
             const userDocRef = doc(db, 'users', newUser.uid);
             const newUserDoc = {
                 uid: newUser.uid,
@@ -263,7 +266,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 lastLogin: serverTimestamp(),
                 claimedMilestones: [],
             };
-            await setDoc(userDocRef, newUserDoc);
+            batch.set(userDocRef, newUserDoc);
+            
+            // 2. Create public referral code mapping
+            const referralCodeRef = doc(db, "referralCodes", referralCode);
+            batch.set(referralCodeRef, { uid: newUser.uid });
+
+            await batch.commit();
 
         } catch (error: any) {
              toast({
@@ -271,10 +280,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Sign Up Failed',
                 description: error.message,
             });
-            // Do not set loading to false here, as the onAuthStateChanged will handle it.
-        } finally {
-            // No matter what, stop loading. If successful, onAuthStateChanged will take over.
-            // If failed, user needs to be able to try again.
             setLoading(false);
         }
     };
@@ -322,18 +327,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         try {
-            const usersRef = collection(db, "users");
-            const q = query(usersRef, where("referralCode", "==", formattedCode));
-            
-            const querySnapshot = await getDocs(q);
+            const referralCodeRef = doc(db, "referralCodes", formattedCode);
+            const referralCodeSnap = await getDoc(referralCodeRef);
 
-            if (querySnapshot.empty) {
+            if (!referralCodeSnap.exists()) {
                 throw new Error("Invalid referral code.");
             }
             
-            const referrerDoc = querySnapshot.docs[0];
-            const referrerId = referrerDoc.id;
+            const referrerId = referralCodeSnap.data().uid;
             
+            if(referrerId === user.uid) {
+                throw new Error("You cannot use your own referral code.");
+            }
+
             const batch = writeBatch(db);
             const userDocRef = doc(db, 'users', user.uid);
 
@@ -356,7 +362,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         } catch (error: any) {
             console.error(error); // Log the actual error for debugging
-            throw new Error("This referral code is not valid.");
+            throw new Error(error.message || "This referral code is not valid.");
         }
     };
     
@@ -472,3 +478,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
