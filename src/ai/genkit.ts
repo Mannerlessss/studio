@@ -7,7 +7,7 @@
  * for all Genkit-related operations, such as defining flows, prompts, and tools.
  */
 import { genkit } from 'genkit';
-import { firebase } from '@genkit-ai/firebase/v1';
+import { firebase } from '@genkit-ai/firebase';
 import { googleAI } from '@genkit-ai/googleai';
 
 // Initialize Genkit with the Google AI and Firebase plugins.
