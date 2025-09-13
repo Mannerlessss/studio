@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     AlertDialog,
   AlertDialogAction,
@@ -10,7 +10,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import {
     Dialog,
@@ -19,8 +18,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
-    DialogClose
 } from "@/components/ui/dialog"
 import {
   Card,
@@ -39,7 +36,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2 } from 'lucide-react';
+import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2, ArrowUpDown, Search } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -53,6 +50,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+
+type UserSortableKeys = 'name' | 'email' | 'membership';
 
 interface User {
     id: string;
@@ -83,6 +82,10 @@ export default function UsersPage() {
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [creditAmount, setCreditAmount] = useState('100'); // Default to the smallest plan
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortKey, setSortKey] = useState<UserSortableKeys>('name');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
 
     useEffect(() => {
         const fetchUsers = async () => {
@@ -101,7 +104,30 @@ export default function UsersPage() {
 
         fetchUsers();
     }, [toast]);
+    
+    const filteredAndSortedUsers = useMemo(() => {
+        return users
+            .filter(user =>
+                user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                user.email.toLowerCase().includes(searchTerm.toLowerCase())
+            )
+            .sort((a, b) => {
+                const aValue = a[sortKey] || '';
+                const bValue = b[sortKey] || '';
+                if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+                if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+    }, [users, searchTerm, sortKey, sortDirection]);
 
+    const handleSort = (key: UserSortableKeys) => {
+        if (sortKey === key) {
+            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(key);
+            setSortDirection('asc');
+        }
+    };
 
     const handleDeleteUser = async (userId: string) => {
         setIsSubmitting(userId);
@@ -226,15 +252,16 @@ export default function UsersPage() {
                             });
                         }
                     }
-
+                    
                     // Upsert the referred user in the referrer's subcollection
                     const referrerReferralsRef = collection(db, 'users', user.referredBy, 'referrals');
                     const q = query(referrerReferralsRef, where("userId", "==", user.id));
                     const referredUserDocs = await getDocs(q);
                     
                     if (referredUserDocs.empty) {
-                        // User not in subcollection, add them
-                         await addDoc(referrerReferralsRef, {
+                         // Add them if they don't exist
+                        const newReferralSubDocRef = doc(referrerReferralsRef);
+                        batch.set(newReferralSubDocRef, {
                             userId: user.id,
                             name: user.name,
                             email: user.email,
@@ -296,21 +323,43 @@ export default function UsersPage() {
   return (
     <>
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
             <CardTitle>Users</CardTitle>
             <CardDescription>
               Manage users and credit their investments.
             </CardDescription>
         </div>
+         <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+                type="search"
+                placeholder="Search by name or email..."
+                className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Membership</TableHead>
+              <TableHead>
+                 <Button variant="ghost" onClick={() => handleSort('name')}>
+                    Name <ArrowUpDown className="ml-2 h-4 w-4" />
+                 </Button>
+              </TableHead>
+              <TableHead>
+                 <Button variant="ghost" onClick={() => handleSort('email')}>
+                    Email <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+              </TableHead>
+              <TableHead>
+                 <Button variant="ghost" onClick={() => handleSort('membership')}>
+                    Membership <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+              </TableHead>
               <TableHead className='text-right'>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -324,7 +373,7 @@ export default function UsersPage() {
                         <TableCell className="text-right"><Skeleton className="h-8 w-48" /></TableCell>
                     </TableRow>
                 ))
-            ) : users.map((user) => (
+            ) : filteredAndSortedUsers.map((user) => (
               <TableRow key={user.id}>
                 <TableCell className="font-medium">{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>
@@ -410,7 +459,7 @@ export default function UsersPage() {
                 </TableCell>
               </TableRow>
             ))}
-             {!loading && users.length === 0 && (
+             {!loading && filteredAndSortedUsers.length === 0 && (
                 <TableRow>
                     <TableCell colSpan={4} className="h-24 text-center">
                         No users found.

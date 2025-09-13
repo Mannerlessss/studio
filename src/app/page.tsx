@@ -19,7 +19,7 @@ import { CollectBonusCard } from '@/components/vaultboost/collect-bonus-card';
 
 
 const Dashboard: NextPage = () => {
-  const { userData, loading, claimDailyBonus } = useAuth();
+  const { userData, loading, claimDailyBonus, totalROI } = useAuth();
 
   if (loading || !userData) {
       return (
@@ -36,13 +36,6 @@ const Dashboard: NextPage = () => {
     claimDailyBonus(amount);
   };
   
-  const totalInvestedInActivePlans = userData.investments
-    ?.filter(inv => inv.status === 'active')
-    .reduce((acc, inv) => acc + inv.planAmount, 0) || 0;
-
-  const totalROI = totalInvestedInActivePlans * 3; // 300% ROI
-
-
   return (
     <div className="bg-background min-h-full">
       <Header />

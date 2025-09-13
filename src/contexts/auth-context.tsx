@@ -1,6 +1,6 @@
 
 'use client';
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
 import { 
     User, 
     onAuthStateChanged,
@@ -61,6 +61,7 @@ interface AuthContextType {
   userData: UserData | null;
   loading: boolean;
   isAdmin: boolean;
+  totalROI: number;
   signInWithGoogle: () => Promise<void>;
   signUpWithEmail: (details: any) => Promise<void>;
   signInWithEmail: (details: any) => Promise<void>;
@@ -83,6 +84,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const router = useRouter();
     const pathname = usePathname();
     const { toast } = useToast();
+
+    const totalROI = useMemo(() => {
+        if (!userData || !userData.investments) return 0;
+        const totalInvestedInActivePlans = userData.investments
+            .filter(inv => inv.status === 'active')
+            .reduce((acc, inv) => acc + inv.planAmount, 0);
+        return totalInvestedInActivePlans * 3; // 300% ROI
+    }, [userData]);
+
 
     const logOut = async () => {
         setLoading(true);
@@ -564,6 +574,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         userData,
         loading,
         isAdmin,
+        totalROI,
         signInWithGoogle,
         signUpWithEmail,
         signInWithEmail,

@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Copy, PlusCircle, Trash2, Loader2 } from 'lucide-react';
+import { Copy, PlusCircle, Trash2, Loader2, ArrowUpDown, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -45,6 +45,8 @@ import { db } from '@/lib/firebase';
 import { addDoc, collection, deleteDoc, doc, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
+type OfferSortableKeys = 'code' | 'rewardAmount' | 'usageCount' | 'createdAt';
+
 interface Offer {
     id: string;
     code: string;
@@ -60,6 +62,9 @@ export default function OffersPage() {
     const [offers, setOffers] = useState<Offer[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortKey, setSortKey] = useState<OfferSortableKeys>('createdAt');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
     // Form state
     const [newCode, setNewCode] = useState('');
@@ -73,7 +78,6 @@ export default function OffersPage() {
             try {
                 const offersSnapshot = await getDocs(collection(db, 'offers'));
                 const offersData: Offer[] = offersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Offer));
-                offersData.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
                 setOffers(offersData);
             } catch (error: any) {
                 console.error("Error fetching offers: ", error);
@@ -84,6 +88,35 @@ export default function OffersPage() {
         };
         fetchOffers();
     }, [toast]);
+    
+    const handleSort = (key: OfferSortableKeys) => {
+        if (sortKey === key) {
+            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(key);
+            setSortDirection('asc');
+        }
+    };
+
+    const filteredAndSortedOffers = useMemo(() => {
+        return offers
+            .filter(offer => offer.code.toLowerCase().includes(searchTerm.toLowerCase()))
+            .sort((a, b) => {
+                let aValue, bValue;
+                 if (sortKey === 'createdAt') {
+                    aValue = a.createdAt?.toMillis() || 0;
+                    bValue = b.createdAt?.toMillis() || 0;
+                } else {
+                    aValue = a[sortKey] || 0;
+                    bValue = b[sortKey] || 0;
+                }
+
+                if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+                if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+    }, [offers, searchTerm, sortKey, sortDirection]);
+
 
     const handleCreateCode = async () => {
         setIsSubmitting(true);
@@ -129,7 +162,6 @@ export default function OffersPage() {
                 description: `New offer code "${newCode.toUpperCase()}" has been created.`,
             });
             
-            // This is a simplified version of adding to state. For a real app, you might re-fetch or use the server timestamp.
              const newOfferForState: Offer = {
                 id: docRef.id,
                 code: newOfferData.code,
@@ -242,20 +274,44 @@ export default function OffersPage() {
     </Card>
 
     <Card>
-      <CardHeader>
-        <CardTitle>Manage Offer Codes</CardTitle>
-        <CardDescription>
-          View, manage, and delete existing offer codes.
-        </CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+            <CardTitle>Manage Offer Codes</CardTitle>
+            <CardDescription>
+            View, manage, and delete existing offer codes.
+            </CardDescription>
+        </div>
+        <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+                type="search"
+                placeholder="Search by code..."
+                className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Code</TableHead>
-              <TableHead>Reward</TableHead>
+              <TableHead>
+                 <Button variant="ghost" onClick={() => handleSort('code')}>
+                    Code <ArrowUpDown className="ml-2 h-4 w-4" />
+                 </Button>
+              </TableHead>
+              <TableHead>
+                 <Button variant="ghost" onClick={() => handleSort('rewardAmount')}>
+                    Reward <ArrowUpDown className="ml-2 h-4 w-4" />
+                 </Button>
+              </TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Usage</TableHead>
+               <TableHead>
+                 <Button variant="ghost" onClick={() => handleSort('usageCount')}>
+                    Usage <ArrowUpDown className="ml-2 h-4 w-4" />
+                 </Button>
+              </TableHead>
               <TableHead className='text-right'>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -270,7 +326,7 @@ export default function OffersPage() {
                         <TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell>
                     </TableRow>
                 ))
-            ) : offers.map((offer) => {
+            ) : filteredAndSortedOffers.map((offer) => {
                 const status = getStatus(offer);
                 return (
               <TableRow key={offer.id}>
@@ -314,7 +370,7 @@ export default function OffersPage() {
                 </TableCell>
               </TableRow>
             )})}
-             {!loading && offers.length === 0 && (
+             {!loading && filteredAndSortedOffers.length === 0 && (
                 <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center">
                         No offer codes found.

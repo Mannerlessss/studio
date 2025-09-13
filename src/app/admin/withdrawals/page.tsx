@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -18,11 +18,14 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Search, ArrowUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, updateDoc, writeBatch, getDoc, collectionGroup, query } from 'firebase/firestore';
+import { collection, doc, getDocs, updateDoc, writeBatch, getDoc, collectionGroup, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+
+type WithdrawalSortableKeys = 'userName' | 'amount' | 'method' | 'date' | 'status';
 
 interface WithdrawalRequest {
   id: string; // Document ID of the withdrawal request
@@ -46,6 +49,10 @@ export default function WithdrawalsPage() {
     const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null); // Store ID of item being submitted
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortKey, setSortKey] = useState<WithdrawalSortableKeys>('date');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
 
     useEffect(() => {
         const fetchWithdrawals = async () => {
@@ -62,12 +69,6 @@ export default function WithdrawalsPage() {
                     } as WithdrawalRequest);
                 });
                 
-                requests.sort((a, b) => {
-                    if (a.status === 'Pending' && b.status !== 'Pending') return -1;
-                    if (a.status !== 'Pending' && b.status === 'Pending') return 1;
-                    return (b.date?.toMillis() || 0) - (a.date?.toMillis() || 0);
-                });
-
                 setWithdrawals(requests);
             } catch (error: any) {
                 console.error("Error fetching withdrawals: ", error);
@@ -79,6 +80,40 @@ export default function WithdrawalsPage() {
 
         fetchWithdrawals();
     }, [toast]);
+
+    const handleSort = (key: WithdrawalSortableKeys) => {
+        if (sortKey === key) {
+            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(key);
+            setSortDirection('asc');
+        }
+    };
+
+    const filteredAndSortedWithdrawals = useMemo(() => {
+        return withdrawals
+            .filter(w => w.userName.toLowerCase().includes(searchTerm.toLowerCase()))
+            .sort((a, b) => {
+                let aValue, bValue;
+                if (sortKey === 'date') {
+                    aValue = a.date?.toMillis() || 0;
+                    bValue = b.date?.toMillis() || 0;
+                } else if (sortKey === 'status') {
+                     // Custom sort for status: Pending > Approved > Rejected
+                    const statusOrder = { 'Pending': 0, 'Approved': 1, 'Rejected': 2 };
+                    aValue = statusOrder[a.status];
+                    bValue = statusOrder[b.status];
+                } 
+                else {
+                    aValue = a[sortKey];
+                    bValue = b[sortKey];
+                }
+
+                if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+                if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+    }, [withdrawals, searchTerm, sortKey, sortDirection]);
 
     const handleStatusChange = async (req: WithdrawalRequest, newStatus: 'Approved' | 'Rejected') => {
         setIsSubmitting(req.id);
@@ -139,23 +174,51 @@ export default function WithdrawalsPage() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Withdrawal Requests</CardTitle>
-        <CardDescription>
-          Approve or reject withdrawal requests from users.
-        </CardDescription>
+       <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+            <CardTitle>Withdrawal Requests</CardTitle>
+            <CardDescription>
+            Approve or reject withdrawal requests from users.
+            </CardDescription>
+        </div>
+         <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+                type="search"
+                placeholder="Search by user name..."
+                className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>User</TableHead>
-              <TableHead>Amount</TableHead>
+              <TableHead>
+                 <Button variant="ghost" onClick={() => handleSort('userName')}>
+                    User <ArrowUpDown className="ml-2 h-4 w-4" />
+                 </Button>
+              </TableHead>
+              <TableHead>
+                 <Button variant="ghost" onClick={() => handleSort('amount')}>
+                    Amount <ArrowUpDown className="ml-2 h-4 w-4" />
+                 </Button>
+              </TableHead>
               <TableHead>Method</TableHead>
               <TableHead>Details</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>
+                 <Button variant="ghost" onClick={() => handleSort('date')}>
+                    Date <ArrowUpDown className="ml-2 h-4 w-4" />
+                 </Button>
+              </TableHead>
+              <TableHead>
+                <Button variant="ghost" onClick={() => handleSort('status')}>
+                    Status <ArrowUpDown className="ml-2 h-4 w-4" />
+                 </Button>
+              </TableHead>
               <TableHead className='text-right min-w-[200px]'>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -172,7 +235,7 @@ export default function WithdrawalsPage() {
                         <TableCell className="text-right"><Skeleton className="h-8 w-48" /></TableCell>
                     </TableRow>
                 ))
-            ) : withdrawals.map((withdrawal) => (
+            ) : filteredAndSortedWithdrawals.map((withdrawal) => (
               <TableRow key={withdrawal.id}>
                 <TableCell className="font-medium">{withdrawal.userName}</TableCell>
                 <TableCell>{withdrawal.amount} Rs.</TableCell>
@@ -219,7 +282,7 @@ export default function WithdrawalsPage() {
                 </TableCell>
               </TableRow>
             ))}
-             {!loading && withdrawals.length === 0 && (
+             {!loading && filteredAndSortedWithdrawals.length === 0 && (
                 <TableRow>
                     <TableCell colSpan={7} className="h-24 text-center">
                         No withdrawal requests found.
