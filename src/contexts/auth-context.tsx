@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     return; // Investment cycle is complete
                 }
 
-                // --- Corrected Date Logic ---
+                // --- CORRECTED DATE LOGIC ---
                 const now = new Date();
                 const lastUpdateDate = data.lastInvestmentUpdate.toDate();
                 
@@ -124,7 +124,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 // Calculate the difference in days
                 const msInDay = 24 * 60 * 60 * 1000;
                 const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
-                // --- End Corrected Date Logic ---
+                // --- END CORRECTED DATE LOGIC ---
                 
                 if (daysPassed <= 0) {
                     return; // No new full day has passed
@@ -142,15 +142,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const newTotalBalance = (data.totalBalance || 0) + totalEarningsToAdd;
                 const newTotalEarnings = (data.earnings || 0) + totalEarningsToAdd;
                 
-                // Create a batch-like array of updates for the transaction
-                const updates: any = {
+                transaction.update(userDocRef, {
                     investmentEarnings: newInvestmentEarnings,
                     totalBalance: newTotalBalance,
                     earnings: newTotalEarnings,
                     lastInvestmentUpdate: Timestamp.fromDate(now) // Set to now to prevent re-calculation today
-                };
-                
-                transaction.update(userDocRef, updates);
+                });
 
                 // Add transaction records for each day earned
                 for (let i = 0; i < daysToProcess; i++) {
@@ -257,7 +254,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // To be implemented if needed
     };
 
-    const signUpWithEmail = async ({ name, email, phone, password }: any) => {
+    const signUpWithEmail = async ({ name, email, phone, password, referralCode: providedCode }: any) => {
         setLoading(true);
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -287,10 +284,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 claimedMilestones: [],
             };
 
-            // 2. Check for a referral code from the link
-            const usedCode = localStorage.getItem('referralCode');
+            // 2. Check for a referral code from link or manual input
+            const usedCode = localStorage.getItem('referralCode') || providedCode;
             if (usedCode) {
-                 const q = query(collection(db, 'users'), where('referralCode', '==', usedCode));
+                 const q = query(collection(db, 'users'), where('referralCode', '==', usedCode.toUpperCase()));
                  const querySnapshot = await getDocs(q);
 
                  if (!querySnapshot.empty) {
@@ -298,7 +295,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                      const referrerId = referrerDoc.id;
 
                      if (referrerId !== newUser.uid) {
-                        newUserDoc.usedReferralCode = usedCode;
+                        newUserDoc.usedReferralCode = usedCode.toUpperCase();
                         newUserDoc.referredBy = referrerId;
                         
                         // Add this new user to the referrer's `referrals` subcollection
@@ -472,5 +469,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
