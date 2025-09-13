@@ -10,23 +10,12 @@
 
 import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
 
-// Define types locally since they cannot be exported from a 'use server' file.
-// The client will have its own definitions.
-interface RedeemOfferCodeInput {
+// Types are defined in the client component that calls this flow.
+
+export async function redeemOfferCodeFlow(input: {
   code: string;
   userId: string;
-}
-
-interface RedeemOfferCodeOutput {
-  success: boolean;
-  message: string;
-  rewardAmount?: number;
-}
-
-
-export async function redeemOfferCodeFlow(
-  input: RedeemOfferCodeInput
-): Promise<RedeemOfferCodeOutput> {
+}): Promise<{ success: boolean; message: string; rewardAmount?: number }> {
   const { db, admin } = getFirebaseAdmin();
   const { userId, code } = input;
 

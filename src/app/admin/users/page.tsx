@@ -110,7 +110,7 @@ export default function UsersPage() {
     }, [toast]);
     
     const filteredAndSortedUsers = useMemo(() => {
-        const safeSearchTerm = (searchTerm || '').toLowerCase();
+        const safeSearchTerm = (searchTerm ?? '').toLowerCase();
         return users
             .filter(user =>
                 (user?.name ?? '').toLowerCase().includes(safeSearchTerm) ||
@@ -526,4 +526,5 @@ export default function UsersPage() {
     
 
     
+
 
