@@ -104,39 +104,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     return; // No active investment to process
                 }
 
-                const now = Timestamp.now();
-                const investmentStartDate = data.lastInvestmentUpdate;
                 const dailyReturnRate = data.membership === 'Pro' ? 0.13 : 0.10;
                 const dailyEarning = data.invested * dailyReturnRate;
-
-                // Calculate how many days of earnings have already been processed
+                
                 const daysAlreadyProcessed = dailyEarning > 0 ? Math.floor((data.investmentEarnings || 0) / dailyEarning) : 0;
                 
                 if (daysAlreadyProcessed >= 30) {
                     return; // Investment cycle is complete
                 }
 
-                // Calculate how many full 24-hour periods have passed since the investment started
-                // This logic is corrected to handle the start of a new day properly.
-                const nowMs = now.toMillis();
-                const startMs = investmentStartDate.toMillis();
-                const totalDaysSinceStart = Math.floor((nowMs - startMs) / (1000 * 60 * 60 * 24));
+                // --- Corrected Date Logic ---
+                const now = new Date();
+                const lastUpdateDate = data.lastInvestmentUpdate.toDate();
                 
-                // Determine how many new, unprocessed days there are
-                const daysToProcess = totalDaysSinceStart - daysAlreadyProcessed;
+                // Normalize dates to the beginning of the day (midnight) for accurate comparison
+                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
 
-                if (daysToProcess <= 0) {
-                    return; // No new full day has passed since the last processing
+                // Calculate the difference in days
+                const msInDay = 24 * 60 * 60 * 1000;
+                const daysPassed = Math.round((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
+                // --- End Corrected Date Logic ---
+
+                if (daysPassed <= 0) {
+                    return; // No new full day has passed
                 }
                 
-                // Ensure we don't process more than 30 days in total for the cycle
-                const daysToActuallyProcess = Math.min(daysToProcess, 30 - daysAlreadyProcessed);
+                const daysToProcess = Math.min(daysPassed, 30 - daysAlreadyProcessed);
                 
-                if (daysToActuallyProcess <= 0) {
+                if (daysToProcess <= 0) {
                     return; // No days left to process in this cycle
                 }
 
-                const totalEarningsToAdd = dailyEarning * daysToActuallyProcess;
+                const totalEarningsToAdd = dailyEarning * daysToProcess;
 
                 const newInvestmentEarnings = (data.investmentEarnings || 0) + totalEarningsToAdd;
                 const newTotalBalance = (data.totalBalance || 0) + totalEarningsToAdd;
@@ -146,19 +146,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     investmentEarnings: newInvestmentEarnings,
                     totalBalance: newTotalBalance,
                     earnings: newTotalEarnings,
+                    // Update the timestamp to today so we don't re-calculate
+                    lastInvestmentUpdate: Timestamp.fromDate(startOfToday) 
                 });
 
-                // Create a transaction record for each day of earnings
-                for (let i = 0; i < daysToActuallyProcess; i++) {
+                for (let i = 0; i < daysToProcess; i++) {
                     const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                    // Calculate the date for the transaction to keep them sequential
-                    const transactionDate = Timestamp.fromMillis(startMs + (daysAlreadyProcessed + i + 1) * 24 * 60 * 60 * 1000);
+                    // The date should reflect the day the earning was for, not the time it was processed
+                    const earningDay = new Date(startOfLastUpdateDay.getTime() + (i + 1) * msInDay);
                     transaction.set(transactionRef, {
                         type: 'earning',
                         amount: dailyEarning,
                         description: `Investment Earning`,
                         status: 'Completed',
-                        date: transactionDate,
+                        date: Timestamp.fromDate(earningDay),
                     });
                 }
             });
@@ -468,5 +469,7 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
 
     
