@@ -6,28 +6,31 @@ service cloud.firestore {
     // Users can only read/write their own data.
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
-
-      // Allow users to create a referral document for another user.
+      
+      // Any authenticated user can CREATE a document in another user's referrals subcollection.
       match /referrals/{referralId} {
         allow create: if request.auth != null;
       }
-    }
-    
-    // Referral codes are public for validation purposes.
-    match /referralCodes/{code} {
-      allow read: if request.auth != null;
+      
+      // Only the user can manage their own transactions and withdrawals.
+      match /transactions/{transactionId} {
+      	allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+      }
+      match /withdrawals/{withdrawalId} {
+      	allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
-    // Offers are public for all to see.
+    // Referral codes are public for validation purposes.
+    // Any authenticated user can GET a referral code document. List/query is disallowed.
+    match /referralCodes/{code} {
+      allow get: if request.auth != null;
+    }
+
+    // Offers collection (publicly readable). Only admins can write.
     match /offers/{offerId} {
       allow read: if true;
-    }
-
-    // Admins can access all data (useful for a back-office app).
-    // Note: This rule is broad. For production, you'd want more granular admin rules.
-    // However, this approach is fine for admin panels that have trusted users.
-    match /{document=**} {
-      allow read, write: if request.auth != null && request.auth.token.admin == true;
+      allow write: if request.auth != null && request.auth.token.admin == true;
     }
   }
 }
