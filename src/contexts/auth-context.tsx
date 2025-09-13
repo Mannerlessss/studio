@@ -13,8 +13,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion } from 'firebase/firestore';
-import { redeemReferral } from '@/ai/flows/redeem-referral-flow';
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, FieldValue } from 'firebase/firestore';
 
 interface UserData {
     uid: string;
@@ -52,7 +51,7 @@ interface AuthContextType {
   signUpWithEmail: (details: any) => Promise<void>;
   signInWithEmail: (details: any) => Promise<void>;
   logOut: () => Promise<void>;
-  redeemReferralCode: (code: string) => Promise<void>;
+  redeemReferralCode: (code: string) => Promise<{ success: boolean; message: string; }>;
   updateUserPhone: (phone: string) => Promise<void>;
   updateUserName: (name: string) => Promise<void>;
   claimDailyBonus: (amount: number) => Promise<void>;
@@ -311,25 +310,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
     
-    const redeemReferralCode = async (code: string) => {
+    const redeemReferralCode = async (code: string): Promise<{ success: boolean; message: string; }> => {
         if (!user || !userData) {
             throw new Error("You must be logged in to redeem a code.");
         }
+        const formattedCode = code.trim().toUpperCase();
 
-        const result = await redeemReferral({
-            code,
-            userId: user.uid,
-            userName: userData.name,
-            userEmail: userData.email,
-        });
+        try {
+            const result = await runTransaction(db, async (transaction) => {
+                const currentUserRef = doc(db, 'users', user.uid);
+                const currentUserDoc = await transaction.get(currentUserRef);
+                if (!currentUserDoc.exists()) {
+                    throw new Error('Your user profile could not be found.');
+                }
+                const currentUserData = currentUserDoc.data()!;
+                if (currentUserData.usedReferralCode) {
+                    throw new Error('You have already redeemed a referral code.');
+                }
 
-        if (result.success) {
-            toast({
-                title: 'Code Redeemed!',
-                description: result.message,
+                const usersRef = collection(db, 'users');
+                const referrerQuery = query(usersRef, where('referralCode', '==', formattedCode), where('__name__', '!=', user.uid));
+                const referrerSnapshot = await transaction.get(referrerQuery);
+
+                if (referrerSnapshot.empty) {
+                    const selfReferralQuery = query(usersRef, where('referralCode', '==', formattedCode));
+                    const selfReferralSnapshot = await transaction.get(selfReferralQuery);
+                    if (!selfReferralSnapshot.empty && selfReferralSnapshot.docs[0].id === user.uid) {
+                        throw new Error("You cannot use your own referral code.");
+                    }
+                    throw new Error('This referral code is not valid.');
+                }
+
+                const referrerDoc = referrerSnapshot.docs[0];
+                const referrerId = referrerDoc.id;
+
+                transaction.update(currentUserRef, {
+                    usedReferralCode: formattedCode,
+                    referredBy: referrerId,
+                });
+
+                const referrerRef = doc(db, 'users', referrerId);
+                transaction.update(referrerRef, {
+                    referrals: arrayUnion({
+                        userId: user.uid,
+                        name: userData.name,
+                        email: userData.email,
+                        hasInvested: false,
+                        date: new Date(),
+                    })
+                });
+
+                return `Successfully redeemed code from ${referrerDoc.data().name}!`;
             });
-        } else {
-            throw new Error(result.message);
+
+            toast({ title: 'Code Redeemed!', description: result });
+            return { success: true, message: result };
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Redemption Failed', description: error.message });
+            return { success: false, message: error.message };
         }
     };
     

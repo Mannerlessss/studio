@@ -7,16 +7,12 @@
  * for all Genkit-related operations, such as defining flows, prompts, and tools.
  */
 import { genkit } from 'genkit';
-import { firebasePlugin } from '@genkit-ai/firebase';
 import { googleAI } from '@genkit-ai/googleai';
 
-// Initialize Genkit with the Google AI and Firebase plugins.
-// The `firebasePlugin()` provides integration with Firebase services, which is
-// essential for server-side operations like the referral code redemption flow.
+// Initialize Genkit with the Google AI plugin.
 // The `googleAI()` plugin configures Genkit to use Google's generative AI models.
 export const ai = genkit({
   plugins: [
     googleAI(),
-    firebasePlugin(),
   ],
 });

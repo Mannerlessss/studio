@@ -113,8 +113,10 @@ const SettingsPage: NextPage = () => {
         }
         setIsRedeeming(true);
         try {
-            await redeemReferralCode(referralCodeInput);
-            setShowRedeemSuccess(true);
+            const result = await redeemReferralCode(referralCodeInput);
+            if (result.success) {
+                setShowRedeemSuccess(true);
+            }
         } catch (error: any) {
              toast({
                 variant: 'destructive',
