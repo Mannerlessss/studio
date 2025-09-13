@@ -9,31 +9,13 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import * as admin from 'firebase-admin';
-import * as fs from 'fs';
-import * as path from 'path';
 
-// Initialize Firebase Admin SDK at the top level
+// Initialize Firebase Admin SDK. This will only happen once per module load.
+// It will automatically use service account credentials from the environment
+// or from a serviceAccountKey.json file if present.
 if (admin.apps.length === 0) {
-  try {
-    const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
-    if (fs.existsSync(serviceAccountPath)) {
-      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
-      console.log("Firebase Admin SDK initialized successfully using serviceAccountKey.json.");
-    } else {
-        // This case is for environments where service account is set via env vars (e.g., Google Cloud)
-        admin.initializeApp();
-        console.log("Firebase Admin SDK initialized using default credentials (e.g., environment variables).");
-    }
-  } catch(error) {
-    console.error("Failed to initialize Firebase Admin SDK at the top level:", error);
-    // In a server environment, you might want to re-throw or handle this more gracefully
-    // For now, we'll let the flow fail with a clear message.
-  }
+    admin.initializeApp();
 }
-
 
 // Define Zod schemas for input validation
 const CreateUserInputSchema = z.object({
