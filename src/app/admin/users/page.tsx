@@ -203,11 +203,22 @@ export default function UsersPage() {
                         }
                     }
 
-                    // Mark the referred user as "invested" in the referrer's subcollection
+                    // Upsert the referred user in the referrer's subcollection
                     const referrerReferralsRef = collection(db, 'users', user.referredBy, 'referrals');
                     const q = query(referrerReferralsRef, where("userId", "==", user.id));
                     const referredUserDocs = await getDocs(q);
-                    if (!referredUserDocs.empty) {
+                    
+                    if (referredUserDocs.empty) {
+                        // User not in subcollection, add them
+                         await addDoc(referrerReferralsRef, {
+                            userId: user.id,
+                            name: user.name,
+                            email: user.email,
+                            hasInvested: true,
+                            joinedAt: user.createdAt || serverTimestamp() 
+                        });
+                    } else {
+                        // User already exists, just update their investment status
                         const referredUserDocRef = referredUserDocs.docs[0].ref;
                         batch.update(referredUserDocRef, { hasInvested: true });
                     }
@@ -409,3 +420,5 @@ export default function UsersPage() {
     </>
   );
 }
+
+    
