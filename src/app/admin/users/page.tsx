@@ -92,6 +92,8 @@ export default function UsersPage() {
     const [newUserEmail, setNewUserEmail] = useState('');
     const [newUserPhone, setNewUserPhone] = useState('');
     const [newUserPassword, setNewUserPassword] = useState('');
+    const [newUserReferralCode, setNewUserReferralCode] = useState('');
+
 
     useEffect(() => {
         const fetchUsers = async () => {
@@ -113,7 +115,7 @@ export default function UsersPage() {
 
     const handleCreateUser = async () => {
         if(!newUserName || !newUserEmail || !newUserPhone || !newUserPassword) {
-            toast({ variant: 'destructive', title: 'Missing fields', description: 'Please fill all fields to create a user.'});
+            toast({ variant: 'destructive', title: 'Missing fields', description: 'Please fill all required fields to create a user.'});
             return;
         }
         setIsCreatingUser(true);
@@ -123,6 +125,7 @@ export default function UsersPage() {
                 email: newUserEmail,
                 phone: newUserPhone,
                 password: newUserPassword,
+                referralCode: newUserReferralCode,
             });
             toast({ title: 'User Created', description: `Account for ${newUserEmail} has been created.` });
             
@@ -146,6 +149,7 @@ export default function UsersPage() {
             setNewUserEmail('');
             setNewUserPhone('');
             setNewUserPassword('');
+            setNewUserReferralCode('');
             setIsCreateUserOpen(false);
 
         } catch (error: any) {
@@ -385,6 +389,10 @@ export default function UsersPage() {
                      <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="password" className="text-right">Password</Label>
                         <Input id="password" type="password" value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} className="col-span-3" disabled={isCreatingUser}/>
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="referral-code" className="text-right">Referral Code</Label>
+                        <Input id="referral-code" value={newUserReferralCode} onChange={e => setNewUserReferralCode(e.target.value.toUpperCase())} className="col-span-3" placeholder="Optional" disabled={isCreatingUser}/>
                     </div>
                 </div>
                  <DialogFooter>

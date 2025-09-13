@@ -11,6 +11,8 @@ import { z } from 'genkit';
 import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
+import { collection, query, where, getDocs, addDoc, Timestamp } from 'firebase/firestore';
+
 
 // Define Zod schemas for input validation
 const CreateUserInputSchema = z.object({
@@ -18,6 +20,7 @@ const CreateUserInputSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
   phone: z.string().min(1, { message: 'Phone number is required' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  referralCode: z.string().optional(),
 });
 export type CreateUserInput = z.infer<typeof CreateUserInputSchema>;
 
@@ -64,7 +67,7 @@ const createUserFlow = ai.defineFlow(
       throw new Error("Firebase Admin SDK is not initialized. Cannot create user.");
     }
     
-    const { name, email, phone, password } = input;
+    const { name, email, phone, password, referralCode: providedCode } = input;
     const auth = admin.auth();
     const firestore = admin.firestore();
 
@@ -79,8 +82,8 @@ const createUserFlow = ai.defineFlow(
     // Step 2: Create user document in Firestore
     const referralCode = `${name.split(' ')[0].toUpperCase().substring(0, 5)}${(Math.random() * 9000 + 1000).toFixed(0)}`;
     const userDocRef = firestore.collection('users').doc(userRecord.uid);
-
-    await userDocRef.set({
+    
+    const newUserDocData: any = {
       uid: userRecord.uid,
       name,
       email,
@@ -101,7 +104,35 @@ const createUserFlow = ai.defineFlow(
       lastLogin: admin.firestore.FieldValue.serverTimestamp(),
       claimedMilestones: [],
       redeemedOfferCodes: [],
-    });
+    };
+    
+    if (providedCode) {
+        const q = firestore.collection('users').where('referralCode', '==', providedCode.toUpperCase());
+        const querySnapshot = await q.get();
+        if (!querySnapshot.empty) {
+            const referrerDoc = querySnapshot.docs[0];
+            newUserDocData.usedReferralCode = providedCode.toUpperCase();
+            newUserDocData.referredBy = referrerDoc.id;
+        }
+    }
+    
+    await userDocRef.set(newUserDocData);
+
+     // Step 3: If referral code was used, add to referrer's subcollection
+    if (newUserDocData.referredBy) {
+        const referrerId = newUserDocData.referredBy;
+         if (referrerId !== userRecord.uid) {
+            const referrerSubCollectionRef = firestore.collection(`users/${referrerId}/referrals`);
+            await referrerSubCollectionRef.add({
+                userId: userRecord.uid,
+                name: name,
+                email: email,
+                hasInvested: false,
+                joinedAt: admin.firestore.Timestamp.now(),
+            });
+        }
+    }
+
 
     return {
       uid: userRecord.uid,
