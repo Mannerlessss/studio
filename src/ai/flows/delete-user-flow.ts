@@ -34,13 +34,23 @@ export const deleteUser = ai.defineFlow(
         throw new Error('User UID is required.');
     }
     
+    // Ensure the SDK is initialized before proceeding.
+    if (admin.apps.length === 0) {
+        throw new Error('Firebase Admin SDK is not initialized. Cannot delete user.');
+    }
+    
     try {
         // Delete from Firebase Authentication
         await admin.auth().deleteUser(uid);
 
         // Delete from Firestore database
         const userDocRef = admin.firestore().collection('users').doc(uid);
-        await userDocRef.delete();
+        
+        // Check if the document exists before trying to delete
+        const docSnap = await userDocRef.get();
+        if (docSnap.exists) {
+            await userDocRef.delete();
+        }
         
         // Note: This doesn't delete subcollections like `investments`, `transactions`, etc.
         // For a full cleanup, a more complex script would be needed to recursively delete
@@ -54,11 +64,22 @@ export const deleteUser = ai.defineFlow(
         console.error(`Failed to delete user ${uid}:`, error);
          // Provide a more user-friendly error message
         if (error.code === 'auth/user-not-found') {
-            throw new Error('User not found in Firebase Authentication. They may have already been deleted.');
+            // If user not in auth, still try to delete from firestore, then return success.
+            try {
+                const userDocRef = admin.firestore().collection('users').doc(uid);
+                const docSnap = await userDocRef.get();
+                if (docSnap.exists) {
+                    await userDocRef.delete();
+                }
+                return {
+                    success: true,
+                    message: `User ${uid} was already deleted from Authentication. Removed from Firestore.`,
+                };
+            } catch (dbError: any) {
+                 throw new Error(`User not found in Auth, but failed to delete from Firestore: ${dbError.message}`);
+            }
         }
         throw new Error(`An error occurred while deleting the user: ${error.message}`);
     }
   }
 );
-
-    
