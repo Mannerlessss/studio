@@ -11,7 +11,6 @@ import { z } from 'genkit';
 import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
-import { collection, query, where, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 
 
 // Define Zod schemas for input validation
@@ -33,20 +32,23 @@ export type CreateUserOutput = z.infer<typeof CreateUserOutputSchema>;
 
 
 // Initialize Firebase Admin SDK if it hasn't been already
-if (admin.apps.length === 0) {
-  try {
-    const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
-    if (fs.existsSync(serviceAccountPath)) {
-      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
-    } else {
-        console.error('serviceAccountKey.json not found, Firebase Admin features will not work.');
+function initializeFirebaseAdmin() {
+    if (admin.apps.length === 0) {
+      try {
+        const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
+        if (fs.existsSync(serviceAccountPath)) {
+          const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+          });
+          console.log("Firebase Admin SDK initialized successfully.");
+        } else {
+            console.error('serviceAccountKey.json not found, Firebase Admin features will not work.');
+        }
+      } catch(error) {
+        console.error("Failed to initialize Firebase Admin", error);
+      }
     }
-  } catch(error) {
-    console.error("Failed to initialize Firebase Admin", error);
-  }
 }
 
 // Define the main exported function that calls the flow
@@ -62,6 +64,7 @@ const createUserFlow = ai.defineFlow(
     outputSchema: CreateUserOutputSchema,
   },
   async (input) => {
+    initializeFirebaseAdmin();
 
     if(admin.apps.length === 0) {
       throw new Error("Firebase Admin SDK is not initialized. Cannot create user.");
