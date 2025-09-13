@@ -8,22 +8,24 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Gift, Shield, LogOut, Loader2 } from 'lucide-react';
+import { User, Gift, Shield, LogOut, Loader2, Ticket } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
 const SettingsPage: NextPage = () => {
-    const { userData, logOut, updateUserPhone, updateUserName } = useAuth();
+    const { userData, logOut, updateUserPhone, updateUserName, redeemOfferCode } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
     
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
+    const [offerCode, setOfferCode] = useState('');
 
     const [isUpdatingName, setIsUpdatingName] = useState(false);
     const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
+    const [isRedeeming, setIsRedeeming] = useState(false);
 
     useEffect(() => {
       if (userData) {
@@ -88,6 +90,26 @@ const SettingsPage: NextPage = () => {
         }
     };
 
+     const handleRedeemCode = async () => {
+        if (!offerCode) {
+            toast({ variant: 'destructive', title: 'Code Required', description: 'Please enter an offer code.' });
+            return;
+        }
+        setIsRedeeming(true);
+        try {
+            await redeemOfferCode(offerCode.toUpperCase());
+            setOfferCode(''); // Clear input on success
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: 'Redemption Failed',
+                description: error.message,
+            });
+        } finally {
+            setIsRedeeming(false);
+        }
+    };
+
   return (
     <div className="bg-background min-h-full">
       <Header />
@@ -120,6 +142,35 @@ const SettingsPage: NextPage = () => {
                   {isUpdatingPhone ? <Loader2 className="animate-spin"/> : 'Update'}
                 </Button>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Ticket className="w-6 h-6 text-primary" />
+              <CardTitle>Redeem Offer Code</CardTitle>
+            </div>
+            <CardDescription>
+              Have a special code? Enter it here for a bonus!
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <Input
+                placeholder="e.g., WELCOME100"
+                value={offerCode}
+                onChange={(e) => setOfferCode(e.target.value)}
+                disabled={isRedeeming}
+              />
+              <Button onClick={handleRedeemCode} disabled={isRedeeming || !offerCode}>
+                {isRedeeming ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  'Redeem'
+                )}
+              </Button>
             </div>
           </CardContent>
         </Card>

@@ -13,7 +13,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc, increment } from 'firebase/firestore';
 
 export interface Investment {
     id: string;
@@ -50,6 +50,7 @@ interface UserData {
     hasCollectedSignupBonus: boolean;
     lastBonusClaim?: Timestamp;
     claimedMilestones?: number[];
+    redeemedOfferCodes?: string[];
     createdAt: any;
     lastLogin: any;
     investments?: Investment[];
@@ -69,6 +70,7 @@ interface AuthContextType {
   claimDailyBonus: (amount: number) => Promise<void>;
   collectSignupBonus: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
+  redeemOfferCode: (code: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -345,6 +347,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
                 claimedMilestones: [],
+                redeemedOfferCodes: [],
             };
 
             const usedCode = localStorage.getItem('referralCode') || providedCode;
@@ -357,8 +360,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     newUserDocData.referredBy = referrerDoc.id;
                 }
             }
-
+             
             await setDoc(userDocRef, newUserDocData);
+
 
             // Step 3: If referral code was used, add to referrer's subcollection
             if (newUserDocData.referredBy) {
@@ -370,7 +374,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         name: name,
                         email: email,
                         hasInvested: false,
-                        joinedAt: serverTimestamp(),
+                        joinedAt: Timestamp.now(),
                     });
                     localStorage.removeItem('referralCode');
                 }
@@ -492,6 +496,69 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: 'Bonus Collected!', description: `You received ${signupBonusAmount} Rs.` });
     }
 
+     const redeemOfferCode = async (code: string) => {
+        if (!user || !userData) {
+            throw new Error('You must be logged in to redeem a code.');
+        }
+
+        if (userData.redeemedOfferCodes?.includes(code)) {
+            throw new Error('You have already redeemed this offer code.');
+        }
+
+        await runTransaction(db, async (transaction) => {
+            const offerQuery = query(collection(db, 'offers'), where('code', '==', code));
+            const offerSnapshot = await getDocs(offerQuery);
+
+            if (offerSnapshot.empty) {
+                throw new Error('Invalid offer code.');
+            }
+
+            const offerDoc = offerSnapshot.docs[0];
+            const offerData = offerDoc.data();
+            const offerRef = offerDoc.ref;
+
+            // Check if expired by date
+            if (offerData.expiresAt && offerData.expiresAt.toMillis() < Date.now()) {
+                throw new Error('This offer code has expired.');
+            }
+
+            // Check if expired by usage
+            if (offerData.maxUsers && offerData.usageCount >= offerData.maxUsers) {
+                throw new Error('This offer code has reached its maximum usage limit.');
+            }
+
+            const userRef = doc(db, 'users', user.uid);
+            
+            // Give reward to user
+            transaction.update(userRef, {
+                totalBalance: increment(offerData.rewardAmount),
+                totalBonusEarnings: increment(offerData.rewardAmount),
+                totalEarnings: increment(offerData.rewardAmount),
+                redeemedOfferCodes: arrayUnion(code),
+            });
+
+            // Increment usage count for the offer
+            transaction.update(offerRef, {
+                usageCount: increment(1),
+            });
+            
+            // Create a transaction record for the user
+            const userTransactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+            transaction.set(userTransactionRef, {
+                 type: 'bonus',
+                 amount: offerData.rewardAmount,
+                 description: `Redeemed offer code: ${code}`,
+                 status: 'Completed',
+                 date: serverTimestamp(),
+            });
+        });
+
+        toast({
+            title: 'Code Redeemed!',
+            description: `You have successfully received ${offerData.rewardAmount} Rs.`,
+        });
+    };
+
     const value: AuthContextType = {
         user,
         userData,
@@ -506,6 +573,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         claimDailyBonus,
         collectSignupBonus,
         sendPasswordReset,
+        redeemOfferCode
     };
     
     if (loading) {
@@ -529,9 +597,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
-
-    
-
-    
