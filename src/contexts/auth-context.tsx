@@ -13,7 +13,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc } from 'firebase/firestore';
 
 export interface Investment {
     id: string;
@@ -318,13 +318,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signUpWithEmail = async ({ name, email, phone, password, referralCode: providedCode }: any) => {
         setLoading(true);
         try {
+            // Step 1: Create Auth User
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const newUser = userCredential.user;
-            const referralCode = `${name.split(' ')[0].toUpperCase().substring(0, 5)}${(Math.random() * 9000 + 1000).toFixed(0)}`;
-            const batch = writeBatch(db);
 
+            // Step 2: Create User Doc
+            const referralCode = `${name.split(' ')[0].toUpperCase().substring(0, 5)}${(Math.random() * 9000 + 1000).toFixed(0)}`;
             const userDocRef = doc(db, 'users', newUser.uid);
-            const newUserDoc: any = {
+
+            const newUserDocData: any = {
                 uid: newUser.uid,
                 name,
                 email,
@@ -347,33 +349,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             const usedCode = localStorage.getItem('referralCode') || providedCode;
             if (usedCode) {
-                 const q = query(collection(db, 'users'), where('referralCode', '==', usedCode.toUpperCase()));
-                 const querySnapshot = await getDocs(q);
-
-                 if (!querySnapshot.empty) {
-                     const referrerDoc = querySnapshot.docs[0];
-                     const referrerId = referrerDoc.id;
-
-                     if (referrerId !== newUser.uid) {
-                        newUserDoc.usedReferralCode = usedCode.toUpperCase();
-                        newUserDoc.referredBy = referrerId;
-                        
-                        const referrerSubCollectionRef = doc(collection(db, `users/${referrerId}/referrals`));
-                        batch.set(referrerSubCollectionRef, {
-                            userId: newUser.uid,
-                            name: name,
-                            email: email,
-                            hasInvested: false,
-                            joinedAt: Timestamp.now(),
-                        });
-                        
-                        localStorage.removeItem('referralCode');
-                     }
-                 }
+                const q = query(collection(db, 'users'), where('referralCode', '==', usedCode.toUpperCase()));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    const referrerDoc = querySnapshot.docs[0];
+                    newUserDocData.usedReferralCode = usedCode.toUpperCase();
+                    newUserDocData.referredBy = referrerDoc.id;
+                }
             }
-            
-            batch.set(userDocRef, newUserDoc);
-            await batch.commit();
+
+            await setDoc(userDocRef, newUserDocData);
+
+            // Step 3: If referral code was used, add to referrer's subcollection
+            if (newUserDocData.referredBy) {
+                const referrerId = newUserDocData.referredBy;
+                 if (referrerId !== newUser.uid) {
+                    const referrerSubCollectionRef = collection(db, `users/${referrerId}/referrals`);
+                    await addDoc(referrerSubCollectionRef, {
+                        userId: newUser.uid,
+                        name: name,
+                        email: email,
+                        hasInvested: false,
+                        joinedAt: serverTimestamp(),
+                    });
+                    localStorage.removeItem('referralCode');
+                }
+            }
 
         } catch (error: any) {
             toast({
@@ -528,6 +529,8 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
 
     
 
