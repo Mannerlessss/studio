@@ -123,7 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                 // Calculate the difference in days
                 const msInDay = 24 * 60 * 60 * 1000;
-                const daysPassed = Math.round((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
+                const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
                 // --- End Corrected Date Logic ---
 
                 if (daysPassed <= 0) {
@@ -469,6 +469,8 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
 
     
 
