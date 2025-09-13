@@ -99,15 +99,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Function to process earnings for all active investments for a user
     const processInvestmentEarnings = async (currentUserId: string) => {
         try {
+            const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
+            const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
+            const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
+
+            if (activeInvestmentsSnapshot.empty) {
+                return; // No active investments to process
+            }
+
             await runTransaction(db, async (transaction) => {
                 const userDocRef = doc(db, 'users', currentUserId);
-                const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
-                const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
-
-                const [userDoc, activeInvestmentsSnapshot] = await Promise.all([
-                    transaction.get(userDocRef),
-                    transaction.get(activeInvestmentsQuery)
-                ]);
+                const userDoc = await transaction.get(userDocRef);
 
                 if (!userDoc.exists()) {
                     console.warn("processInvestmentEarnings: User document not found.");
@@ -115,7 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 let totalEarningsToAdd = 0;
-                const userData = userDoc.data() as UserData;
+                const currentData = userDoc.data() as UserData;
                 const now = new Date();
                 const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -125,16 +127,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                     const startDate = investment.startDate.toDate();
                     const startOfInvestmentDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-
-                    const msInDay = 24 * 60 * 60 * 1000;
-                    const totalDaysSinceStart = Math.floor((startOfToday.getTime() - startOfInvestmentDay.getTime()) / msInDay);
                     
-                    if (totalDaysSinceStart <= 0) continue;
+                    const msInDay = 24 * 60 * 60 * 1000;
+                    // Total full days passed since the plan started
+                    const totalDaysSinceStart = Math.floor((startOfToday.getTime() - startOfInvestmentDay.getTime()) / msInDay);
+
+                    if (totalDaysSinceStart <= 0) continue; // Not a new day yet
 
                     const daysAlreadyProcessed = Math.round(investment.earnings / investment.dailyReturn);
                     const daysToProcess = totalDaysSinceStart - daysAlreadyProcessed;
 
-                    if (daysToProcess <= 0) continue;
+                    if (daysToProcess <= 0) continue; // Already processed for today or past days
                     
                     const remainingDaysInPlan = investment.durationDays - daysAlreadyProcessed;
                     const daysToCredit = Math.min(daysToProcess, remainingDaysInPlan);
@@ -169,9 +172,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                 if (totalEarningsToAdd > 0) {
                     transaction.update(userDocRef, {
-                        totalInvestmentEarnings: (userData.totalInvestmentEarnings || 0) + totalEarningsToAdd,
-                        totalBalance: (userData.totalBalance || 0) + totalEarningsToAdd,
-                        totalEarnings: (userData.totalEarnings || 0) + totalEarningsToAdd,
+                        totalInvestmentEarnings: (currentData.totalInvestmentEarnings || 0) + totalEarningsToAdd,
+                        totalBalance: (currentData.totalBalance || 0) + totalEarningsToAdd,
+                        totalEarnings: (currentData.totalEarnings || 0) + totalEarningsToAdd,
                     });
                 }
             });
@@ -494,3 +497,4 @@ export const useAuth = (): AuthContextType => {
     return context;
 };
 
+    
