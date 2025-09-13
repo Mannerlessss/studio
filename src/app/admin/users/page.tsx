@@ -134,10 +134,10 @@ export default function UsersPage() {
     const handleDeleteUser = async (userId: string) => {
         setIsSubmitting(userId);
         try {
-            await deleteUser(userId);
+            const result = await deleteUser(userId);
             toast({
                 title: 'User Deleted',
-                description: "The user's account and data have been permanently removed.",
+                description: result.message,
             });
             setUsers(prevUsers => prevUsers.filter(u => u.id !== userId));
         } catch (error: any) {

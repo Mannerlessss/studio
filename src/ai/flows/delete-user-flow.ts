@@ -7,36 +7,20 @@
  * and their corresponding document in the Firestore database. This is a
  * privileged operation that requires the Firebase Admin SDK.
  */
+import { z } from 'zod';
+import { db, auth } from '@/lib/firebaseAdmin';
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-import * as admin from 'firebase-admin';
-
-// Initialize Firebase Admin SDK.
-// This will automatically use service account credentials if the file is present
-// or use application default credentials in a deployed environment.
-admin.initializeApp();
-
-export const deleteUser = ai.defineFlow(
-  {
-    name: 'deleteUserFlow',
-    inputSchema: z.string().describe('The UID of the user to delete.'),
-    outputSchema: z.object({
-        success: z.boolean(),
-        message: z.string(),
-    }),
-  },
-  async (uid) => {
+export async function deleteUser(uid: string): Promise<{ success: boolean; message: string; }> {
     if (!uid) {
         throw new Error('User UID is required.');
     }
     
     try {
         // Delete from Firebase Authentication
-        await admin.auth().deleteUser(uid);
+        await auth.deleteUser(uid);
 
         // Delete from Firestore database
-        const userDocRef = admin.firestore().collection('users').doc(uid);
+        const userDocRef = db.collection('users').doc(uid);
         
         // Check if the document exists before trying to delete
         const docSnap = await userDocRef.get();
@@ -58,7 +42,7 @@ export const deleteUser = ai.defineFlow(
         if (error.code === 'auth/user-not-found') {
             // If user not in auth, still try to delete from firestore, then return success.
             try {
-                const userDocRef = admin.firestore().collection('users').doc(uid);
+                const userDocRef = db.collection('users').doc(uid);
                 const docSnap = await userDocRef.get();
                 if (docSnap.exists) {
                     await userDocRef.delete();
@@ -73,5 +57,4 @@ export const deleteUser = ai.defineFlow(
         }
         throw new Error(`An error occurred while deleting the user: ${error.message}`);
     }
-  }
-);
+}

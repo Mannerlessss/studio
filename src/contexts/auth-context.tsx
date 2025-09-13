@@ -14,7 +14,7 @@ import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc, increment } from 'firebase/firestore';
-import { redeemOfferCodeFlow } from '@/ai/flows/redeem-offer-code-flow';
+import { redeemOfferCode } from '@/ai/flows/redeem-offer-code-flow';
 
 
 export interface Investment {
@@ -514,7 +514,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         try {
-            const result = await redeemOfferCodeFlow({
+            const result = await redeemOfferCode({
                 userId: user.uid,
                 code: code,
             });
