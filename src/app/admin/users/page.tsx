@@ -42,7 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, getDocs, updateDoc, writeBatch, serverTimestamp, query, where, addDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, updateDoc, writeBatch, serverTimestamp, query, where, addDoc, increment } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     Select,
@@ -64,10 +64,14 @@ interface User {
     totalReferralEarnings: number;
     totalInvested: number;
     claimedMilestones?: number[];
+    investedReferralCount: number;
     referredBy?: string;
 }
 
 const investmentPlans = [100, 300, 500, 1000, 2000];
+const milestones: { [key: number]: number } = {
+  5: 250, 10: 500, 20: 1000, 30: 1500, 40: 2000, 50: 2500,
+};
 
 export default function UsersPage() {
     const { toast } = useToast();
@@ -142,11 +146,12 @@ export default function UsersPage() {
             };
             if (!user.hasInvested) {
                 userUpdates.hasInvested = true;
+                userUpdates.commissionParent = user.referredBy; // Set commission parent on first investment
             }
             batch.update(userDocRef, userUpdates);
 
-            // 4. Handle Referral Logic (if it's the user's first ever investment)
-            if (!user.hasInvested && user.referredBy) {
+            // 4. Handle Referral Logic (if it's the user's first investment >= 100)
+            if (!user.hasInvested && user.referredBy && amount >= 100) {
                 const referrerDocRef = doc(db, 'users', user.referredBy);
                 const referrerDoc = await getDoc(referrerDocRef);
 
@@ -165,16 +170,38 @@ export default function UsersPage() {
                         type: 'bonus', amount: bonusAmount, description: `Welcome referral bonus!`, status: 'Completed', date: now,
                     });
 
-                    // Give standard referral bonus to the referrer
+                    // Give standard referral bonus to the referrer & increment their count
+                    const newReferralCount = (referrerData.investedReferralCount || 0) + 1;
                     batch.update(referrerDocRef, {
                         totalBalance: (referrerData.totalBalance || 0) + bonusAmount,
                         totalReferralEarnings: (referrerData.totalReferralEarnings || 0) + bonusAmount,
                         totalEarnings: ((referrerData as any).totalEarnings || 0) + bonusAmount,
+                        investedReferralCount: newReferralCount,
                     });
                     const referrerBonusTransactionRef = doc(collection(db, `users/${user.referredBy}/transactions`));
                      batch.set(referrerBonusTransactionRef, {
                         type: 'referral', amount: bonusAmount, description: `Referral bonus from ${user.name}`, status: 'Completed', date: now,
                     });
+                    
+                    // CHECK FOR MILESTONES
+                    const claimedMilestones = referrerData.claimedMilestones || [];
+                    for (const milestone in milestones) {
+                        const milestoneNum = Number(milestone);
+                        if (newReferralCount >= milestoneNum && !claimedMilestones.includes(milestoneNum)) {
+                            const rewardAmount = milestones[milestoneNum];
+                             batch.update(referrerDocRef, {
+                                totalBalance: increment(rewardAmount),
+                                totalReferralEarnings: increment(rewardAmount),
+                                totalEarnings: increment(rewardAmount),
+                                claimedMilestones: [...claimedMilestones, milestoneNum]
+                            });
+
+                             const milestoneTransactionRef = doc(collection(db, `users/${user.referredBy}/transactions`));
+                             batch.set(milestoneTransactionRef, {
+                                type: 'bonus', amount: rewardAmount, description: `Milestone Bonus: ${milestone} referrals`, status: 'Completed', date: now,
+                            });
+                        }
+                    }
 
                     // Mark the referred user as "invested" in the referrer's subcollection
                     const referrerReferralsRef = collection(db, 'users', user.referredBy, 'referrals');
@@ -382,4 +409,3 @@ export default function UsersPage() {
     </>
   );
 }
-

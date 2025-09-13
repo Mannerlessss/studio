@@ -34,6 +34,8 @@ interface UserData {
     referralCode?: string;
     usedReferralCode?: string;
     referredBy?: string;
+    commissionParent?: string; // UID of the user who gets commission
+    investedReferralCount: number;
     referrals?: any[]; // Array of referred user objects
     membership: 'Basic' | 'Pro';
     rank: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
@@ -98,15 +100,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Function to process earnings for all active investments for a user
     const processInvestmentEarnings = async (currentUserId: string) => {
+        const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
+        const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
+        
         try {
-            const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
-            const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
-            const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
-
-            if (activeInvestmentsSnapshot.empty) {
-                return; // No active investments to process
-            }
-
              await runTransaction(db, async (transaction) => {
                 const userDocRef = doc(db, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
@@ -116,19 +113,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     return;
                 }
                 
+                const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
+                if (activeInvestmentsSnapshot.empty) {
+                    return; // No active investments to process
+                }
+
                 let totalEarningsToAdd = 0;
                 const currentData = userDoc.data() as UserData;
                 const now = new Date();
                 const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                
+                const commissionParentRef = currentData.commissionParent ? doc(db, 'users', currentData.commissionParent) : null;
+                let commissionParentDoc: any = null;
+                if(commissionParentRef){
+                    commissionParentDoc = await transaction.get(commissionParentRef);
+                }
+
 
                 for (const investmentDoc of activeInvestmentsSnapshot.docs) {
-                    // We re-read the investment doc inside the transaction to ensure consistency
-                    const investmentRef = doc(db, `users/${currentUserId}/investments`, investmentDoc.id);
-                    const freshInvestmentDoc = await transaction.get(investmentRef);
-
-                    if (!freshInvestmentDoc.exists()) continue;
-
-                    const investment = freshInvestmentDoc.data() as Investment;
+                    const investment = investmentDoc.data() as Investment;
 
                     const lastUpdateDate = investment.lastUpdate.toDate();
                     const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
@@ -136,7 +139,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const msInDay = 24 * 60 * 60 * 1000;
                     const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
                     
-                    if (daysPassed <= 0) continue; // Not a new day yet
+                    if (daysPassed <= 0) continue;
 
                     const daysAlreadyProcessed = Math.round(investment.earnings / investment.dailyReturn);
                     const remainingDaysInPlan = investment.durationDays - daysAlreadyProcessed;
@@ -149,22 +152,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         const newEarnings = investment.earnings + earningsForThisPlan;
                         const newStatus = (daysAlreadyProcessed + daysToCredit) >= investment.durationDays ? 'completed' : 'active';
                         
-                        transaction.update(investmentRef, {
+                        transaction.update(investmentDoc.ref, {
                             earnings: newEarnings,
                             lastUpdate: serverTimestamp(),
                             status: newStatus
                         });
 
-                        // Create transaction records for each day earned
                         for (let i = 0; i < daysToCredit; i++) {
                             const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                             const earningDay = new Date(startOfToday.getTime() - (daysPassed - i - 1) * msInDay);
+                            const earningDay = new Date(startOfToday.getTime() - (daysPassed - i - 1) * msInDay);
                             transaction.set(transactionRef, {
                                 type: 'earning',
                                 amount: investment.dailyReturn,
                                 description: `Earning from Plan ${investment.planAmount}`,
                                 status: 'Completed',
                                 date: Timestamp.fromDate(earningDay),
+                            });
+                        }
+
+                        // Handle lifetime commission
+                        if (commissionParentDoc && commissionParentDoc.exists()) {
+                            const commissionAmount = earningsForThisPlan * 0.03;
+                            const parentData = commissionParentDoc.data();
+                            transaction.update(commissionParentRef!, {
+                                totalBalance: (parentData.totalBalance || 0) + commissionAmount,
+                                totalReferralEarnings: (parentData.totalReferralEarnings || 0) + commissionAmount,
+                                totalEarnings: (parentData.totalEarnings || 0) + commissionAmount,
+                            });
+                            
+                            const commissionTransactionRef = doc(collection(db, `users/${commissionParentRef!.id}/transactions`));
+                            transaction.set(commissionTransactionRef, {
+                                type: 'referral',
+                                amount: commissionAmount,
+                                description: `3% commission from ${currentData.name}`,
+                                status: 'Completed',
+                                date: serverTimestamp(),
                             });
                         }
                     }
@@ -289,7 +311,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const newUser = userCredential.user;
-            const referralCode = `${name.split(' ')[0].toUpperCase()}${(Math.random() * 9000 + 1000).toFixed(0)}`;
+            const referralCode = `${name.split(' ')[0].toUpperCase().substring(0, 5)}${(Math.random() * 9000 + 1000).toFixed(0)}`;
             const batch = writeBatch(db);
 
             const userDocRef = doc(db, 'users', newUser.uid);
@@ -307,6 +329,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 totalInvestmentEarnings: 0,
                 hasInvested: false,
                 hasCollectedSignupBonus: false,
+                investedReferralCount: 0,
                 referralCode: referralCode,
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
@@ -344,7 +367,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await batch.commit();
 
         } catch (error: any) {
-             toast({
+            toast({
                 variant: 'destructive',
                 title: 'Sign Up Failed',
                 description: error.message,
@@ -496,7 +519,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
 
     

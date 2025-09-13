@@ -47,13 +47,18 @@ export const ReferralMilestonesCard: FC<ReferralMilestonesCardProps> = ({ succes
             </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-            {nextMilestone !== null && (
+            {nextMilestone !== null ? (
                 <div className='space-y-2'>
                     <p className="text-sm font-semibold">Next Reward: <span className="text-primary">{milestones[nextMilestone]} Rs.</span> for {nextMilestone} referrals</p>
                     <Progress value={progressPercent} />
                     <p className="text-xs text-muted-foreground text-right">{successfullyInvested} / {nextMilestone} invested referrals</p>
                 </div>
+            ) : (
+                <div className="p-3 rounded-lg bg-green-500/10 text-center">
+                    <p className="font-semibold text-green-600">Congratulations! You've completed all milestones!</p>
+                </div>
             )}
+
 
             <div className="space-y-3">
                 {Object.entries(milestones).map(([target, reward]) => {
