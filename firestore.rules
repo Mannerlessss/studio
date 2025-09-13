@@ -2,30 +2,24 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // User collection
     match /users/{userId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId; 
-    }
-    
-    // Allow users to add themselves to another user's referral list
-    match /users/{referrerId}/referrals/{referralId} {
-      allow create: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+
+      // Allow any authenticated user to create a referral document for another user
+      match /referrals/{referralId} {
+        allow create: if request.auth != null;
+      }
     }
 
-    // Offers collection (admin-managed)
     match /offers/{offerId} {
-      // Allow authenticated users to read. Write access should be handled by admin SDK.
+      // Admin-only write access
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.admin == true;
       allow read: if request.auth != null;
     }
 
-    // Admin-specific rules for collections
-    match /users/{userId}/{document=**} {
-      // Allow admins full access to all subcollections
-      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-    }
-     match /offers/{offerId}/{document=**} {
-      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    match /withdrawals/{withdrawalId} {
+      allow read, write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.admin == true;
     }
   }
 }
