@@ -161,7 +161,7 @@ const SettingsPage: NextPage = () => {
               <Input
                 placeholder="e.g., WELCOME100"
                 value={offerCode}
-                onChange={(e) => setOfferCode(e.target.value)}
+                onChange={(e) => setOfferCode(e.target.value.toUpperCase())}
                 disabled={isRedeeming}
               />
               <Button onClick={handleRedeemCode} disabled={isRedeeming || !offerCode}>
