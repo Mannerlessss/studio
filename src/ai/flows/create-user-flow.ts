@@ -21,17 +21,16 @@ if (admin.apps.length === 0) {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
-      console.log("Firebase Admin SDK initialized successfully.");
+      console.log("Firebase Admin SDK initialized successfully using serviceAccountKey.json.");
     } else {
-        // This case is for environments where service account is set via env vars
-        // or another mechanism. If serviceAccountKey.json is the ONLY method,
-        // this will fail gracefully later.
+        // This case is for environments where service account is set via env vars (e.g., Google Cloud)
         admin.initializeApp();
-        console.log("Firebase Admin SDK initialized using default credentials.");
+        console.log("Firebase Admin SDK initialized using default credentials (e.g., environment variables).");
     }
   } catch(error) {
-    console.error("Failed to initialize Firebase Admin", error);
+    console.error("Failed to initialize Firebase Admin SDK at the top level:", error);
     // In a server environment, you might want to re-throw or handle this more gracefully
+    // For now, we'll let the flow fail with a clear message.
   }
 }
 
@@ -67,12 +66,10 @@ const createUserFlow = ai.defineFlow(
     outputSchema: CreateUserOutputSchema,
   },
   async (input) => {
-    // Check if initialization was successful. The most reliable check is to try to use a service.
-    try {
-        await admin.auth().listUsers(1);
-    } catch (e) {
-        console.error("Firebase Admin SDK not initialized correctly.", e);
-        throw new Error("Firebase Admin SDK is not initialized. Cannot create user.");
+    // A robust check to ensure Firebase Admin is initialized before proceeding.
+    if (admin.apps.length === 0) {
+      console.error("FATAL: Firebase Admin SDK is not initialized. The flow cannot continue.");
+      throw new Error("The Firebase Admin SDK failed to initialize. Check server logs for details. This is an unrecoverable error.");
     }
 
     const { name, email, phone, password, referralCode: providedCode } = input;
