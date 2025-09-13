@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, HandCoins, Gift, TrendingUp } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, collectionGroup, getDocs, query, where } from 'firebase/firestore';
+import { collection, collectionGroup, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Stats {
@@ -26,23 +26,24 @@ export default function AdminDashboard() {
                 const totalUsers = usersSnapshot.size;
 
                 // Pending Withdrawals
-                const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'));
+                const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'), where('status', '==', 'Pending'));
                 const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
-                const pendingWithdrawals = withdrawalsSnapshot.docs.filter(doc => doc.data().status === 'Pending').length;
+                const pendingWithdrawals = withdrawalsSnapshot.size;
 
                 // Active Offer Codes
                 const offersSnapshot = await getDocs(collection(db, 'offers'));
                 const activeOffers = offersSnapshot.docs.filter(doc => {
                     const offer = doc.data();
-                    const isExpiredByDate = offer.expiresAt && offer.expiresAt.toMillis() < Date.now();
+                    const now = new Date();
+                    const isExpiredByDate = offer.expiresAt && (offer.expiresAt as Timestamp).toDate() < now;
                     const isExpiredByUsage = offer.maxUsers && offer.usageCount >= offer.maxUsers;
                     return !isExpiredByDate && !isExpiredByUsage;
                 }).length;
 
-                // Total Investments - Sum of 'invested' field from all users
+                // Total Investments - Sum of 'totalInvested' field from all users
                 let totalInvestments = 0;
                 usersSnapshot.forEach(doc => {
-                    totalInvestments += doc.data().invested || 0;
+                    totalInvestments += doc.data().totalInvested || 0;
                 });
 
                 setStats({

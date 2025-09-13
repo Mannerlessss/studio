@@ -35,6 +35,11 @@ const Dashboard: NextPage = () => {
   const handleBonusClaim = (amount: number) => {
     claimDailyBonus(amount);
   };
+  
+  const totalProjectedEarnings = userData.investments
+    ?.filter(inv => inv.status === 'active')
+    .reduce((acc, inv) => acc + (inv.planAmount * inv.dailyReturn * inv.durationDays), 0) || 0;
+
 
   return (
     <div className="bg-background min-h-full">
@@ -50,22 +55,22 @@ const Dashboard: NextPage = () => {
         <div className="grid grid-cols-2 gap-4" id="info-cards">
           <InfoCard
             title="Invested"
-            value={`${userData.invested || 0} Rs.`}
+            value={`${userData.totalInvested || 0} Rs.`}
             icon={<Wallet className="h-6 w-6 text-primary" />}
           />
           <InfoCard
             title="Earnings"
-            value={`${userData.earnings || 0} Rs.`}
+            value={`${userData.totalEarnings || 0} Rs.`}
             icon={<TrendingUp className="h-6 w-6 text-primary" />}
           />
            <InfoCard
             title="Projected"
-            value={`${userData.projected || 0} Rs.`}
+            value={`${totalProjectedEarnings || 0} Rs.`}
             icon={<PiggyBank className="h-6 w-6 text-primary" />}
           />
           <InfoCard
             title="Referral"
-            value={`${userData.referralEarnings || 0} Rs.`}
+            value={`${userData.totalReferralEarnings || 0} Rs.`}
             icon={<Users className="h-6 w-6 text-primary" />}
           />
         </div>

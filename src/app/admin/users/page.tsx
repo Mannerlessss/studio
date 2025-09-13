@@ -42,40 +42,39 @@ import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, getDocs, updateDoc, writeBatch, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, updateDoc, writeBatch, serverTimestamp, query, where, addDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 interface User {
     id: string;
     name: string;
     email: string;
     membership: 'Basic' | 'Pro';
-    totalBalance: number;
-    bonusEarnings: number;
-    referralEarnings: number;
-    investmentEarnings: number;
     hasInvested?: boolean;
-    referredBy?: string;
-    invested?: number;
-    projected?: number;
+    totalBalance: number;
+    totalInvestmentEarnings: number;
+    totalBonusEarnings: number;
+    totalReferralEarnings: number;
+    totalInvested: number;
     claimedMilestones?: number[];
+    referredBy?: string;
 }
 
-const referralMilestones: { [key: number]: number } = {
-  5: 250,
-  10: 500,
-  20: 1000,
-  30: 1500,
-  40: 2000,
-  50: 2500,
-};
+const investmentPlans = [100, 300, 500, 1000, 2000];
 
 export default function UsersPage() {
     const { toast } = useToast();
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
-    const [creditAmount, setCreditAmount] = useState('');
+    const [creditAmount, setCreditAmount] = useState('100'); // Default to the smallest plan
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
 
     useEffect(() => {
@@ -99,11 +98,11 @@ export default function UsersPage() {
     const handleCredit = async (user: User) => {
         setIsSubmitting(user.id);
         const amount = Number(creditAmount);
-        if (isNaN(amount) || amount <= 0) {
+        if (isNaN(amount) || !investmentPlans.includes(amount)) {
             toast({
                 variant: 'destructive',
                 title: 'Invalid Amount',
-                description: 'Please enter a valid amount to credit.',
+                description: 'Please select a valid investment plan amount.',
             });
             setIsSubmitting(null);
             return;
@@ -112,66 +111,72 @@ export default function UsersPage() {
         try {
             const userDocRef = doc(db, 'users', user.id);
             const batch = writeBatch(db);
+            const now = serverTimestamp();
 
-            const newInvestedAmount = (user.invested || 0) + amount;
+            // 1. Create a new document in the `investments` subcollection
+            const newInvestmentRef = doc(collection(db, `users/${user.id}/investments`));
             const dailyReturnRate = user.membership === 'Pro' ? 0.13 : 0.10;
-            const newProjectedAmount = newInvestedAmount * dailyReturnRate * 30;
-            
-            const updates: any = { 
-                invested: newInvestedAmount,
-                projected: newProjectedAmount,
-            };
+            batch.set(newInvestmentRef, {
+                planAmount: amount,
+                dailyReturn: amount * dailyReturnRate,
+                startDate: now,
+                lastUpdate: now,
+                durationDays: 30,
+                earnings: 0,
+                status: 'active',
+            });
 
-            // This is the user's first investment ever. Set the starting timestamp.
-            if (!user.hasInvested || (user.invested || 0) <= 0) {
-                updates.investmentEarnings = 0; // Reset earnings for the new cycle
-                updates.lastInvestmentUpdate = serverTimestamp(); // Set the starting point for daily calculations
-            }
-
-
-            batch.update(userDocRef, updates);
-
+            // 2. Create a transaction record
             const transactionRef = doc(collection(db, `users/${user.id}/transactions`));
             batch.set(transactionRef, {
                 type: 'investment',
                 amount,
-                description: `Investment Added`,
+                description: `Invested in Plan ${amount}`,
                 status: 'Completed',
-                date: serverTimestamp(),
+                date: now,
             });
+            
+            // 3. Update the user's main document
+            const userUpdates: any = {
+                totalInvested: (user.totalInvested || 0) + amount,
+            };
+            if (!user.hasInvested) {
+                userUpdates.hasInvested = true;
+            }
+            batch.update(userDocRef, userUpdates);
 
-            // --- Referral & Milestone Logic ---
-            if (!user.hasInvested && amount >= 100 && user.referredBy) {
+            // 4. Handle Referral Logic (if it's the user's first ever investment)
+            if (!user.hasInvested && user.referredBy) {
                 const referrerDocRef = doc(db, 'users', user.referredBy);
                 const referrerDoc = await getDoc(referrerDocRef);
 
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data() as User;
                     const bonusAmount = 75; // Standard referral bonus
-                    
-                    // 1. Give welcome bonus to the new investor
+
+                    // Give welcome bonus to the new investor
                     batch.update(userDocRef, {
                         totalBalance: (user.totalBalance || 0) + bonusAmount,
-                        bonusEarnings: (user.bonusEarnings || 0) + bonusAmount,
-                        earnings: ((user as any).earnings || 0) + bonusAmount,
+                        totalBonusEarnings: (user.totalBonusEarnings || 0) + bonusAmount,
+                        totalEarnings: ((user as any).totalEarnings || 0) + bonusAmount,
                     });
                     const userBonusTransactionRef = doc(collection(db, `users/${user.id}/transactions`));
                     batch.set(userBonusTransactionRef, {
-                        type: 'bonus', amount: bonusAmount, description: `Welcome referral bonus!`, status: 'Completed', date: serverTimestamp(),
+                        type: 'bonus', amount: bonusAmount, description: `Welcome referral bonus!`, status: 'Completed', date: now,
                     });
 
-                    // 2. Give standard referral bonus to the referrer
+                    // Give standard referral bonus to the referrer
                     batch.update(referrerDocRef, {
                         totalBalance: (referrerData.totalBalance || 0) + bonusAmount,
-                        referralEarnings: (referrerData.referralEarnings || 0) + bonusAmount,
-                        earnings: (referrerData.earnings || 0) + bonusAmount,
+                        totalReferralEarnings: (referrerData.totalReferralEarnings || 0) + bonusAmount,
+                        totalEarnings: ((referrerData as any).totalEarnings || 0) + bonusAmount,
                     });
                     const referrerBonusTransactionRef = doc(collection(db, `users/${user.referredBy}/transactions`));
                      batch.set(referrerBonusTransactionRef, {
-                        type: 'referral', amount: bonusAmount, description: `Referral bonus from ${user.name}`, status: 'Completed', date: serverTimestamp(),
+                        type: 'referral', amount: bonusAmount, description: `Referral bonus from ${user.name}`, status: 'Completed', date: now,
                     });
 
-                    // 3. Mark the referred user as "invested" in the referrer's subcollection
+                    // Mark the referred user as "invested" in the referrer's subcollection
                     const referrerReferralsRef = collection(db, 'users', user.referredBy, 'referrals');
                     const q = query(referrerReferralsRef, where("userId", "==", user.id));
                     const referredUserDocs = await getDocs(q);
@@ -179,54 +184,21 @@ export default function UsersPage() {
                         const referredUserDocRef = referredUserDocs.docs[0].ref;
                         batch.update(referredUserDocRef, { hasInvested: true });
                     }
-
-                    // 4. Check for referral milestones for the referrer
-                    const referralsQuery = query(collection(db, `users/${user.referredBy}/referrals`), where("hasInvested", "==", true));
-                    const investedReferralsSnapshot = await getDocs(referralsQuery);
-                    const newInvestedCount = investedReferralsSnapshot.size + 1; // +1 for the current user
-                    
-                    for (const milestone of Object.keys(referralMilestones).map(Number)) {
-                        const reward = referralMilestones[milestone];
-                        const alreadyClaimed = referrerData.claimedMilestones?.includes(milestone);
-
-                        if (newInvestedCount >= milestone && !alreadyClaimed) {
-                            // Add reward to referrer's balance
-                            batch.update(referrerDocRef, {
-                                totalBalance: (referrerData.totalBalance || 0) + bonusAmount + reward, // Add the standard bonus again since it's deferred until commit
-                                referralEarnings: (referrerData.referralEarnings || 0) + bonusAmount + reward,
-                                earnings: (referrerData.earnings || 0) + bonusAmount + reward,
-                                claimedMilestones: [...(referrerData.claimedMilestones || []), milestone]
-                            });
-
-                            // Create transaction for milestone bonus
-                            const milestoneTransactionRef = doc(collection(db, `users/${user.referredBy}/transactions`));
-                            batch.set(milestoneTransactionRef, {
-                                type: 'referral', amount: reward, description: `Referral Milestone: ${milestone} users!`, status: 'Completed', date: serverTimestamp(),
-                            });
-                        }
-                    }
                 }
             }
-            // --- End Referral & Milestone Logic ---
             
-             if (!user.hasInvested && amount >= 100) {
-                  batch.update(userDocRef, { hasInvested: true });
-             }
-
             await batch.commit();
 
             toast({
                 title: `Investment Credited`,
-                description: `${amount} Rs. has been credited for user ${user.name}.`,
+                description: `${amount} Rs. has been invested for user ${user.name}.`,
             });
             setUsers(prevUsers => prevUsers.map(u => u.id === user.id ? { 
                 ...u, 
                 hasInvested: true, 
-                invested: newInvestedAmount, 
-                projected: newProjectedAmount, 
-                investmentEarnings: !user.hasInvested ? 0 : u.investmentEarnings 
+                totalInvested: (u.totalInvested || 0) + amount,
             } : u));
-            setCreditAmount('');
+            setCreditAmount('100');
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -307,7 +279,7 @@ export default function UsersPage() {
                                 </Button>
                             </DialogTrigger>
                         </Dialog>
-                       <AlertDialog onOpenChange={(open) => !open && setCreditAmount('')}>
+                       <AlertDialog onOpenChange={(open) => !open && setCreditAmount('100')}>
                           <AlertDialogTrigger asChild>
                              <Button variant="outline" size="sm" disabled={!!isSubmitting}>
                                 <DollarSign className='w-4 h-4 mr-1' /> Credit
@@ -317,12 +289,21 @@ export default function UsersPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Credit Investment for {user.name}</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Enter the amount to credit. This will trigger referral bonuses and milestones on first investment.
+                                Select the investment plan to credit. This will create a new active investment plan for the user.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <div className="space-y-2">
-                                <Label htmlFor="credit-amount">Amount (in Rs.)</Label>
-                                <Input id="credit-amount" type="number" placeholder="e.g., 1000" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} disabled={!!isSubmitting}/>
+                                <Label htmlFor="credit-amount">Plan Amount (in Rs.)</Label>
+                                <Select onValueChange={(value) => setCreditAmount(value)} value={creditAmount} disabled={!!isSubmitting}>
+                                    <SelectTrigger id="credit-amount">
+                                        <SelectValue placeholder="Select a plan" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {investmentPlans.map(plan => (
+                                            <SelectItem key={plan} value={String(plan)}>{plan} Rs. Plan</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <AlertDialogFooter>
                               <AlertDialogCancel disabled={!!isSubmitting}>Cancel</AlertDialogCancel>
@@ -377,21 +358,21 @@ export default function UsersPage() {
                                 <TrendingUp className="w-4 h-4" />
                                 <span>Investment Earnings</span>
                             </div>
-                            <span>{selectedUser.investmentEarnings || 0} Rs.</span>
+                            <span>{selectedUser.totalInvestmentEarnings || 0} Rs.</span>
                        </div>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-muted-foreground">
                                 <Users className="w-4 h-4" />
                                 <span>Referral Earnings</span>
                             </div>
-                            <span>{selectedUser.referralEarnings || 0} Rs.</span>
+                            <span>{selectedUser.totalReferralEarnings || 0} Rs.</span>
                        </div>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-muted-foreground">
                                 <Gift className="w-4 h-4" />
                                 <span>Bonus Earnings</span>
                             </div>
-                            <span>{selectedUser.bonusEarnings || 0} Rs.</span>
+                            <span>{selectedUser.totalBonusEarnings || 0} Rs.</span>
                        </div>
                     </div>
                 </div>
@@ -402,4 +383,3 @@ export default function UsersPage() {
   );
 }
 
-    
