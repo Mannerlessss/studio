@@ -104,6 +104,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
         
         try {
+            // First, get all active investments outside of a transaction.
+            const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
+
+            if (activeInvestmentsSnapshot.empty) {
+                return; // No active investments to process
+            }
+
+            // Now, run a transaction to update user and investment docs together.
              await runTransaction(db, async (transaction) => {
                 const userDocRef = doc(db, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
@@ -113,11 +121,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     return;
                 }
                 
-                const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
-                if (activeInvestmentsSnapshot.empty) {
-                    return; // No active investments to process
-                }
-
                 let totalEarningsToAdd = 0;
                 const currentData = userDoc.data() as UserData;
                 const now = new Date();
@@ -131,7 +134,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
                 for (const investmentDoc of activeInvestmentsSnapshot.docs) {
-                    const investment = investmentDoc.data() as Investment;
+                    // We must re-fetch inside the transaction to ensure we have the latest data
+                    const currentInvestmentRef = doc(db, `users/${currentUserId}/investments`, investmentDoc.id);
+                    const currentInvestmentDoc = await transaction.get(currentInvestmentRef);
+
+                    if (!currentInvestmentDoc.exists()) continue;
+
+                    const investment = currentInvestmentDoc.data() as Investment;
 
                     const lastUpdateDate = investment.lastUpdate.toDate();
                     const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
@@ -152,7 +161,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         const newEarnings = investment.earnings + earningsForThisPlan;
                         const newStatus = (daysAlreadyProcessed + daysToCredit) >= investment.durationDays ? 'completed' : 'active';
                         
-                        transaction.update(investmentDoc.ref, {
+                        transaction.update(currentInvestmentRef, {
                             earnings: newEarnings,
                             lastUpdate: serverTimestamp(),
                             status: newStatus
@@ -355,7 +364,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             name: name,
                             email: email,
                             hasInvested: false,
-                            joinedAt: serverTimestamp(),
+                            joinedAt: Timestamp.now(),
                         });
                         
                         localStorage.removeItem('referralCode');
@@ -519,5 +528,7 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
 
     
