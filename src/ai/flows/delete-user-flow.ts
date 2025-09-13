@@ -12,7 +12,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import * as admin from 'firebase-admin';
 
-// Initialize Firebase Admin SDK
+// Initialize Firebase Admin SDK.
 // This will automatically use service account credentials if the file is present
 // or use application default credentials in a deployed environment.
 if (admin.apps.length === 0) {

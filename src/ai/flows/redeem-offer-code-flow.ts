@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A server-side flow to securely redeem an offer code.
@@ -11,7 +12,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import * as admin from 'firebase-admin';
 
-// Initialize Firebase Admin SDK if not already initialized
+// Initialize Firebase Admin SDK if not already initialized.
 if (admin.apps.length === 0) {
   admin.initializeApp();
 }
@@ -33,7 +34,7 @@ export type RedeemOfferCodeOutput = z.infer<
   typeof RedeemOfferCodeOutputSchema
 >;
 
-async function redeemOfferCode(
+export async function redeemOfferCode(
   input: RedeemOfferCodeInput
 ): Promise<RedeemOfferCodeOutput> {
   return redeemOfferCodeFlow(input);
@@ -112,7 +113,7 @@ export const redeemOfferCodeFlow = ai.defineFlow(
         });
 
         const userTransactionRef = userRef.collection('transactions').doc();
-        transaction.set(userTransactionRef, {
+        transaction.set(userTransactionfRef, {
           type: 'bonus',
           amount: rewardAmount,
           description: `Redeemed offer code: ${code.toUpperCase()}`,
