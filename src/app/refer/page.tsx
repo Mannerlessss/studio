@@ -127,7 +127,7 @@ const ReferPage: NextPage = () => {
             </Card>
             <Card className="bg-card">
                 <CardContent className="p-4">
-                    {loadingStats ? <Skeleton className="h-8 w-1/2 mx-auto" /> : <p className="text-3xl font-bold">{userData?.totalReferralEarnings || 0} <span className='text-xl'>Rs.</span></p>}
+                    {userData ? <p className="text-3xl font-bold">{userData?.totalReferralEarnings || 0} <span className='text-xl'>Rs.</span></p> : <Skeleton className="h-8 w-1/2 mx-auto" />}
                     <p className="text-xs flex items-center justify-center gap-1"><Gift className='w-3 h-3' /> Total Earnings</p>
                 </CardContent>
             </Card>
