@@ -115,28 +115,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                 // --- CORRECTED DATE LOGIC ---
                 const now = new Date();
-                const lastUpdateDate = data.lastInvestmentUpdate.toDate();
+                const investmentStartDate = data.lastInvestmentUpdate.toDate();
                 
-                // Normalize dates to the beginning of the day (midnight) for accurate comparison
                 const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
+                const startOfInvestmentDay = new Date(investmentStartDate.getFullYear(), investmentStartDate.getMonth(), investmentStartDate.getDate());
 
-                // Calculate the difference in days
                 const msInDay = 24 * 60 * 60 * 1000;
-                const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
-                // --- END CORRECTED DATE LOGIC ---
+                const totalDaysSinceInvestment = Math.floor((startOfToday.getTime() - startOfInvestmentDay.getTime()) / msInDay);
                 
-                if (daysPassed <= 0) {
-                    return; // No new full day has passed
+                const daysToProcess = totalDaysSinceInvestment - daysAlreadyProcessed;
+
+                if (daysToProcess <= 0) {
+                    return; // No new full day has passed since last processing
                 }
                 
-                const daysToProcess = Math.min(daysPassed, 30 - daysAlreadyProcessed);
+                const daysToCredit = Math.min(daysToProcess, 30 - daysAlreadyProcessed);
                 
-                if (daysToProcess <= 0) {
+                if (daysToCredit <= 0) {
                     return; // No days left to process in this cycle
                 }
 
-                const totalEarningsToAdd = dailyEarning * daysToProcess;
+                const totalEarningsToAdd = dailyEarning * daysToCredit;
 
                 const newInvestmentEarnings = (data.investmentEarnings || 0) + totalEarningsToAdd;
                 const newTotalBalance = (data.totalBalance || 0) + totalEarningsToAdd;
@@ -146,14 +145,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     investmentEarnings: newInvestmentEarnings,
                     totalBalance: newTotalBalance,
                     earnings: newTotalEarnings,
-                    lastInvestmentUpdate: Timestamp.fromDate(now) // Set to now to prevent re-calculation today
                 });
 
                 // Add transaction records for each day earned
-                for (let i = 0; i < daysToProcess; i++) {
+                for (let i = 0; i < daysToCredit; i++) {
                     const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
                     // The date should reflect the day the earning was for
-                    const earningDay = new Date(startOfLastUpdateDay.getTime() + (i + 1) * msInDay);
+                    const earningDay = new Date(startOfToday.getTime() - (daysToProcess - i - 1) * msInDay);
                     transaction.set(transactionRef, {
                         type: 'earning',
                         amount: dailyEarning,
@@ -469,3 +467,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
