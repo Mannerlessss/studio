@@ -15,14 +15,12 @@ export const ActiveInvestmentsCard: FC = () => {
     const dailyReturnRate = userData?.membership === 'Pro' ? 0.13 : 0.10;
     const dailyEarning = investedAmount * dailyReturnRate;
     
-    const investmentStartDate = userData?.lastInvestmentUpdate ? userData.lastInvestmentUpdate : null;
-    
     const daysElapsed = useMemo(() => {
-        if (!investmentStartDate || dailyEarning <= 0) return 0;
+        if (dailyEarning <= 0) return 0;
         // Calculate days elapsed based on earnings to be precise
         const elapsed = Math.floor(investmentEarnings / dailyEarning);
         return Math.min(elapsed, 30); // Cap at 30 days
-    }, [investmentEarnings, dailyEarning, investmentStartDate]);
+    }, [investmentEarnings, dailyEarning]);
 
     const progress = (daysElapsed / 30) * 100;
 

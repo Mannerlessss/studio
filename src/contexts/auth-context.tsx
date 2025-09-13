@@ -51,7 +51,6 @@ interface AuthContextType {
   signUpWithEmail: (details: any) => Promise<void>;
   signInWithEmail: (details: any) => Promise<void>;
   logOut: () => Promise<void>;
-  redeemReferralCode: (code: string) => Promise<{ success: boolean; message: string; }>;
   updateUserPhone: (phone: string) => Promise<void>;
   updateUserName: (name: string) => Promise<void>;
   claimDailyBonus: (amount: number) => Promise<void>;
@@ -104,23 +103,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 const now = Timestamp.now();
-                
                 const investmentStartDate = data.lastInvestmentUpdate;
-                const totalDaysSinceStart = Math.floor((now.toMillis() - investmentStartDate.toMillis()) / (1000 * 60 * 60 * 24));
-                
                 const dailyReturnRate = data.membership === 'Pro' ? 0.13 : 0.10;
                 const dailyEarning = data.invested * dailyReturnRate;
+
+                // Calculate how many days of earnings have already been processed
                 const daysAlreadyProcessed = dailyEarning > 0 ? Math.floor((data.investmentEarnings || 0) / dailyEarning) : 0;
                 
-                if (daysAlreadyProcessed >= 30) return; // Cycle complete
+                if (daysAlreadyProcessed >= 30) {
+                    return; // Investment cycle is complete
+                }
 
+                // Calculate how many full 24-hour periods have passed since the investment started
+                const totalDaysSinceStart = Math.floor((now.toMillis() - investmentStartDate.toMillis()) / (1000 * 60 * 60 * 24));
+                
+                // Determine how many new, unprocessed days there are
                 const daysToProcess = totalDaysSinceStart - daysAlreadyProcessed;
 
-                if (daysToProcess <= 0) return; // No full day passed since last processing
-
+                if (daysToProcess <= 0) {
+                    return; // No new full day has passed since the last processing
+                }
+                
+                // Ensure we don't process more than 30 days in total for the cycle
                 const daysToActuallyProcess = Math.min(daysToProcess, 30 - daysAlreadyProcessed);
                 
-                if (daysToActuallyProcess <= 0) return;
+                if (daysToActuallyProcess <= 0) {
+                    return; // No days left to process in this cycle
+                }
 
                 const totalEarningsToAdd = dailyEarning * daysToActuallyProcess;
 
@@ -134,8 +143,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     earnings: newTotalEarnings,
                 });
 
+                // Create a transaction record for each day of earnings
                 for (let i = 0; i < daysToActuallyProcess; i++) {
                     const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
+                    // Calculate the date for the transaction to keep them sequential
                     const transactionDate = Timestamp.fromMillis(investmentStartDate.toMillis() + (daysAlreadyProcessed + i + 1) * 24 * 60 * 60 * 1000);
                     transaction.set(transactionRef, {
                         type: 'earning',
@@ -145,7 +156,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         date: transactionDate,
                     });
                 }
-                 console.log(`Processed ${daysToActuallyProcess} day(s) of investment earnings.`);
             });
         } catch (error) {
              if (String(error).includes("document does not exist")) {
@@ -176,10 +186,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                      setUserData(null);
                 } else {
                     const userDocRef = doc(db, 'users', currentUser.uid);
+                    // Process earnings ONCE before setting up the listener to avoid infinite loops
+                    await processDailyEarnings(currentUser.uid); 
+                    
                     unsubFromDoc = onSnapshot(userDocRef, 
-                        async (docSnap) => {
+                        (docSnap) => {
                              if (docSnap.exists()) {
-                                await processDailyEarnings(currentUser.uid);
                                 setUserData({ uid: docSnap.id, ...docSnap.data() } as UserData);
                             } else {
                                 console.warn(`No Firestore document found for user ${currentUser.uid}. Waiting for it to be created...`);
@@ -261,7 +273,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 hasInvested: false,
                 hasCollectedSignupBonus: false,
                 referralCode: referralCode,
-                referrals: [],
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
                 claimedMilestones: [],
@@ -307,67 +318,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 title: 'Error',
                 description: error.message,
             });
-        }
-    };
-    
-    const redeemReferralCode = async (code: string): Promise<{ success: boolean; message: string; }> => {
-        if (!user || !userData) {
-            throw new Error("You must be logged in to redeem a code.");
-        }
-        const formattedCode = code.trim().toUpperCase();
-
-        try {
-            const result = await runTransaction(db, async (transaction) => {
-                const currentUserRef = doc(db, 'users', user.uid);
-                const currentUserDoc = await transaction.get(currentUserRef);
-                if (!currentUserDoc.exists()) {
-                    throw new Error('Your user profile could not be found.');
-                }
-                const currentUserData = currentUserDoc.data()!;
-                if (currentUserData.usedReferralCode) {
-                    throw new Error('You have already redeemed a referral code.');
-                }
-
-                const usersRef = collection(db, 'users');
-                const referrerQuery = query(usersRef, where('referralCode', '==', formattedCode), where('__name__', '!=', user.uid));
-                const referrerSnapshot = await transaction.get(referrerQuery);
-
-                if (referrerSnapshot.empty) {
-                    const selfReferralQuery = query(usersRef, where('referralCode', '==', formattedCode));
-                    const selfReferralSnapshot = await transaction.get(selfReferralQuery);
-                    if (!selfReferralSnapshot.empty && selfReferralSnapshot.docs[0].id === user.uid) {
-                        throw new Error("You cannot use your own referral code.");
-                    }
-                    throw new Error('This referral code is not valid.');
-                }
-
-                const referrerDoc = referrerSnapshot.docs[0];
-                const referrerId = referrerDoc.id;
-
-                transaction.update(currentUserRef, {
-                    usedReferralCode: formattedCode,
-                    referredBy: referrerId,
-                });
-
-                const referrerRef = doc(db, 'users', referrerId);
-                transaction.update(referrerRef, {
-                    referrals: arrayUnion({
-                        userId: user.uid,
-                        name: userData.name,
-                        email: userData.email,
-                        hasInvested: false,
-                        date: new Date(),
-                    })
-                });
-
-                return `Successfully redeemed code from ${referrerDoc.data().name}!`;
-            });
-
-            toast({ title: 'Code Redeemed!', description: result });
-            return { success: true, message: result };
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Redemption Failed', description: error.message });
-            return { success: false, message: error.message };
         }
     };
     
@@ -454,7 +404,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signUpWithEmail,
         signInWithEmail,
         logOut,
-        redeemReferralCode,
         updateUserPhone,
         updateUserName,
         claimDailyBonus,
