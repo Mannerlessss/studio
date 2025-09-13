@@ -120,13 +120,14 @@ export default function UsersPage() {
             const updates: any = { 
                 invested: newInvestedAmount,
                 projected: newProjectedAmount,
-                lastInvestmentUpdate: serverTimestamp(),
             };
 
-            // Only reset investmentEarnings if it's the user's first investment ever.
-            if (!user.hasInvested) {
-                updates.investmentEarnings = 0;
+            // This is the user's first investment ever. Set the starting timestamp.
+            if (!user.hasInvested || (user.invested || 0) <= 0) {
+                updates.investmentEarnings = 0; // Reset earnings for the new cycle
+                updates.lastInvestmentUpdate = serverTimestamp(); // Set the starting point for daily calculations
             }
+
 
             batch.update(userDocRef, updates);
 
@@ -401,5 +402,4 @@ export default function UsersPage() {
   );
 }
 
-    
     

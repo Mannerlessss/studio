@@ -101,7 +101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 
                 const data = userDoc.data() as UserData;
                 if (!data.invested || data.invested <= 0 || !data.lastInvestmentUpdate) {
-                    return; // No active investment to process
+                    return; // No active investment or timestamp to process
                 }
 
                 const dailyReturnRate = data.membership === 'Pro' ? 0.13 : 0.10;
@@ -125,7 +125,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const msInDay = 24 * 60 * 60 * 1000;
                 const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
                 // --- End Corrected Date Logic ---
-
+                
                 if (daysPassed <= 0) {
                     return; // No new full day has passed
                 }
@@ -142,17 +142,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const newTotalBalance = (data.totalBalance || 0) + totalEarningsToAdd;
                 const newTotalEarnings = (data.earnings || 0) + totalEarningsToAdd;
                 
-                transaction.update(userDocRef, {
+                // Create a batch-like array of updates for the transaction
+                const updates: any = {
                     investmentEarnings: newInvestmentEarnings,
                     totalBalance: newTotalBalance,
                     earnings: newTotalEarnings,
-                    // Update the timestamp to today so we don't re-calculate
-                    lastInvestmentUpdate: Timestamp.fromDate(startOfToday) 
-                });
+                    lastInvestmentUpdate: Timestamp.fromDate(now) // Set to now to prevent re-calculation today
+                };
+                
+                transaction.update(userDocRef, updates);
 
+                // Add transaction records for each day earned
                 for (let i = 0; i < daysToProcess; i++) {
                     const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                    // The date should reflect the day the earning was for, not the time it was processed
+                    // The date should reflect the day the earning was for
                     const earningDay = new Date(startOfLastUpdateDay.getTime() + (i + 1) * msInDay);
                     transaction.set(transactionRef, {
                         type: 'earning',
@@ -469,9 +472,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
-
-    
 
     
