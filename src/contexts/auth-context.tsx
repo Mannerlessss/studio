@@ -14,8 +14,6 @@ import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc, increment } from 'firebase/firestore';
-import { redeemOfferCodeFlow } from '@/ai/flows/redeem-offer-code-flow';
-
 
 export interface Investment {
     id: string;
@@ -58,18 +56,6 @@ interface UserData {
     investments?: Investment[];
 }
 
-interface RedeemOfferCodeInput {
-  code: string;
-  userId: string;
-}
-
-interface RedeemOfferCodeOutput {
-  success: boolean;
-  message: string;
-  rewardAmount?: number;
-}
-
-
 interface AuthContextType {
   user: User | null;
   userData: UserData | null;
@@ -85,7 +71,6 @@ interface AuthContextType {
   claimDailyBonus: (amount: number) => Promise<void>;
   collectSignupBonus: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
-  redeemOfferCode: (code: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -520,30 +505,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: 'Bonus Collected!', description: `You received ${signupBonusAmount} Rs.` });
     }
 
-    const redeemOfferCode = async (code: string) => {
-        if (!user) {
-            throw new Error('You must be logged in to redeem a code.');
-        }
-
-        try {
-            const result = await redeemOfferCodeFlow({
-                userId: user.uid,
-                code: code,
-            });
-
-            if (result.success) {
-                toast({
-                    title: 'Code Redeemed!',
-                    description: result.message,
-                });
-            }
-        } catch (error: any) {
-            // Re-throw the error so the calling component can handle it
-            // (e.g., stop a loading spinner)
-            throw new Error(error.message || 'An unexpected error occurred.');
-        }
-    };
-
     const value: AuthContextType = {
         user,
         userData,
@@ -559,7 +520,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         claimDailyBonus,
         collectSignupBonus,
         sendPasswordReset,
-        redeemOfferCode
     };
     
     if (loading) {
@@ -583,5 +543,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
