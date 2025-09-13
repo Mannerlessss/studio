@@ -99,15 +99,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Function to process earnings for all active investments for a user
     const processInvestmentEarnings = async (currentUserId: string) => {
         try {
+            const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
+            const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
+            const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
+
+            if (activeInvestmentsSnapshot.empty) {
+                return; // No active investments to process
+            }
+
              await runTransaction(db, async (transaction) => {
-                const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
-                const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
-                const activeInvestmentsSnapshot = await transaction.get(activeInvestmentsQuery);
-
-                if (activeInvestmentsSnapshot.empty) {
-                    return; // No active investments to process
-                }
-
                 const userDocRef = doc(db, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
 
@@ -115,32 +115,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     console.warn("processInvestmentEarnings: User document not found.");
                     return;
                 }
-
+                
                 let totalEarningsToAdd = 0;
                 const currentData = userDoc.data() as UserData;
                 const now = new Date();
                 const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
                 for (const investmentDoc of activeInvestmentsSnapshot.docs) {
-                    const investment = investmentDoc.data() as Investment;
+                    // We re-read the investment doc inside the transaction to ensure consistency
                     const investmentRef = doc(db, `users/${currentUserId}/investments`, investmentDoc.id);
+                    const freshInvestmentDoc = await transaction.get(investmentRef);
 
-                    const startDate = investment.startDate.toDate();
-                    const startOfInvestmentDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                    if (!freshInvestmentDoc.exists()) continue;
+
+                    const investment = freshInvestmentDoc.data() as Investment;
+
+                    const lastUpdateDate = investment.lastUpdate.toDate();
+                    const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
                     
                     const msInDay = 24 * 60 * 60 * 1000;
-                    // Total full days passed since the plan started
-                    const totalDaysSinceStart = Math.floor((startOfToday.getTime() - startOfInvestmentDay.getTime()) / msInDay);
-
-                    if (totalDaysSinceStart <= 0) continue; // Not a new day yet
+                    const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
+                    
+                    if (daysPassed <= 0) continue; // Not a new day yet
 
                     const daysAlreadyProcessed = Math.round(investment.earnings / investment.dailyReturn);
-                    const daysToProcess = totalDaysSinceStart - daysAlreadyProcessed;
-
-                    if (daysToProcess <= 0) continue; // Already processed for today or past days
-                    
                     const remainingDaysInPlan = investment.durationDays - daysAlreadyProcessed;
-                    const daysToCredit = Math.min(daysToProcess, remainingDaysInPlan);
+                    const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
 
                     if (daysToCredit > 0) {
                         const earningsForThisPlan = investment.dailyReturn * daysToCredit;
@@ -155,10 +155,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             status: newStatus
                         });
 
-                         // Create transaction records for each day earned
+                        // Create transaction records for each day earned
                         for (let i = 0; i < daysToCredit; i++) {
                             const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                             const earningDay = new Date(startOfToday.getTime() - (daysToProcess - i - 1) * msInDay);
+                             const earningDay = new Date(startOfToday.getTime() - (daysPassed - i - 1) * msInDay);
                             transaction.set(transactionRef, {
                                 type: 'earning',
                                 amount: investment.dailyReturn,
