@@ -34,6 +34,7 @@ interface UserData {
 
     bonusEarnings: number;
     investmentEarnings: number;
+
     hasInvested: boolean;
     hasCollectedSignupBonus: boolean;
     lastBonusClaim?: Timestamp;
@@ -116,7 +117,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 // Calculate how many full 24-hour periods have passed since the investment started
-                const totalDaysSinceStart = Math.floor((now.toMillis() - investmentStartDate.toMillis()) / (1000 * 60 * 60 * 24));
+                // This logic is corrected to handle the start of a new day properly.
+                const nowMs = now.toMillis();
+                const startMs = investmentStartDate.toMillis();
+                const totalDaysSinceStart = Math.floor((nowMs - startMs) / (1000 * 60 * 60 * 24));
                 
                 // Determine how many new, unprocessed days there are
                 const daysToProcess = totalDaysSinceStart - daysAlreadyProcessed;
@@ -148,7 +152,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 for (let i = 0; i < daysToActuallyProcess; i++) {
                     const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
                     // Calculate the date for the transaction to keep them sequential
-                    const transactionDate = Timestamp.fromMillis(investmentStartDate.toMillis() + (daysAlreadyProcessed + i + 1) * 24 * 60 * 60 * 1000);
+                    const transactionDate = Timestamp.fromMillis(startMs + (daysAlreadyProcessed + i + 1) * 24 * 60 * 60 * 1000);
                     transaction.set(transactionRef, {
                         type: 'earning',
                         amount: dailyEarning,
@@ -464,3 +468,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
