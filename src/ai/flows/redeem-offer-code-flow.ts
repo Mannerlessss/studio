@@ -8,27 +8,26 @@
  * balance and the offer's usage count in a single, secure transaction.
  */
 
-import { z } from 'zod';
-import { db, admin } from '@/lib/firebaseAdmin';
+import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
 
-export const RedeemOfferCodeInputSchema = z.object({
-  code: z.string().describe('The offer code to redeem.'),
-  userId: z.string().describe('The UID of the user redeeming the code.'),
-});
-export type RedeemOfferCodeInput = z.infer<typeof RedeemOfferCodeInputSchema>;
+// Define types locally since they cannot be exported from a 'use server' file.
+// The client will have its own definitions.
+interface RedeemOfferCodeInput {
+  code: string;
+  userId: string;
+}
 
-export const RedeemOfferCodeOutputSchema = z.object({
-  success: z.boolean(),
-  message: z.string(),
-  rewardAmount: z.number().optional(),
-});
-export type RedeemOfferCodeOutput = z.infer<
-  typeof RedeemOfferCodeOutputSchema
->;
+interface RedeemOfferCodeOutput {
+  success: boolean;
+  message: string;
+  rewardAmount?: number;
+}
 
-export async function redeemOfferCode(
+
+export async function redeemOfferCodeFlow(
   input: RedeemOfferCodeInput
 ): Promise<RedeemOfferCodeOutput> {
+  const { db, admin } = getFirebaseAdmin();
   const { userId, code } = input;
 
   if (!userId || !code) {

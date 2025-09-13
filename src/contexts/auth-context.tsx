@@ -14,7 +14,7 @@ import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc, increment } from 'firebase/firestore';
-import { redeemOfferCode } from '@/ai/flows/redeem-offer-code-flow';
+import { redeemOfferCodeFlow } from '@/ai/flows/redeem-offer-code-flow';
 
 
 export interface Investment {
@@ -57,6 +57,18 @@ interface UserData {
     lastLogin: any;
     investments?: Investment[];
 }
+
+interface RedeemOfferCodeInput {
+  code: string;
+  userId: string;
+}
+
+interface RedeemOfferCodeOutput {
+  success: boolean;
+  message: string;
+  rewardAmount?: number;
+}
+
 
 interface AuthContextType {
   user: User | null;
@@ -514,7 +526,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         try {
-            const result = await redeemOfferCode({
+            const result = await redeemOfferCodeFlow({
                 userId: user.uid,
                 code: code,
             });
@@ -524,9 +536,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     title: 'Code Redeemed!',
                     description: result.message,
                 });
-            } else {
-                // This case may not be hit if the flow throws an error
-                throw new Error(result.message);
             }
         } catch (error: any) {
             // Re-throw the error so the calling component can handle it
