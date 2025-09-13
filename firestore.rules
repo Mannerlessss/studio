@@ -4,35 +4,39 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Users can only read and write their own data.
-    // They can also be updated by another user, but ONLY to add to the 'referrals' field.
+    // The redeemReferralFlow will handle cross-user writes securely.
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      // Allow another authenticated user to add their info to the referrer's 'referrals' list
-      allow update: if request.auth != null
-                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['referrals'])
-                      && request.resource.data.referrals.size() == resource.data.referrals.size() + 1;
+      // Allow admins to read/write any user document for management.
+      allow read, write: if request.auth != null && request.auth.token.admin == true;
+
+      // Users can only manage their own transactions.
+      match /transactions/{transactionId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Users can only read their own referrals list.
+      match /referrals/{referralId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
-    // Admins can do anything
-    match /users/{userId} {
-      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-    }
+    // Offer codes are public to read for all users.
+    // Only admins can create, update, or delete them.
     match /offers/{offerId} {
-      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.admin == true;
     }
-    
-    // referralCodes collection is public for reads by authenticated users
-    match /referralCodes/{code} {
-      allow get: if request.auth != null;
+
+     // Withdrawal requests can only be managed by admins.
+    match /withdrawals/{withdrawalId} {
+       allow read, write: if request.auth != null && request.auth.token.admin == true;
     }
-    
-    // Offers collection can be read by anyone (for client side checks)
-    // but only written to by admins
-    match /offers/{offerId} {
-       allow read: if request.auth != null;
+
+    // Admins have full access to all collections for administrative purposes.
+    match /{document=**} {
+      allow read, write: if request.auth != null && request.auth.token.admin == true;
     }
   }
 }
-
-    

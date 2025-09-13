@@ -14,6 +14,7 @@ import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion } from 'firebase/firestore';
+import { redeemReferral } from '@/ai/flows/redeem-referral-flow';
 
 interface UserData {
     uid: string;
@@ -23,7 +24,7 @@ interface UserData {
     referralCode?: string;
     usedReferralCode?: string;
     referredBy?: string;
-    referrals?: string[]; // Array of UIDs of referred users
+    referrals?: any[]; // Array of referred user objects
     membership: 'Basic' | 'Pro';
     rank: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
     totalBalance: number;
@@ -244,9 +245,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             const referralCode = `${name.split(' ')[0].toUpperCase()}${(Math.random() * 9000 + 1000).toFixed(0)}`;
             
-            const batch = writeBatch(db);
-            
-            // 1. Create user document
+            // Create user document
             const userDocRef = doc(db, 'users', newUser.uid);
             const newUserDoc = {
                 uid: newUser.uid,
@@ -268,13 +267,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 lastLogin: serverTimestamp(),
                 claimedMilestones: [],
             };
-            batch.set(userDocRef, newUserDoc);
-            
-            // 2. Create public referral code mapping
-            const referralCodeRef = doc(db, "referralCodes", referralCode);
-            batch.set(referralCodeRef, { uid: newUser.uid });
-
-            await batch.commit();
+            await setDoc(userDocRef, newUserDoc);
 
         } catch (error: any) {
              toast({
@@ -319,56 +312,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     const redeemReferralCode = async (code: string) => {
-        if (!user || !userData) throw new Error("User not authenticated");
-        if (userData.usedReferralCode) throw new Error("You have already used a referral code.");
-
-        const formattedCode = code.trim().toUpperCase();
-
-        if (userData.referralCode === formattedCode) {
-            throw new Error("You cannot use your own referral code.");
+        if (!user || !userData) {
+            throw new Error("You must be logged in to redeem a code.");
         }
-        
-        try {
-            const referralCodeDocRef = doc(db, "referralCodes", formattedCode);
-            const referralCodeSnap = await getDoc(referralCodeDocRef);
 
-            if (!referralCodeSnap.exists()) {
-                throw new Error("Invalid referral code.");
-            }
-            
-            const referrerId = referralCodeSnap.data().uid;
-            
-            if(referrerId === user.uid) {
-                throw new Error("You cannot use your own referral code.");
-            }
+        const result = await redeemReferral({
+            code,
+            userId: user.uid,
+            userName: userData.name,
+            userEmail: userData.email,
+        });
 
-            const batch = writeBatch(db);
-            const currentUserDocRef = doc(db, 'users', user.uid);
-            const referrerDocRef = doc(db, 'users', referrerId);
-
-            // Update current user's doc
-            batch.update(currentUserDocRef, { 
-                usedReferralCode: formattedCode,
-                referredBy: referrerId
+        if (result.success) {
+            toast({
+                title: 'Code Redeemed!',
+                description: result.message,
             });
-
-            // Add the new user's ID to the referrer's `referrals` array
-            batch.update(referrerDocRef, {
-                referrals: arrayUnion({
-                    userId: user.uid,
-                    name: userData.name,
-                    email: userData.email,
-                    hasInvested: false,
-                    date: serverTimestamp()
-                })
-            });
-
-            await batch.commit();
-            toast({ title: 'Referral Code Applied!', description: 'Your account is now linked.'});
-
-        } catch (error: any) {
-            console.error(error); 
-            throw new Error(error.message || "This referral code is not valid.");
+        } else {
+            throw new Error(result.message);
         }
     };
     
@@ -484,7 +445,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
-
-    
