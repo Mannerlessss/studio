@@ -36,9 +36,11 @@ const Dashboard: NextPage = () => {
     claimDailyBonus(amount);
   };
   
-  const totalProjectedEarnings = userData.investments
+  const totalInvestedInActivePlans = userData.investments
     ?.filter(inv => inv.status === 'active')
-    .reduce((acc, inv) => acc + (inv.planAmount * inv.dailyReturn * inv.durationDays), 0) || 0;
+    .reduce((acc, inv) => acc + inv.planAmount, 0) || 0;
+
+  const totalROI = totalInvestedInActivePlans * 3; // 300% ROI
 
 
   return (
@@ -64,8 +66,8 @@ const Dashboard: NextPage = () => {
             icon={<TrendingUp className="h-6 w-6 text-primary" />}
           />
            <InfoCard
-            title="Projected"
-            value={`${totalProjectedEarnings || 0} Rs.`}
+            title="Total ROI"
+            value={`300% (${totalROI.toLocaleString('en-IN')} Rs.)`}
             icon={<PiggyBank className="h-6 w-6 text-primary" />}
           />
           <InfoCard
