@@ -39,7 +39,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2, PlusCircle } from 'lucide-react';
+import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -53,7 +53,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { createUser } from '@/ai/flows/create-user-flow';
 
 interface User {
     id: string;
@@ -85,16 +84,6 @@ export default function UsersPage() {
     const [creditAmount, setCreditAmount] = useState('100'); // Default to the smallest plan
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
 
-    // Create user form state
-    const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
-    const [isCreatingUser, setIsCreatingUser] = useState(false);
-    const [newUserName, setNewUserName] = useState('');
-    const [newUserEmail, setNewUserEmail] = useState('');
-    const [newUserPhone, setNewUserPhone] = useState('');
-    const [newUserPassword, setNewUserPassword] = useState('');
-    const [newUserReferralCode, setNewUserReferralCode] = useState('');
-
-
     useEffect(() => {
         const fetchUsers = async () => {
             setLoading(true);
@@ -113,51 +102,6 @@ export default function UsersPage() {
         fetchUsers();
     }, [toast]);
 
-    const handleCreateUser = async () => {
-        if(!newUserName || !newUserEmail || !newUserPhone || !newUserPassword) {
-            toast({ variant: 'destructive', title: 'Missing fields', description: 'Please fill all required fields to create a user.'});
-            return;
-        }
-        setIsCreatingUser(true);
-        try {
-            await createUser({
-                name: newUserName,
-                email: newUserEmail,
-                phone: newUserPhone,
-                password: newUserPassword,
-                referralCode: newUserReferralCode,
-            });
-            toast({ title: 'User Created', description: `Account for ${newUserEmail} has been created.` });
-            
-            // Note: This is a simplification. In a real-world scenario, you might want to re-fetch the users list
-            // to include the newly created user without a full page reload.
-            setUsers(prev => [...prev, {
-                id: 'new-user-temp-id', // temporary
-                name: newUserName,
-                email: newUserEmail,
-                membership: 'Basic',
-                totalBalance: 0,
-                totalInvested: 0,
-                totalBonusEarnings: 0,
-                totalInvestmentEarnings: 0,
-                totalReferralEarnings: 0,
-                investedReferralCount: 0,
-            }]);
-
-            // Reset form and close dialog
-            setNewUserName('');
-            setNewUserEmail('');
-            setNewUserPhone('');
-            setNewUserPassword('');
-            setNewUserReferralCode('');
-            setIsCreateUserOpen(false);
-
-        } catch (error: any) {
-             toast({ variant: 'destructive', title: 'Failed to create user', description: error.message });
-        } finally {
-            setIsCreatingUser(false);
-        }
-    }
 
     const handleDeleteUser = async (userId: string) => {
         setIsSubmitting(userId);
@@ -359,50 +303,6 @@ export default function UsersPage() {
               Manage users and credit their investments.
             </CardDescription>
         </div>
-        <Dialog open={isCreateUserOpen} onOpenChange={setIsCreateUserOpen}>
-            <DialogTrigger asChild>
-                <Button>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Create User
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                 <DialogHeader>
-                    <DialogTitle>Create New User</DialogTitle>
-                    <DialogDescription>
-                        Create a new user account and associated Firestore document.
-                    </DialogDescription>
-                </DialogHeader>
-                 <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="name" className="text-right">Name</Label>
-                        <Input id="name" value={newUserName} onChange={e => setNewUserName(e.target.value)} className="col-span-3" disabled={isCreatingUser}/>
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="email" className="text-right">Email</Label>
-                        <Input id="email" type="email" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} className="col-span-3" disabled={isCreatingUser}/>
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="phone" className="text-right">Phone</Label>
-                        <Input id="phone" type="tel" value={newUserPhone} onChange={e => setNewUserPhone(e.target.value)} className="col-span-3" disabled={isCreatingUser}/>
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="password" className="text-right">Password</Label>
-                        <Input id="password" type="password" value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} className="col-span-3" disabled={isCreatingUser}/>
-                    </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="referral-code" className="text-right">Referral Code</Label>
-                        <Input id="referral-code" value={newUserReferralCode} onChange={e => setNewUserReferralCode(e.target.value.toUpperCase())} className="col-span-3" placeholder="Optional" disabled={isCreatingUser}/>
-                    </div>
-                </div>
-                 <DialogFooter>
-                    <Button type="submit" onClick={handleCreateUser} disabled={isCreatingUser}>
-                        {isCreatingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                        Create Account
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
       </CardHeader>
       <CardContent>
         <Table>
