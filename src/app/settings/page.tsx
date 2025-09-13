@@ -13,31 +13,17 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-
 
 const SettingsPage: NextPage = () => {
-    const { userData, logOut, redeemReferralCode, updateUserPhone, updateUserName } = useAuth();
+    const { userData, logOut, updateUserPhone, updateUserName } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
-    const [referralCodeInput, setReferralCodeInput] = useState('');
-    const [showRedeemSuccess, setShowRedeemSuccess] = useState(false);
     
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
 
     const [isUpdatingName, setIsUpdatingName] = useState(false);
     const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
-    const [isRedeeming, setIsRedeeming] = useState(false);
 
     useEffect(() => {
       if (userData) {
@@ -102,32 +88,6 @@ const SettingsPage: NextPage = () => {
         }
     };
 
-    const handleRedeem = async () => {
-        if (!referralCodeInput) {
-            toast({
-                variant: 'destructive',
-                title: 'No Code Entered',
-                description: 'Please enter a referral code.',
-            });
-            return;
-        }
-        setIsRedeeming(true);
-        try {
-            const result = await redeemReferralCode(referralCodeInput);
-            if (result.success) {
-                setShowRedeemSuccess(true);
-            }
-        } catch (error: any) {
-             toast({
-                variant: 'destructive',
-                title: 'Redemption Failed',
-                description: error.message || 'This code is invalid or has already been used.',
-            });
-        } finally {
-            setIsRedeeming(false);
-        }
-    }
-
   return (
     <div className="bg-background min-h-full">
       <Header />
@@ -163,44 +123,6 @@ const SettingsPage: NextPage = () => {
             </div>
           </CardContent>
         </Card>
-
-        {userData && !userData.usedReferralCode && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Gift className="w-6 h-6 text-primary" />
-                <CardTitle>Used a Referral Code?</CardTitle>
-              </div>
-              <CardDescription>
-                If a friend referred you, enter their code here to link your
-                accounts.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="referral-code">Friend's Referral Code</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="referral-code"
-                    placeholder="e.g., FRIEND123"
-                    value={referralCodeInput}
-                    onChange={(e) =>
-                      setReferralCodeInput(e.target.value)
-                    }
-                    disabled={isRedeeming}
-                  />
-                  <Button onClick={handleRedeem} disabled={isRedeeming}>
-                    {isRedeeming ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      'Redeem'
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <Card>
           <CardHeader>
@@ -251,24 +173,6 @@ const SettingsPage: NextPage = () => {
 
       </div>
       <BottomNav activePage="settings" />
-
-      {/* Success Dialog */}
-       <AlertDialog open={showRedeemSuccess} onOpenChange={setShowRedeemSuccess}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Code Redeemed Successfully!</AlertDialogTitle>
-              <AlertDialogDescription>
-                Your account is now linked to your friend. Make your first investment to get your welcome bonus!
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => router.push('/investment')}>Invest Now</AlertDialogCancel>
-              <AlertDialogAction onClick={() => setShowRedeemSuccess(false)}>
-                Maybe Later
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
     </div>
   );
 };

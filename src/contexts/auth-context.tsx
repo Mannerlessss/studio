@@ -13,7 +13,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, FieldValue } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion } from 'firebase/firestore';
 
 interface UserData {
     uid: string;
@@ -31,6 +31,7 @@ interface UserData {
     earnings: number;
     projected: number;
     referralEarnings: number;
+
     bonusEarnings: number;
     investmentEarnings: number;
     hasInvested: boolean;
@@ -230,7 +231,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
      useEffect(() => {
         if (loading) return;
 
-        const isAuthPage = pathname === '/login';
+        const isAuthPage = pathname === '/login' || pathname.startsWith('/ref/');
         const isAdminPage = pathname.startsWith('/admin');
 
         if (!user && !isAuthPage) {
@@ -253,12 +254,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const newUser = userCredential.user;
-
             const referralCode = `${name.split(' ')[0].toUpperCase()}${(Math.random() * 9000 + 1000).toFixed(0)}`;
-            
-            // Create user document
+            const batch = writeBatch(db);
+
+            // 1. Create user document
             const userDocRef = doc(db, 'users', newUser.uid);
-            const newUserDoc = {
+            const newUserDoc: any = {
                 uid: newUser.uid,
                 name,
                 email,
@@ -277,7 +278,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 lastLogin: serverTimestamp(),
                 claimedMilestones: [],
             };
-            await setDoc(userDocRef, newUserDoc);
+
+            // 2. Check for a referral code from the link
+            const usedCode = localStorage.getItem('referralCode');
+            if (usedCode) {
+                 const q = query(collection(db, 'users'), where('referralCode', '==', usedCode));
+                 const querySnapshot = await getDocs(q);
+
+                 if (!querySnapshot.empty) {
+                     const referrerDoc = querySnapshot.docs[0];
+                     const referrerId = referrerDoc.id;
+
+                     if (referrerId !== newUser.uid) {
+                        newUserDoc.usedReferralCode = usedCode;
+                        newUserDoc.referredBy = referrerId;
+                        
+                        // Add this new user to the referrer's `referrals` subcollection
+                        const referrerSubCollectionRef = doc(collection(db, `users/${referrerId}/referrals`));
+                        batch.set(referrerSubCollectionRef, {
+                            userId: newUser.uid,
+                            name: name,
+                            email: email,
+                            hasInvested: false,
+                            joinedAt: serverTimestamp(),
+                        });
+                        
+                        localStorage.removeItem('referralCode'); // Clean up
+                     }
+                 }
+            }
+            
+            batch.set(userDocRef, newUserDoc);
+            await batch.commit();
 
         } catch (error: any) {
              toast({

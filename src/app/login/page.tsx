@@ -37,6 +37,7 @@ export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
+    const [referralCode, setReferralCode] = useState('');
 
     // Login state
     const [loginEmail, setLoginEmail] = useState('');
@@ -55,7 +56,7 @@ export default function LoginPage() {
             });
             return;
         }
-        await signUpWithEmail({ name, email, phone, password });
+        await signUpWithEmail({ name, email, phone, password, referralCode });
     };
 
      const handleSignIn = async () => {
@@ -90,7 +91,7 @@ export default function LoginPage() {
             <div className="flex flex-col items-center justify-center mb-6 space-y-4">
             <Gem className="w-12 h-12 text-primary" />
             <h1 className="text-2xl font-bold tracking-widest text-primary">
-                UPI VAULT BOOST
+                VAULTBOOST
             </h1>
             </div>
             <TabsList className="grid w-full grid-cols-2">
@@ -174,6 +175,13 @@ export default function LoginPage() {
                     <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                         <Input id="password" type="password" placeholder="••••••••" className="pl-10" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading}/>
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="referral-code">Referral Code (Optional)</Label>
+                    <div className="relative">
+                        <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                        <Input id="referral-code" placeholder="e.g. FRIEND123" className="pl-10" value={referralCode} onChange={(e) => setReferralCode(e.target.value)} disabled={loading}/>
                     </div>
                 </div>
                 </CardContent>
