@@ -11,8 +11,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "set-admin": "tsx src/lib/set-admin-claim.ts",
-    "clear-test-users": "tsx src/lib/clear-test-users.ts"
+    "set-admin": "tsx src/lib/set-admin-claim.ts"
   },
   "dependencies": {
     "@genkit-ai/firebase": "^1.19.2",
