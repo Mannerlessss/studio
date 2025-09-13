@@ -15,10 +15,7 @@ import * as admin from 'firebase-admin';
 // Initialize Firebase Admin SDK.
 // This will automatically use service account credentials if the file is present
 // or use application default credentials in a deployed environment.
-if (admin.apps.length === 0) {
-    admin.initializeApp();
-}
-
+admin.initializeApp();
 
 export const deleteUser = ai.defineFlow(
   {
@@ -32,11 +29,6 @@ export const deleteUser = ai.defineFlow(
   async (uid) => {
     if (!uid) {
         throw new Error('User UID is required.');
-    }
-    
-    // Ensure the SDK is initialized before proceeding.
-    if (admin.apps.length === 0) {
-        throw new Error('Firebase Admin SDK is not initialized. Cannot delete user.');
     }
     
     try {

@@ -12,10 +12,10 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import * as admin from 'firebase-admin';
 
-// Initialize Firebase Admin SDK if not already initialized.
-if (admin.apps.length === 0) {
-  admin.initializeApp();
-}
+// Initialize Firebase Admin SDK.
+// This will automatically use service account credentials if the file is present
+// or use application default credentials in a deployed environment.
+admin.initializeApp();
 
 const db = admin.firestore();
 
@@ -113,7 +113,7 @@ export const redeemOfferCodeFlow = ai.defineFlow(
         });
 
         const userTransactionRef = userRef.collection('transactions').doc();
-        transaction.set(userTransactionfRef, {
+        transaction.set(userTransactionRef, {
           type: 'bonus',
           amount: rewardAmount,
           description: `Redeemed offer code: ${code.toUpperCase()}`,
