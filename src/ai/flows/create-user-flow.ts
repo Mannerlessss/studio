@@ -50,7 +50,8 @@ const createUserFlow = ai.defineFlow(
   async (input) => {
     // A robust check to ensure Firebase Admin is initialized before proceeding.
     if (admin.apps.length === 0) {
-      console.error("FATAL: Firebase Admin SDK is not initialized. The flow cannot continue.");
+      // This should theoretically not be reached if top-level initialization works,
+      // but serves as a final safeguard.
       throw new Error("The Firebase Admin SDK failed to initialize. Check server logs for details. This is an unrecoverable error.");
     }
 
