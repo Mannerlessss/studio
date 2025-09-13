@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import {
@@ -88,6 +89,21 @@ export default function WithdrawalsPage() {
 
             batch.update(withdrawalDocRef, { status: newStatus });
             
+            // Also update the corresponding transaction document
+            const transactionQuery = query(
+                collection(db, `users/${req.userId}/transactions`), 
+                where('type', '==', 'withdrawal'),
+                where('amount', '==', req.amount),
+                where('status', '==', 'Pending')
+            );
+            const transactionSnapshot = await getDocs(transactionQuery);
+            // This assumes the latest pending withdrawal transaction matches. A more robust system might use a shared ID.
+             if (!transactionSnapshot.empty) {
+                const transactionDocRef = transactionSnapshot.docs[0].ref;
+                batch.update(transactionDocRef, { status: newStatus });
+            }
+
+
             if (newStatus === 'Rejected') {
                  const userDocRef = doc(db, 'users', req.userId);
                  const userDoc = await getDoc(userDocRef);

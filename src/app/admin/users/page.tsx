@@ -42,7 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, getDocs, updateDoc, writeBatch, serverTimestamp, query, where, addDoc, increment } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, updateDoc, writeBatch, serverTimestamp, query, where, addDoc, increment, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     Select,
@@ -66,6 +66,7 @@ interface User {
     claimedMilestones?: number[];
     investedReferralCount: number;
     referredBy?: string;
+    createdAt?: Timestamp;
 }
 
 const investmentPlans = [100, 300, 500, 1000, 2000];
@@ -309,7 +310,7 @@ export default function UsersPage() {
                 </TableCell>
                 <TableCell className="text-right">
                     <div className='flex gap-2 justify-end'>
-                        <Dialog onOpenChange={(isOpen) => !isOpen && setSelectedUser(null)}>
+                        <Dialog onOpenChange={(isOpen) => { if (!isOpen) setSelectedUser(null); }}>
                             <DialogTrigger asChild>
                                 <Button variant="ghost" size="icon" onClick={() => setSelectedUser(user)}>
                                     <Eye className='w-4 h-4' />
@@ -420,5 +421,3 @@ export default function UsersPage() {
     </>
   );
 }
-
-    
