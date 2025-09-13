@@ -1,3 +1,16 @@
+
 {
-  "rules": "firestore.rules"
+  "rules": "firestore.rules",
+  "indexes": [
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "referralCode",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ]
 }

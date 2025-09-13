@@ -355,13 +355,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await batch.commit();
 
         } catch (error: any) {
-            console.error("--- DEBUG: Referral Redemption Error ---");
-            console.error("Timestamp:", new Date().toISOString());
-            console.error("User UID:", user.uid);
-            console.error("Attempted Code:", formattedCode);
-            console.error("Error Object:", error);
-            console.error("--- END DEBUG ---");
-            throw new Error(error.message || "Invalid referral code.");
+            console.error(error); // Log the actual error for debugging
+            throw new Error("This referral code is not valid.");
         }
     };
     
