@@ -12,6 +12,29 @@ import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Initialize Firebase Admin SDK at the top level
+if (admin.apps.length === 0) {
+  try {
+    const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
+    if (fs.existsSync(serviceAccountPath)) {
+      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+      console.log("Firebase Admin SDK initialized successfully.");
+    } else {
+        // This case is for environments where service account is set via env vars
+        // or another mechanism. If serviceAccountKey.json is the ONLY method,
+        // this will fail gracefully later.
+        admin.initializeApp();
+        console.log("Firebase Admin SDK initialized using default credentials.");
+    }
+  } catch(error) {
+    console.error("Failed to initialize Firebase Admin", error);
+    // In a server environment, you might want to re-throw or handle this more gracefully
+  }
+}
+
 
 // Define Zod schemas for input validation
 const CreateUserInputSchema = z.object({
@@ -31,26 +54,6 @@ const CreateUserOutputSchema = z.object({
 export type CreateUserOutput = z.infer<typeof CreateUserOutputSchema>;
 
 
-// Initialize Firebase Admin SDK if it hasn't been already
-function initializeFirebaseAdmin() {
-    if (admin.apps.length === 0) {
-      try {
-        const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
-        if (fs.existsSync(serviceAccountPath)) {
-          const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-          admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-          });
-          console.log("Firebase Admin SDK initialized successfully.");
-        } else {
-            console.error('serviceAccountKey.json not found, Firebase Admin features will not work.');
-        }
-      } catch(error) {
-        console.error("Failed to initialize Firebase Admin", error);
-      }
-    }
-}
-
 // Define the main exported function that calls the flow
 export async function createUser(input: CreateUserInput): Promise<CreateUserOutput> {
   return createUserFlow(input);
@@ -64,12 +67,14 @@ const createUserFlow = ai.defineFlow(
     outputSchema: CreateUserOutputSchema,
   },
   async (input) => {
-    initializeFirebaseAdmin();
-
-    if(admin.apps.length === 0) {
-      throw new Error("Firebase Admin SDK is not initialized. Cannot create user.");
+    // Check if initialization was successful. The most reliable check is to try to use a service.
+    try {
+        await admin.auth().listUsers(1);
+    } catch (e) {
+        console.error("Firebase Admin SDK not initialized correctly.", e);
+        throw new Error("Firebase Admin SDK is not initialized. Cannot create user.");
     }
-    
+
     const { name, email, phone, password, referralCode: providedCode } = input;
     const auth = admin.auth();
     const firestore = admin.firestore();
