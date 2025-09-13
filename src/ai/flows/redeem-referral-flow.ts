@@ -11,7 +11,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { getFirestore } from 'firebase-admin/firestore';
-import * as admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 // Genkit's firebase plugin initializes the app, so we just need to get the instance.
 const db = getFirestore();
@@ -86,7 +86,7 @@ const redeemReferralFlow = ai.defineFlow(
         // Update the referrer
         const referrerRef = db.collection('users').doc(referrerId);
         transaction.update(referrerRef, {
-            referrals: admin.firestore.FieldValue.arrayUnion({
+            referrals: FieldValue.arrayUnion({
                 userId: userId,
                 name: userName,
                 email: userEmail,
