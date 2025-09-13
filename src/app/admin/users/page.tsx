@@ -109,10 +109,11 @@ export default function UsersPage() {
     }, [toast]);
     
     const filteredAndSortedUsers = useMemo(() => {
+        const safeSearchTerm = (searchTerm || '').toLowerCase();
         return users
             .filter(user =>
-                (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (user.email || '').toLowerCase().includes(searchTerm.toLowerCase())
+                (user?.name ?? '').toLowerCase().includes(safeSearchTerm) ||
+                (user?.email ?? '').toLowerCase().includes(safeSearchTerm)
             )
             .sort((a, b) => {
                 const aValue = a[sortKey] || '';
