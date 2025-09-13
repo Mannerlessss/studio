@@ -111,8 +111,8 @@ export default function UsersPage() {
     const filteredAndSortedUsers = useMemo(() => {
         return users
             .filter(user =>
-                user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                user.email.toLowerCase().includes(searchTerm.toLowerCase())
+                (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (user.email || '').toLowerCase().includes(searchTerm.toLowerCase())
             )
             .sort((a, b) => {
                 const aValue = a[sortKey] || '';
@@ -520,5 +520,7 @@ export default function UsersPage() {
     </>
   );
 }
+
+    
 
     
