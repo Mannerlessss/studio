@@ -47,8 +47,8 @@ export function WithdrawCard() {
   };
 
   const hasInvested = userData?.hasInvested || false;
-  const canWithdraw = (userData?.totalBalance || 0) >= 100;
   const balance = userData?.totalBalance || 0;
+  const canWithdraw = balance >= 100;
 
   const handleSubmit = async () => {
      if (!user || !userData) {

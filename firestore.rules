@@ -1,42 +1,46 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Helper function to check for admin custom claim
+    function isAdmin() {
+      return request.auth.token.admin == true;
+    }
 
-    // Global Collections
+    // Plans collection is readable by any authenticated user
     match /plans/{planId} {
       allow read: if request.auth != null;
-      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow write: if isAdmin(); // Only admins can create/edit plans
     }
 
+    // Offers collection is readable by any authenticated user
     match /offers/{offerId} {
       allow read: if request.auth != null;
-      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow write: if isAdmin(); // Only admins can create/edit offers
     }
 
-    // User Data
+    // Users Collection
     match /users/{userId} {
-      // A user can create their own document
-      allow create: if request.auth != null && request.auth.uid == userId;
-      
-      // A user can read or update their own document
-      allow read, update: if request.auth != null && request.auth.uid == userId;
+      // Users can read and write to their OWN document.
+      // Admins can read any user document.
+      allow get, update, delete: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
+      allow read: if request.auth.uid == userId || isAdmin();
 
-      // Only an admin can delete a user document
-      allow delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      // Admins can list all users, but regular users cannot.
+      allow list: if isAdmin();
 
-      // Any authenticated user can list the users collection to find referral codes,
-      // but they cannot read the full documents of other users.
-      allow list: if request.auth != null;
-
-      // A user can read and write to any document in their own subcollections.
+      // Users can access their own subcollections.
+      // Admins can read any subcollection.
       match /{subcollection}/{docId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if request.auth.uid == userId;
+        allow read: if isAdmin();
       }
     }
 
-    // Admin-specific queries on collections
-    match /withdrawals/{docId} {
-       allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    // Withdrawals are a subcollection, but we might need a collectionGroup query for admins.
+    match /{path=**}/withdrawals/{withdrawalId} {
+      allow read, write: if exists(/databases/$(database)/documents/users/$(request.auth.uid)) || isAdmin();
     }
   }
 }
