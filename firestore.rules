@@ -1,51 +1,54 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Default deny all
-    match /{document=**} {
-      allow read, write: if false;
+    // Helper function to check if the user is an admin
+    function isAdmin() {
+      return request.auth.token.admin == true;
     }
 
-    // Users can only read/write their OWN documents and subcollections.
-    // They cannot list other users.
+    // Rules for the 'users' collection
     match /users/{userId} {
-      allow get, write: if request.auth != null && request.auth.uid == userId;
+      // Admins can read any user document and list all users
+      allow get, list: if isAdmin();
       
-      // Admins can read any user's profile
-      allow get: if request.auth != null && request.auth.token.admin == true;
+      // A user can read, update, and delete their own document
+      allow get, update, delete: if request.auth.uid == userId;
 
-      // Admins can list all users for the admin panel
-      allow list: if request.auth != null && request.auth.token.admin == true;
+      // A user can create their own document (on signup)
+      allow create: if request.auth.uid == userId;
 
-      match /transactions/{transactionId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      match /investments/{investmentId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      match /referrals/{referralId} {
-         allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Rules for all subcollections within a user document
+      match /{allPaths=**} {
+        // A user can read and write to their own subcollections
+        allow read, write: if request.auth.uid == userId;
+        // Admins can also read any user's subcollections
+        allow read: if isAdmin();
       }
     }
 
-    // Admins need to query withdrawals across all users
+    // Rules for the 'withdrawals' collection group
+    // This allows admins to query all withdrawals across all users
     match /{path=**}/withdrawals/{withdrawalId} {
-       allow read: if request.auth != null && request.auth.token.admin == true;
-       allow write: if request.auth != null && request.auth.token.admin == true;
+        allow read: if isAdmin();
     }
-
-    // Global collections
+    
+    // Rules for the global 'plans' collection
     match /plans/{planId} {
-      allow read: if request.auth != null;
-      // Only admins can create/update/delete plans
-      allow write: if request.auth != null && request.auth.token.admin == true;
+        // Any authenticated user can read the plans
+        allow read: if request.auth != null;
+        // Only admins can create, update, or delete plans
+        allow write: if isAdmin();
     }
 
+    // Rules for the global 'offers' collection
     match /offers/{offerId} {
-      allow read: if request.auth != null;
-       // Only admins can create/update/delete offers
-      allow write: if request.auth != null && request.auth.token.admin == true;
+        // Any authenticated user can read the offers (to check them)
+        allow read: if request.auth != null;
+        // Only admins can create, update, or delete offers
+        allow write: if isAdmin();
     }
   }
 }

@@ -1,3 +1,4 @@
+
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
 import { 
@@ -159,13 +160,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
                     
                     if (daysPassed <= 0) continue;
+                    
+                    const dailyReturn = investment.dailyReturn || 0;
+                    if (dailyReturn <= 0) continue; // Skip if no daily return
 
-                    const daysAlreadyProcessed = (investment.dailyReturn || 0) > 0 ? Math.round(investment.earnings / investment.dailyReturn) : 0;
+                    const daysAlreadyProcessed = Math.round(investment.earnings / dailyReturn);
                     const remainingDaysInPlan = investment.durationDays - daysAlreadyProcessed;
                     const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
 
                     if (daysToCredit > 0) {
-                        const earningsForThisPlan = investment.dailyReturn * daysToCredit;
+                        const earningsForThisPlan = dailyReturn * daysToCredit;
                         totalEarningsToAdd += earningsForThisPlan;
 
                         const newEarnings = investment.earnings + earningsForThisPlan;
@@ -182,7 +186,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             const earningDay = new Date(startOfToday.getTime() - (daysPassed - i - 1) * msInDay);
                             transaction.set(transactionRef, {
                                 type: 'earning',
-                                amount: investment.dailyReturn,
+                                amount: dailyReturn,
                                 description: `Earning from Plan ${investment.planAmount}`,
                                 status: 'Completed',
                                 date: Timestamp.fromDate(earningDay),
