@@ -160,7 +160,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     
                     if (daysPassed <= 0) continue;
 
-                    const daysAlreadyProcessed = investment.dailyReturn > 0 ? Math.round(investment.earnings / investment.dailyReturn) : 0;
+                    const daysAlreadyProcessed = (investment.dailyReturn || 0) > 0 ? Math.round(investment.earnings / investment.dailyReturn) : 0;
                     const remainingDaysInPlan = investment.durationDays - daysAlreadyProcessed;
                     const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
 
