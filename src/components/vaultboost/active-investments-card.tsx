@@ -15,7 +15,7 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
     
     const minutesProcessed = perMinuteReturn > 0 ? Math.round(investment.earnings / perMinuteReturn) : 0;
     const progress = durationMinutes > 0 ? (minutesProcessed / durationMinutes) * 100 : 0;
-    const dailyReturnRate = (perMinuteReturn * 1440 / investment.planAmount) * 100; // 1440 minutes in a day
+    const perMinuteReturnRate = (perMinuteReturn / investment.planAmount) * 100;
 
     return (
         <div className="p-4 rounded-lg bg-muted/50 border relative">
@@ -31,7 +31,7 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
             </div>
 
             <div className="absolute top-4 left-1/2 -translate-x-1/2">
-                 <Badge className="bg-blue-500 text-white shadow-lg">{!isNaN(dailyReturnRate) ? dailyReturnRate.toFixed(0) : 0}% Daily</Badge>
+                 <Badge className="bg-blue-500 text-white shadow-lg">{!isNaN(perMinuteReturnRate) ? perMinuteReturnRate.toFixed(0) : 0}% per Min</Badge>
             </div>
 
             <div className="mt-4 col-span-2 space-y-2">

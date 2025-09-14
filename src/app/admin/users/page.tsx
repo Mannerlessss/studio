@@ -172,10 +172,9 @@ export default function UsersPage() {
 
             // 1. Create a new document in the `investments` subcollection
             const newInvestmentRef = doc(collection(db, `users/${user.id}/investments`));
-            const dailyReturnRate = user.membership === 'Pro' ? 0.13 : 0.10;
-            const totalEarning = amount * dailyReturnRate;
-            const perMinuteReturn = totalEarning / 1440; // 1440 minutes in a day
-            
+            const returnRate = user.membership === 'Pro' ? 0.13 : 0.10;
+            const perMinuteReturn = amount * returnRate;
+
             batch.set(newInvestmentRef, {
                 planAmount: amount,
                 perMinuteReturn: perMinuteReturn,
