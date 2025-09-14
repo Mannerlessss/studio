@@ -297,5 +297,3 @@ export default function WithdrawalsPage() {
     </Card>
   );
 }
-
-    

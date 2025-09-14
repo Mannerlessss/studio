@@ -1,52 +1,48 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper function to check for admin custom claim
+
     function isAdmin() {
+      // Check if the user is an admin.
+      // Note: This relies on a custom claim { admin: true } being set.
       return request.auth.token.admin == true;
     }
-    
-    // Helper function to check if user is owner of the document
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
 
-    // USERS COLLECTION
-    // Admins can read the full list of users.
+    // USERS
+    // Admins can read/write any user document.
     // Users can only read/write their own document.
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
-      allow list: if isAdmin();
-      
-      // USER SUB-COLLECTIONS
-      // Users can perform any action on sub-collections within their own document.
-      // This is secure because the parent match already ensures they are the owner.
-      match /{allPaths=**} {
-        allow read, write: if isOwner(userId);
-      }
+      allow read, update, delete: if request.auth.uid == userId || isAdmin();
+      allow create: if request.auth.uid == userId;
+
+      // USERS SUBCOLLECTIONS
+      // A user owns all their subcollection documents. Admins can read them.
+       match /{allSubcollections=**} {
+         allow read, write: if request.auth.uid == userId || isAdmin();
+       }
     }
     
-    // WITHDRAWALS (Collection Group)
-    // This allows admins to query the 'withdrawals' sub-collection across ALL users.
-    // This is required for the admin withdrawals page.
+    // WITHDRAWALS (COLLECTION GROUP)
+    // This is required for the admin panel to query all withdrawals at once.
+    // Admins can list and read all withdrawals from any user.
     match /{path=**}/withdrawals/{withdrawalId} {
-      allow read: if isAdmin();
+        allow read: if isAdmin();
     }
     
-    // PLANS & OFFERS (Global Collections)
-    // Any authenticated user can read plans and offers.
+    // OFFERS (GLOBAL)
+    // Any authenticated user can read offers.
+    // Only admins can create, update, or delete them.
+    match /offers/{offerId} {
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
+    }
+
+    // PLANS (GLOBAL)
+    // Any authenticated user can read plans.
     // Only admins can create, update, or delete them.
     match /plans/{planId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
-    }
-    
-    match /offers/{offerId} {
-       allow read: if request.auth != null;
-       allow write: if isAdmin();
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
     }
   }
 }
-    
