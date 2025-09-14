@@ -2,44 +2,41 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Rule for the 'users' collection
-    match /users/{userId} {
-      // Users can read and write to their own document
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-
-      // Allow users to read and write to their own subcollections
-      match /investments/{investmentId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      match /transactions/{transactionId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      match /referrals/{referralId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      match /withdrawals/{withdrawalId} {
-      	allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-    }
-
-    // Rule for reading the 'users' collection to find referrers
-    match /users/{userId} {
-      // Allow any authenticated user to perform a query on the collection
-      // This is needed for the referral code lookup during signup
-      allow list: if request.auth != null;
-    }
-
-    // Rule for the 'offers' collection
-    match /offers/{offerId} {
-      // Authenticated users can read offers
+    // Global Collections
+    match /plans/{planId} {
       allow read: if request.auth != null;
-      // Only admins can create, update, or delete offers
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // Admins can read from withdrawals and users collections for the admin panel
-    match /{document=**} {
-      allow read: if request.auth != null && request.auth.token.admin == true;
+    match /offers/{offerId} {
+      allow read: if request.auth != null;
+      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // User Data
+    match /users/{userId} {
+      // A user can create their own document
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // A user can read or update their own document
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+
+      // Only an admin can delete a user document
+      allow delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+
+      // Any authenticated user can list the users collection to find referral codes,
+      // but they cannot read the full documents of other users.
+      allow list: if request.auth != null;
+
+      // A user can read and write to any document in their own subcollections.
+      match /{subcollection}/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Admin-specific queries on collections
+    match /withdrawals/{docId} {
+       allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
   }
 }
