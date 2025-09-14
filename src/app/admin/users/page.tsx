@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import {
@@ -110,11 +109,10 @@ export default function UsersPage() {
     }, [toast]);
     
     const filteredAndSortedUsers = useMemo(() => {
-        const safeSearchTerm = (searchTerm ?? '').toLowerCase();
         return users
             .filter(user =>
-                (user?.name ?? '').toLowerCase().includes(safeSearchTerm) ||
-                (user?.email ?? '').toLowerCase().includes(safeSearchTerm)
+                (user?.name ?? '').toLowerCase().includes((searchTerm ?? '').toLowerCase()) ||
+                (user?.email ?? '').toLowerCase().includes((searchTerm ?? '').toLowerCase())
             )
             .sort((a, b) => {
                 const aValue = a[sortKey] || '';
@@ -201,7 +199,9 @@ export default function UsersPage() {
             };
             if (!user.hasInvested) {
                 userUpdates.hasInvested = true;
-                userUpdates.commissionParent = user.referredBy; // Set commission parent on first investment
+                if (user.referredBy) {
+                    userUpdates.commissionParent = user.referredBy; // Set commission parent on first investment
+                }
             }
             batch.update(userDocRef, userUpdates);
 
@@ -522,9 +522,3 @@ export default function UsersPage() {
     </>
   );
 }
-
-    
-
-    
-
-
