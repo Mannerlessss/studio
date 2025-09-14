@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import {
@@ -66,7 +65,7 @@ export function AnnouncementPopup() {
         <div className="flex flex-col gap-3">
           <Link href="https://wa.me/7888540806" target="_blank" className="w-full">
             <Button className="w-full bg-green-500 hover:bg-green-600 text-white">
-              <MessageCircle className="mr-2" /> Chat on WhatsApp
+              <MessageCircle className="mr-2" /> Join on WhatsApp
             </Button>
           </Link>
           <Button variant="outline" onClick={handleClose}>
