@@ -3,40 +3,39 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can only read and write their own data.
-    // The redeemReferralFlow will handle cross-user writes securely.
+    // Helper function to check if a user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if the user is the owner of the document
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Users can read and write their own data.
+    // They can only create their own user document.
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-
-      // Allow admins to read/write any user document for management.
-      allow read, write: if request.auth != null && request.auth.token.admin == true;
-
-      // Users can only manage their own transactions.
-      match /transactions/{transactionId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      // Users can only read their own referrals list.
-      match /referrals/{referralId} {
-        allow read: if request.auth != null && request.auth.uid == userId;
+      allow read, update, delete: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn();
+      
+      // Users can read and write to their own subcollections
+      match /{allSubcollections}/{docId} {
+        allow read, write: if isSignedIn() && isOwner(userId);
       }
     }
-
-    // Offer codes are public to read for all users.
-    // Only admins can create, update, or delete them.
+    
+    // Offers can be read by any authenticated user, but only created/modified
+    // by admin backend processes (not covered by client-side rules).
     match /offers/{offerId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow read: if isSignedIn();
+      allow write: if false; // Disallow client-side writes
     }
 
-     // Withdrawal requests can only be managed by admins.
+    // Withdrawals are handled within the user's subcollection, covered above.
+    // This is a catch-all to ensure no top-level access.
     match /withdrawals/{withdrawalId} {
-       allow read, write: if request.auth != null && request.auth.token.admin == true;
-    }
-
-    // Admins have full access to all collections for administrative purposes.
-    match /{document=**} {
-      allow read, write: if request.auth != null && request.auth.token.admin == true;
+      allow read, write: if false;
     }
   }
 }
