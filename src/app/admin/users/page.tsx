@@ -186,9 +186,10 @@ export default function UsersPage() {
             const batch = writeBatch(db);
             const now = serverTimestamp();
 
-            const userMembershipRate = user.membership === 'Pro' ? 1.3 : 1.0;
-            const planDailyReturnRate = selectedPlan.dailyReturnPercentage / 100;
-            const finalDailyReturn = amount * planDailyReturnRate * userMembershipRate;
+            const isProMember = user.membership === 'Pro';
+            const baseDailyReturn = (selectedPlan.amount * selectedPlan.dailyReturnPercentage) / 100;
+            const proBonus = isProMember ? baseDailyReturn * 0.30 : 0;
+            const finalDailyReturn = baseDailyReturn + proBonus;
 
             // 1. Create a new document in the `investments` subcollection
             const newInvestmentRef = doc(collection(db, `users/${user.id}/investments`));
@@ -219,7 +220,7 @@ export default function UsersPage() {
             if (!user.hasInvested) {
                 userUpdates.hasInvested = true;
                 if (user.referredBy) {
-                    userUpdates.commissionParent = user.referredBy; // Set commission parent on first investment
+                    userUpdates.commissionParent = user.referredBy;
                 }
             }
             batch.update(userDocRef, userUpdates);
@@ -277,7 +278,6 @@ export default function UsersPage() {
                         }
                     }
                     
-                    // Upsert the referred user in the referrer's subcollection
                     const referrerReferralsRef = collection(db, 'users', user.referredBy, 'referrals');
                     const q = query(referrerReferralsRef, where("userId", "==", user.id));
                     const referredUserDocs = await getDocs(q);

@@ -24,6 +24,7 @@ const InvestmentPage: NextPage = () => {
   const [loading, setLoading] = useState(true);
   const { userData } = useAuth();
   const userName = userData?.name || 'User';
+  const isProMember = userData?.membership === 'Pro';
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -35,7 +36,6 @@ const InvestmentPage: NextPage = () => {
         setPlans(fetchedPlans);
       } catch (error) {
         console.error("Error fetching investment plans: ", error);
-        // Optionally show a toast to the user
       } finally {
         setLoading(false);
       }
@@ -62,13 +62,17 @@ const InvestmentPage: NextPage = () => {
            ))
         ) : plans.length > 0 ? (
           plans.map((plan) => {
-            const dailyReturn = (plan.amount * plan.dailyReturnPercentage) / 100;
+            const baseDailyReturn = (plan.amount * plan.dailyReturnPercentage) / 100;
+            const proBonus = isProMember ? baseDailyReturn * 0.30 : 0; // 30% bonus on the daily return for Pro
+            const finalDailyReturn = baseDailyReturn + proBonus;
+
             return (
               <InvestmentPlanCard
                 key={plan.id}
                 amount={plan.amount}
-                dailyReturn={dailyReturn}
+                dailyReturn={finalDailyReturn}
                 dailyReturnPercentage={plan.dailyReturnPercentage}
+                proReturnPercentage={isProMember ? plan.dailyReturnPercentage * 1.3 : undefined}
                 duration={plan.durationDays}
                 mostPurchased={plan.isPopular}
                 userName={userName}
@@ -92,6 +96,7 @@ const InvestmentPage: NextPage = () => {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>• Daily earnings are credited to your account every 24 hours based on your plan.</p>
+                <p>• Pro members receive a 30% bonus on daily returns on all investment plans.</p>
                 <p>• All investment plans expire automatically after their duration is complete.</p>
             </CardContent>
         </Card>
