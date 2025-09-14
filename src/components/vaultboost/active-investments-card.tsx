@@ -1,4 +1,3 @@
-
 'use client';
 import { FC, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -11,9 +10,9 @@ import { Button } from '../ui/button';
 
 const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
     
-    const daysProcessed = Math.round(investment.earnings / investment.dailyReturn);
-    const progress = (daysProcessed / investment.durationDays) * 100;
-    const dailyReturnRate = (investment.dailyReturn / investment.planAmount) * 100;
+    const minutesProcessed = Math.round(investment.earnings / investment.perMinuteReturn);
+    const progress = (minutesProcessed / investment.durationMinutes) * 100;
+    const dailyReturnRate = (investment.perMinuteReturn * 30 / investment.planAmount) * 100; // Recalculate equivalent daily rate for display
 
     return (
         <div className="p-4 rounded-lg bg-muted/50 border relative">
@@ -23,13 +22,13 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
                     <p className="text-sm text-muted-foreground">Plan Active</p>
                 </div>
                 <div className='text-right'>
-                    <p className="text-2xl font-bold text-green-500">{investment.earnings.toLocaleString()} Rs.</p>
+                    <p className="text-2xl font-bold text-green-500">{investment.earnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Rs.</p>
                     <p className="text-sm text-muted-foreground">Total Earned</p>
                 </div>
             </div>
 
             <div className="absolute top-4 left-1/2 -translate-x-1/2">
-                <Badge className="bg-blue-500 text-white shadow-lg">{dailyReturnRate.toFixed(0)}% Daily</Badge>
+                 <Badge className="bg-blue-500 text-white shadow-lg">{dailyReturnRate.toFixed(0)}% Daily</Badge>
             </div>
 
             <div className="mt-4 col-span-2 space-y-2">
@@ -39,8 +38,8 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
                 </div>
                 <Progress value={progress} />
                 <div className="flex justify-between items-center text-xs text-muted-foreground">
-                    <p>Day {daysProcessed} of {investment.durationDays}</p>
-                    <p>Daily: {investment.dailyReturn.toLocaleString()} Rs.</p>
+                    <p>Min {minutesProcessed} of {investment.durationMinutes}</p>
+                    <p>Per Min: {investment.perMinuteReturn.toFixed(4)} Rs.</p>
                 </div>
             </div>
         </div>

@@ -17,12 +17,15 @@ import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collectio
 export interface Investment {
     id: string;
     planAmount: number;
-    dailyReturn: number;
+    perMinuteReturn: number; // Was dailyReturn
     startDate: Timestamp;
     lastUpdate: Timestamp;
-    durationDays: number;
+    durationMinutes: number; // Was durationDays
     earnings: number;
     status: 'active' | 'completed';
+    // Firestore still uses dailyReturn and durationDays for field names for backward compatibility during test
+    dailyReturn: number; 
+    durationDays: number;
 }
 
 interface UserData {
@@ -145,26 +148,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const currentInvestmentDoc = await transaction.get(currentInvestmentRef);
 
                     if (!currentInvestmentDoc.exists()) continue;
-
-                    const investment = currentInvestmentDoc.data() as Investment;
+                    
+                    const investment = currentInvestmentDoc.data() as any;
                     const lastUpdate = investment.lastUpdate.toDate();
-                    const msInDay = 24 * 60 * 60 * 1000;
+                    const msInMinute = 60 * 1000;
                     
                     const timeSinceLastUpdate = now.getTime() - lastUpdate.getTime();
-                    const daysPassed = Math.floor(timeSinceLastUpdate / msInDay);
+                    const minutesPassed = Math.floor(timeSinceLastUpdate / msInMinute);
                     
-                    if (daysPassed <= 0) continue;
+                    if (minutesPassed <= 0) continue;
 
-                    const daysAlreadyProcessed = Math.round(investment.earnings / investment.dailyReturn);
-                    const remainingDaysInPlan = investment.durationDays - daysAlreadyProcessed;
-                    const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
+                    const perMinuteReturn = investment.dailyReturn; // Field is named dailyReturn in Firestore
+                    const durationMinutes = investment.durationMinutes; // Field is named durationMinutes
 
-                    if (daysToCredit > 0) {
-                        const earningsForThisPlan = investment.dailyReturn * daysToCredit;
+                    const minutesAlreadyProcessed = Math.round(investment.earnings / perMinuteReturn);
+                    const remainingMinutesInPlan = durationMinutes - minutesAlreadyProcessed;
+                    const minutesToCredit = Math.min(minutesPassed, remainingMinutesInPlan);
+
+                    if (minutesToCredit > 0) {
+                        const earningsForThisPlan = perMinuteReturn * minutesToCredit;
                         totalEarningsToAdd += earningsForThisPlan;
 
                         const newEarnings = investment.earnings + earningsForThisPlan;
-                        const newStatus = (daysAlreadyProcessed + daysToCredit) >= investment.durationDays ? 'completed' : 'active';
+                        const newStatus = (minutesAlreadyProcessed + minutesToCredit) >= durationMinutes ? 'completed' : 'active';
                         
                         transaction.update(currentInvestmentRef, {
                             earnings: newEarnings,
@@ -172,15 +178,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             status: newStatus
                         });
 
-                        for (let i = 0; i < daysToCredit; i++) {
+                        for (let i = 0; i < minutesToCredit; i++) {
                             const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                            const earningDay = new Date(lastUpdate.getTime() + (i + 1) * msInDay);
+                            const earningMinute = new Date(lastUpdate.getTime() + (i + 1) * msInMinute);
                             transaction.set(transactionRef, {
                                 type: 'earning',
-                                amount: investment.dailyReturn,
+                                amount: perMinuteReturn,
                                 description: `Earning from Plan ${investment.planAmount}`,
                                 status: 'Completed',
-                                date: Timestamp.fromDate(earningDay),
+                                date: Timestamp.fromDate(earningMinute),
                             });
                         }
 
@@ -257,7 +263,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         
                         const investmentsColRef = collection(db, `users/${currentUser.uid}/investments`);
                         unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
-                            const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));
+                            const investments = investmentsSnap.docs.map(doc => {
+                                const data = doc.data();
+                                return {
+                                    id: doc.id,
+                                    ...data,
+                                    // Map Firestore fields to interface fields for consistency
+                                    perMinuteReturn: data.dailyReturn,
+                                    durationMinutes: data.durationMinutes,
+                                } as Investment;
+                            });
                             setUserData({ ...baseUserData, investments });
                             setLoading(false);
                         }, (error) => {
