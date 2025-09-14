@@ -10,9 +10,12 @@ import { Button } from '../ui/button';
 
 const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
     
-    const minutesProcessed = investment.perMinuteReturn > 0 ? Math.round(investment.earnings / investment.perMinuteReturn) : 0;
-    const progress = investment.durationMinutes > 0 ? (minutesProcessed / investment.durationMinutes) * 100 : 0;
-    const dailyReturnRate = (investment.perMinuteReturn * 1440 / investment.planAmount) * 100; // 1440 minutes in a day
+    const perMinuteReturn = investment.perMinuteReturn || 0;
+    const durationMinutes = investment.durationMinutes || 0;
+    
+    const minutesProcessed = perMinuteReturn > 0 ? Math.round(investment.earnings / perMinuteReturn) : 0;
+    const progress = durationMinutes > 0 ? (minutesProcessed / durationMinutes) * 100 : 0;
+    const dailyReturnRate = (perMinuteReturn * 1440 / investment.planAmount) * 100; // 1440 minutes in a day
 
     return (
         <div className="p-4 rounded-lg bg-muted/50 border relative">
@@ -28,7 +31,7 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
             </div>
 
             <div className="absolute top-4 left-1/2 -translate-x-1/2">
-                 <Badge className="bg-blue-500 text-white shadow-lg">{dailyReturnRate.toFixed(0)}% Daily</Badge>
+                 <Badge className="bg-blue-500 text-white shadow-lg">{!isNaN(dailyReturnRate) ? dailyReturnRate.toFixed(0) : 0}% Daily</Badge>
             </div>
 
             <div className="mt-4 col-span-2 space-y-2">
@@ -38,8 +41,8 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
                 </div>
                 <Progress value={progress} />
                 <div className="flex justify-between items-center text-xs text-muted-foreground">
-                    <p>Min {minutesProcessed} of {investment.durationMinutes}</p>
-                    <p>Per Min: {investment.perMinuteReturn.toFixed(4)} Rs.</p>
+                    <p>Min {minutesProcessed} of {durationMinutes}</p>
+                    <p>Per Min: {perMinuteReturn.toFixed(4)} Rs.</p>
                 </div>
             </div>
         </div>

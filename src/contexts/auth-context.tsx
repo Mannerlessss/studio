@@ -296,8 +296,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                                 return {
                                     id: doc.id,
                                     ...data,
-                                    perMinuteReturn: data.perMinuteReturn,
-                                    durationMinutes: data.durationMinutes,
                                 } as Investment;
                             });
                             setUserData({ ...baseUserData, investments });
