@@ -1,4 +1,3 @@
-
 import type { FC } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,7 +23,7 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
   badgeText = 'Most Purchased',
   userName = 'User',
 }) => {
-  const totalProfit = dailyReturn * duration;
+  const totalProfit = dailyReturn * 30; // Kept as 30 for display purposes
   const message = `Hi, I'm ${userName} and I want to buy the plan for ${amount} Rs.`;
   const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
 

@@ -130,7 +130,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     return;
                 }
                 
-                let totalEarningsToAdd = 0;
+                let totalBatchEarnings = 0;
+                let totalBatchCommission = 0;
                 const currentData = userDoc.data() as UserData;
                 const now = new Date();
                 
@@ -151,69 +152,76 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const lastUpdate = investment.lastUpdate.toDate();
                     const msInMinute = 60 * 1000;
                     
-                    const timeSinceLastUpdate = now.getTime() - lastUpdate.getTime();
-                    const minutesPassed = Math.floor(timeSinceLastUpdate / msInMinute);
+                    const minutesPassed = Math.floor((now.getTime() - lastUpdate.getTime()) / msInMinute);
                     
                     if (minutesPassed <= 0) continue;
 
-                    const perMinuteReturn = investment.dailyReturn; 
+                    const perMinuteReturn = investment.perMinuteReturn; 
                     const durationMinutes = investment.durationMinutes; 
 
                     if (!perMinuteReturn || !durationMinutes) continue;
 
-                    const minutesAlreadyProcessed = Math.round(investment.earnings / perMinuteReturn);
+                    const minutesAlreadyProcessed = Math.floor(investment.earnings / perMinuteReturn);
                     const remainingMinutesInPlan = durationMinutes - minutesAlreadyProcessed;
                     const minutesToCredit = Math.min(minutesPassed, remainingMinutesInPlan);
 
                     if (minutesToCredit > 0) {
                         const earningsForThisPlan = perMinuteReturn * minutesToCredit;
-                        totalEarningsToAdd += earningsForThisPlan;
+                        totalBatchEarnings += earningsForThisPlan;
 
                         const newEarnings = investment.earnings + earningsForThisPlan;
                         const newStatus = (minutesAlreadyProcessed + minutesToCredit) >= durationMinutes ? 'completed' : 'active';
                         
+                        // Update the investment document itself
                         transaction.update(currentInvestmentRef, {
                             earnings: newEarnings,
                             lastUpdate: serverTimestamp(),
                             status: newStatus
                         });
 
-                        // We can simplify and not create a transaction record for every single minute.
-                        // This will be too slow and costly. We can add one transaction for the batch.
-                        
-                        if (commissionParentDoc && commissionParentDoc.exists()) {
-                            const commissionAmount = earningsForThisPlan * 0.03;
-                            const parentData = commissionParentDoc.data();
-                            transaction.update(commissionParentRef!, {
-                                totalBalance: (parentData.totalBalance || 0) + commissionAmount,
-                                totalReferralEarnings: (parentData.totalReferralEarnings || 0) + commissionAmount,
-                                totalEarnings: (parentData.totalEarnings || 0) + commissionAmount,
-                            });
-                            
-                            const commissionTransactionRef = doc(collection(db, `users/${commissionParentRef!.id}/transactions`));
-                            transaction.set(commissionTransactionRef, {
-                                type: 'referral',
-                                amount: commissionAmount,
-                                description: `3% commission from ${currentData.name}`,
+                        // Create a transaction record for each minute credited
+                        for (let i = 0; i < minutesToCredit; i++) {
+                            const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
+                            const earningTime = new Date(lastUpdate.getTime() + (i + 1) * msInMinute);
+                             transaction.set(transactionRef, {
+                                type: 'earning',
+                                amount: perMinuteReturn,
+                                description: `Earning from Plan ${investment.planAmount}`,
                                 status: 'Completed',
-                                date: serverTimestamp(),
+                                date: Timestamp.fromDate(earningTime),
                             });
+                        }
+                        
+                        // Handle lifetime commission
+                        if (commissionParentDoc && commissionParentDoc.exists()) {
+                            const commissionForThisPlan = earningsForThisPlan * 0.03;
+                            totalBatchCommission += commissionForThisPlan;
                         }
                     }
                 }
 
-                if (totalEarningsToAdd > 0) {
+                // Update the user's total balances
+                if (totalBatchEarnings > 0) {
                     transaction.update(userDocRef, {
-                        totalInvestmentEarnings: (currentData.totalInvestmentEarnings || 0) + totalEarningsToAdd,
-                        totalBalance: (currentData.totalBalance || 0) + totalEarningsToAdd,
-                        totalEarnings: (currentData.totalEarnings || 0) + totalEarningsToAdd,
+                        totalInvestmentEarnings: increment(totalBatchEarnings),
+                        totalBalance: increment(totalBatchEarnings),
+                        totalEarnings: increment(totalBatchEarnings),
+                    });
+                }
+
+                // Update the referrer's total balances
+                if (totalBatchCommission > 0 && commissionParentRef) {
+                     transaction.update(commissionParentRef, {
+                        totalBalance: increment(totalBatchCommission),
+                        totalReferralEarnings: increment(totalBatchCommission),
+                        totalEarnings: increment(totalBatchCommission),
                     });
                     
-                    const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                    transaction.set(transactionRef, {
-                        type: 'earning',
-                        amount: totalEarningsToAdd,
-                        description: `Batch investment earnings`,
+                    const commissionTransactionRef = doc(collection(db, `users/${commissionParentRef.id}/transactions`));
+                    transaction.set(commissionTransactionRef, {
+                        type: 'referral',
+                        amount: totalBatchCommission,
+                        description: `3% commission from ${currentData.name}`,
                         status: 'Completed',
                         date: serverTimestamp(),
                     });
@@ -233,6 +241,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let earningsInterval: NodeJS.Timeout;
 
         if (user && !isAdmin) {
+            // Run once immediately on login
+            processInvestmentEarnings(user.uid);
+            
+            // Then set up the interval
             earningsInterval = setInterval(() => {
                 processInvestmentEarnings(user.uid);
             }, 60000); // 60,000 milliseconds = 1 minute
@@ -267,7 +279,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                      setUserData(null);
                      setLoading(false);
                 } else {
-                    await processInvestmentEarnings(currentUser.uid); 
                     
                     const userDocRef = doc(db, 'users', currentUser.uid);
                     unsubFromUser = onSnapshot(userDocRef, (userDocSnap) => {
@@ -285,7 +296,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                                 return {
                                     id: doc.id,
                                     ...data,
-                                    perMinuteReturn: data.dailyReturn,
+                                    perMinuteReturn: data.perMinuteReturn,
                                     durationMinutes: data.durationMinutes,
                                 } as Investment;
                             });
