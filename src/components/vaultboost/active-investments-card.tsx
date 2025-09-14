@@ -10,9 +10,9 @@ import { Button } from '../ui/button';
 
 const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
     
-    const minutesProcessed = Math.round(investment.earnings / investment.perMinuteReturn);
-    const progress = (minutesProcessed / investment.durationMinutes) * 100;
-    const dailyReturnRate = (investment.perMinuteReturn * 30 / investment.planAmount) * 100; // Recalculate equivalent daily rate for display
+    const minutesProcessed = investment.perMinuteReturn > 0 ? Math.round(investment.earnings / investment.perMinuteReturn) : 0;
+    const progress = investment.durationMinutes > 0 ? (minutesProcessed / investment.durationMinutes) * 100 : 0;
+    const dailyReturnRate = (investment.perMinuteReturn * 1440 / investment.planAmount) * 100; // 1440 minutes in a day
 
     return (
         <div className="p-4 rounded-lg bg-muted/50 border relative">

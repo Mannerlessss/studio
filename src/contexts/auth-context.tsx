@@ -23,9 +23,6 @@ export interface Investment {
     durationMinutes: number; // Was durationDays
     earnings: number;
     status: 'active' | 'completed';
-    // Firestore still uses dailyReturn and durationDays for field names for backward compatibility during test
-    dailyReturn: number; 
-    durationDays: number;
 }
 
 interface UserData {
@@ -160,6 +157,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                     const perMinuteReturn = investment.dailyReturn; // Field is named dailyReturn in Firestore
                     const durationMinutes = investment.durationMinutes; // Field is named durationMinutes
+
+                    if (!perMinuteReturn || !durationMinutes) continue; // Skip if data is malformed
 
                     const minutesAlreadyProcessed = Math.round(investment.earnings / perMinuteReturn);
                     const remainingMinutesInPlan = durationMinutes - minutesAlreadyProcessed;
