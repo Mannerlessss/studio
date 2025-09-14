@@ -12,7 +12,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc, increment, DocumentReference } from 'firebase/firestore';
 
 export interface Investment {
     id: string;
@@ -110,131 +110,166 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Function to process earnings for all active investments for a user
     const processInvestmentEarnings = async (currentUserId: string) => {
-        if(!currentUserId) return;
-        const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
-        const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
-        
+        if (!currentUserId) return;
+    
         try {
-            const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
-
-            if (activeInvestmentsSnapshot.empty) {
-                return;
-            }
-
-             await runTransaction(db, async (transaction) => {
+            // Run a transaction to ensure atomic reads and writes.
+            await runTransaction(db, async (transaction) => {
                 const userDocRef = doc(db, 'users', currentUserId);
+                
+                // =============================================================
+                // PHASE 1: READ ALL NECESSARY DOCUMENTS FIRST
+                // =============================================================
                 const userDoc = await transaction.get(userDocRef);
-
                 if (!userDoc.exists()) {
                     console.warn("processInvestmentEarnings: User document not found.");
-                    return;
+                    return; // Abort transaction
                 }
-                
-                let totalBatchEarnings = 0;
-                let totalBatchCommission = 0;
+    
                 const currentData = userDoc.data() as UserData;
-                const now = new Date();
-                
+    
                 const commissionParentRef = currentData.commissionParent ? doc(db, 'users', currentData.commissionParent) : null;
                 let commissionParentDoc: any = null;
-                if(commissionParentRef){
+                if (commissionParentRef) {
                     commissionParentDoc = await transaction.get(commissionParentRef);
                 }
-
-
-                for (const investmentDoc of activeInvestmentsSnapshot.docs) {
-                    const currentInvestmentRef = doc(db, `users/${currentUserId}/investments`, investmentDoc.id);
-                    const currentInvestmentDoc = await transaction.get(currentInvestmentRef);
-
-                    if (!currentInvestmentDoc.exists()) continue;
-                    
-                    const investment = currentInvestmentDoc.data() as any;
+    
+                // Fetch all active investments for the user
+                const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
+                const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
+                const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
+    
+                // Now, re-read each active investment document *within* the transaction to lock it
+                const investmentDocs = await Promise.all(
+                    activeInvestmentsSnapshot.docs.map(d => transaction.get(d.ref))
+                );
+    
+                // =============================================================
+                // PHASE 2: PERFORM CALCULATIONS
+                // =============================================================
+                let totalBatchEarnings = 0;
+                let totalBatchCommission = 0;
+                const now = new Date();
+                const writeOperations: any[] = [];
+    
+                for (const investmentDoc of investmentDocs) {
+                    if (!investmentDoc.exists()) continue;
+    
+                    const investment = investmentDoc.data() as Investment;
+                    const investmentRef = investmentDoc.ref;
+    
                     const lastUpdate = investment.lastUpdate.toDate();
                     const msInMinute = 60 * 1000;
-                    
                     const minutesPassed = Math.floor((now.getTime() - lastUpdate.getTime()) / msInMinute);
-                    
+    
                     if (minutesPassed <= 0) continue;
-
-                    const perMinuteReturn = investment.perMinuteReturn; 
-                    const durationMinutes = investment.durationMinutes; 
-
+    
+                    const perMinuteReturn = investment.perMinuteReturn;
+                    const durationMinutes = investment.durationMinutes;
+    
                     if (!perMinuteReturn || !durationMinutes) continue;
-
-                    const minutesAlreadyProcessed = Math.floor(investment.earnings / perMinuteReturn);
+    
+                    const minutesAlreadyProcessed = Math.floor((investment.earnings || 0) / perMinuteReturn);
                     const remainingMinutesInPlan = durationMinutes - minutesAlreadyProcessed;
                     const minutesToCredit = Math.min(minutesPassed, remainingMinutesInPlan);
-
+    
                     if (minutesToCredit > 0) {
                         const earningsForThisPlan = perMinuteReturn * minutesToCredit;
                         totalBatchEarnings += earningsForThisPlan;
-
-                        const newEarnings = investment.earnings + earningsForThisPlan;
+    
+                        const newEarnings = (investment.earnings || 0) + earningsForThisPlan;
                         const newStatus = (minutesAlreadyProcessed + minutesToCredit) >= durationMinutes ? 'completed' : 'active';
-                        
-                        // Update the investment document itself
-                        transaction.update(currentInvestmentRef, {
-                            earnings: newEarnings,
-                            lastUpdate: serverTimestamp(),
-                            status: newStatus
+    
+                        // Queue the investment update
+                        writeOperations.push({
+                            type: 'update',
+                            ref: investmentRef,
+                            data: {
+                                earnings: newEarnings,
+                                lastUpdate: serverTimestamp(),
+                                status: newStatus
+                            }
                         });
-
-                        // Create a transaction record for each minute credited
+    
+                        // Queue transaction records for each minute
                         for (let i = 0; i < minutesToCredit; i++) {
                             const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
                             const earningTime = new Date(lastUpdate.getTime() + (i + 1) * msInMinute);
-                             transaction.set(transactionRef, {
-                                type: 'earning',
-                                amount: perMinuteReturn,
-                                description: `Earning from Plan ${investment.planAmount}`,
-                                status: 'Completed',
-                                date: Timestamp.fromDate(earningTime),
+                            writeOperations.push({
+                                type: 'set',
+                                ref: transactionRef,
+                                data: {
+                                    type: 'earning',
+                                    amount: perMinuteReturn,
+                                    description: `Earning from Plan ${investment.planAmount}`,
+                                    status: 'Completed',
+                                    date: Timestamp.fromDate(earningTime),
+                                }
                             });
                         }
-                        
-                        // Handle lifetime commission
+    
+                        // Calculate commission
                         if (commissionParentDoc && commissionParentDoc.exists()) {
                             const commissionForThisPlan = earningsForThisPlan * 0.03;
                             totalBatchCommission += commissionForThisPlan;
                         }
                     }
                 }
-
-                // Update the user's total balances
+    
+                // Queue user balance update
                 if (totalBatchEarnings > 0) {
-                    transaction.update(userDocRef, {
-                        totalInvestmentEarnings: increment(totalBatchEarnings),
-                        totalBalance: increment(totalBatchEarnings),
-                        totalEarnings: increment(totalBatchEarnings),
+                    writeOperations.push({
+                        type: 'update',
+                        ref: userDocRef,
+                        data: {
+                            totalInvestmentEarnings: increment(totalBatchEarnings),
+                            totalBalance: increment(totalBatchEarnings),
+                            totalEarnings: increment(totalBatchEarnings),
+                        }
                     });
                 }
-
-                // Update the referrer's total balances
+    
+                // Queue referrer balance update and transaction
                 if (totalBatchCommission > 0 && commissionParentRef) {
-                     transaction.update(commissionParentRef, {
-                        totalBalance: increment(totalBatchCommission),
-                        totalReferralEarnings: increment(totalBatchCommission),
-                        totalEarnings: increment(totalBatchCommission),
+                    writeOperations.push({
+                        type: 'update',
+                        ref: commissionParentRef,
+                        data: {
+                            totalBalance: increment(totalBatchCommission),
+                            totalReferralEarnings: increment(totalBatchCommission),
+                            totalEarnings: increment(totalBatchCommission),
+                        }
                     });
-                    
                     const commissionTransactionRef = doc(collection(db, `users/${commissionParentRef.id}/transactions`));
-                    transaction.set(commissionTransactionRef, {
-                        type: 'referral',
-                        amount: totalBatchCommission,
-                        description: `3% commission from ${currentData.name}`,
-                        status: 'Completed',
-                        date: serverTimestamp(),
+                    writeOperations.push({
+                        type: 'set',
+                        ref: commissionTransactionRef,
+                        data: {
+                            type: 'referral',
+                            amount: totalBatchCommission,
+                            description: `3% commission from ${currentData.name}`,
+                            status: 'Completed',
+                            date: serverTimestamp(),
+                        }
                     });
                 }
+    
+                // =============================================================
+                // PHASE 3: EXECUTE ALL WRITES
+                // =============================================================
+                writeOperations.forEach(op => {
+                    if (op.type === 'update') {
+                        transaction.update(op.ref, op.data);
+                    } else if (op.type === 'set') {
+                        transaction.set(op.ref, op.data);
+                    }
+                });
             });
         } catch (error) {
-             if (String(error).includes("document does not exist")) {
-                console.warn("processInvestmentEarnings failed because user document doesn't exist. This is expected during signup race conditions.");
-            } else {
-                console.error("Error processing investment earnings: ", error);
-            }
+            console.error("Error processing investment earnings transaction: ", error);
         }
     };
+    
 
      // Set up an interval to process earnings every minute
     useEffect(() => {
@@ -291,11 +326,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         
                         const investmentsColRef = collection(db, `users/${currentUser.uid}/investments`);
                         unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
-                            const investments = investmentsSnap.docs.map(doc => {
-                                const data = doc.data();
+                            const investments = investmentsSnap.docs.map(docSnap => {
+                                const data = docSnap.data();
                                 return {
-                                    id: doc.id,
+                                    id: docSnap.id,
                                     ...data,
+                                    perMinuteReturn: data.perMinuteReturn || 0,
+                                    durationMinutes: data.durationMinutes || 0,
                                 } as Investment;
                             });
                             setUserData({ ...baseUserData, investments });
