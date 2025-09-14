@@ -15,7 +15,7 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
     
     const daysProcessed = dailyReturn > 0 ? Math.round(investment.earnings / dailyReturn) : 0;
     const progress = durationDays > 0 ? (daysProcessed / durationDays) * 100 : 0;
-    const dailyReturnRate = (dailyReturn / investment.planAmount) * 100;
+    const dailyReturnRate = investment.planAmount > 0 ? (dailyReturn / investment.planAmount) * 100 : 0;
 
     return (
         <div className="p-4 rounded-lg bg-muted/50 border relative">
