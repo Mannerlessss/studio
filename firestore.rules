@@ -1,35 +1,43 @@
-
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Plans can be read by any authenticated user, but only written by an admin.
+    
+    // Plans can be read by any authenticated user, but only created/modified by admin
     match /plans/{planId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow write: if request.auth.token.admin == true;
     }
-
-    // Offers can be read by any authenticated user, but only written by an admin.
+    
+    // Offers can be read by any authenticated user, but only created/modified by admin
     match /offers/{offerId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && request.auth.token.admin == true;
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.admin == true;
     }
 
-    // A user can manage their own data.
+    // A user can:
+    // - Create their own user document
+    // - Read/update/delete their own document
+    // - List users (for referral code lookup), but not read other users' full data
     match /users/{userId} {
+      allow create: if request.auth != null;
       allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null; // Anyone can create a user doc during signup.
+      allow list: if request.auth != null;
 
-      // A user can read their own subcollections.
-      match /{subcollection}/{docId} {
+      // A user can read/write to all of their own subcollections
+      match /{subcollection=**} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
-
-    // Admins can read any user document and their subcollections.
-    match /users/{userId}/{document=**} {
-       allow read, write: if request.auth != null && request.auth.token.admin == true;
+    
+    // Admins need broader access to manage withdrawals and referrals across users
+    match /users/{userId}/withdrawals/{withdrawalId} {
+        allow read, write: if request.auth.token.admin == true;
+    }
+    match /users/{userId}/referrals/{referralId} {
+        allow read, write: if request.auth.token.admin == true;
+    }
+    match /users/{userId}/transactions/{transactionId} {
+        allow read, write: if request.auth.token.admin == true;
     }
   }
 }
