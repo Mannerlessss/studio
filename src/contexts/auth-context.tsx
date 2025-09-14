@@ -17,10 +17,10 @@ import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collectio
 export interface Investment {
     id: string;
     planAmount: number;
-    perMinuteReturn: number; // Was dailyReturn
+    perMinuteReturn: number;
     startDate: Timestamp;
     lastUpdate: Timestamp;
-    durationMinutes: number; // Was durationDays
+    durationMinutes: number;
     earnings: number;
     status: 'active' | 'completed';
 }
@@ -110,6 +110,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Function to process earnings for all active investments for a user
     const processInvestmentEarnings = async (currentUserId: string) => {
+        if(!currentUserId) return;
         const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
         const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
         
@@ -155,10 +156,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     
                     if (minutesPassed <= 0) continue;
 
-                    const perMinuteReturn = investment.dailyReturn; // Field is named dailyReturn in Firestore
-                    const durationMinutes = investment.durationMinutes; // Field is named durationMinutes
+                    const perMinuteReturn = investment.dailyReturn; 
+                    const durationMinutes = investment.durationMinutes; 
 
-                    if (!perMinuteReturn || !durationMinutes) continue; // Skip if data is malformed
+                    if (!perMinuteReturn || !durationMinutes) continue;
 
                     const minutesAlreadyProcessed = Math.round(investment.earnings / perMinuteReturn);
                     const remainingMinutesInPlan = durationMinutes - minutesAlreadyProcessed;
@@ -177,18 +178,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             status: newStatus
                         });
 
-                        for (let i = 0; i < minutesToCredit; i++) {
-                            const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                            const earningMinute = new Date(lastUpdate.getTime() + (i + 1) * msInMinute);
-                            transaction.set(transactionRef, {
-                                type: 'earning',
-                                amount: perMinuteReturn,
-                                description: `Earning from Plan ${investment.planAmount}`,
-                                status: 'Completed',
-                                date: Timestamp.fromDate(earningMinute),
-                            });
-                        }
-
+                        // We can simplify and not create a transaction record for every single minute.
+                        // This will be too slow and costly. We can add one transaction for the batch.
+                        
                         if (commissionParentDoc && commissionParentDoc.exists()) {
                             const commissionAmount = earningsForThisPlan * 0.03;
                             const parentData = commissionParentDoc.data();
@@ -216,6 +208,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         totalBalance: (currentData.totalBalance || 0) + totalEarningsToAdd,
                         totalEarnings: (currentData.totalEarnings || 0) + totalEarningsToAdd,
                     });
+                    
+                    const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
+                    transaction.set(transactionRef, {
+                        type: 'earning',
+                        amount: totalEarningsToAdd,
+                        description: `Batch investment earnings`,
+                        status: 'Completed',
+                        date: serverTimestamp(),
+                    });
                 }
             });
         } catch (error) {
@@ -227,6 +228,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+     // Set up an interval to process earnings every minute
+    useEffect(() => {
+        let earningsInterval: NodeJS.Timeout;
+
+        if (user && !isAdmin) {
+            earningsInterval = setInterval(() => {
+                processInvestmentEarnings(user.uid);
+            }, 60000); // 60,000 milliseconds = 1 minute
+        }
+
+        // Cleanup interval on component unmount or when user logs out
+        return () => {
+            if (earningsInterval) {
+                clearInterval(earningsInterval);
+            }
+        };
+    }, [user, isAdmin]);
 
     useEffect(() => {
         let unsubFromUser: (() => void) | undefined;
@@ -267,7 +285,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                                 return {
                                     id: doc.id,
                                     ...data,
-                                    // Map Firestore fields to interface fields for consistency
                                     perMinuteReturn: data.dailyReturn,
                                     durationMinutes: data.durationMinutes,
                                 } as Investment;
