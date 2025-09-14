@@ -14,8 +14,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 interface InvestmentPlan {
   id: string;
   amount: number;
-  dailyReturnPercentage: number;
-  durationDays: number;
+  dailyInterest: number;
+  days: number;
   isPopular: boolean;
 }
 
@@ -30,7 +30,7 @@ const InvestmentPage: NextPage = () => {
     const fetchPlans = async () => {
       setLoading(true);
       try {
-        const q = query(collection(db, 'investmentPlans'), orderBy('amount', 'asc'));
+        const q = query(collection(db, 'plans'), orderBy('amount', 'asc'));
         const querySnapshot = await getDocs(q);
         const fetchedPlans = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InvestmentPlan));
         setPlans(fetchedPlans);
@@ -62,7 +62,7 @@ const InvestmentPage: NextPage = () => {
            ))
         ) : plans.length > 0 ? (
           plans.map((plan) => {
-            const baseDailyReturn = (plan.amount * plan.dailyReturnPercentage) / 100;
+            const baseDailyReturn = (plan.amount * plan.dailyInterest) / 100;
             const proBonus = isProMember ? baseDailyReturn * 0.30 : 0; // 30% bonus on the daily return for Pro
             const finalDailyReturn = baseDailyReturn + proBonus;
 
@@ -71,9 +71,9 @@ const InvestmentPage: NextPage = () => {
                 key={plan.id}
                 amount={plan.amount}
                 dailyReturn={finalDailyReturn}
-                dailyReturnPercentage={plan.dailyReturnPercentage}
-                proReturnPercentage={isProMember ? plan.dailyReturnPercentage * 1.3 : undefined}
-                duration={plan.durationDays}
+                dailyInterest={plan.dailyInterest}
+                proDailyInterest={isProMember ? plan.dailyInterest * 1.3 : undefined}
+                duration={plan.days}
                 mostPurchased={plan.isPopular}
                 userName={userName}
               />

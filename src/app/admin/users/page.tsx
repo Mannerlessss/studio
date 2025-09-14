@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2, ArrowUpDown, Search, UserPlus } from 'lucide-react';
+import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2, ArrowUpDown, Search } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -56,8 +56,8 @@ import { deleteUser } from '@/ai/flows/delete-user-flow';
 interface InvestmentPlan {
   id: string;
   amount: number;
-  dailyReturnPercentage: number;
-  durationDays: number;
+  dailyInterest: number;
+  days: number;
 }
 
 type UserSortableKeys = 'name' | 'email' | 'membership';
@@ -104,7 +104,7 @@ export default function UsersPage() {
                 const usersData: User[] = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
                 setUsers(usersData);
 
-                const plansSnapshot = await getDocs(collection(db, 'investmentPlans'));
+                const plansSnapshot = await getDocs(collection(db, 'plans'));
                 const plansData: InvestmentPlan[] = plansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InvestmentPlan));
                 setInvestmentPlans(plansData);
                 if (plansData.length > 0) {
@@ -187,7 +187,7 @@ export default function UsersPage() {
             const now = serverTimestamp();
 
             const isProMember = user.membership === 'Pro';
-            const baseDailyReturn = (selectedPlan.amount * selectedPlan.dailyReturnPercentage) / 100;
+            const baseDailyReturn = (selectedPlan.amount * selectedPlan.dailyInterest) / 100;
             const proBonus = isProMember ? baseDailyReturn * 0.30 : 0;
             const finalDailyReturn = baseDailyReturn + proBonus;
 
@@ -196,7 +196,7 @@ export default function UsersPage() {
             batch.set(newInvestmentRef, {
                 planAmount: amount,
                 dailyReturn: finalDailyReturn,
-                durationDays: selectedPlan.durationDays,
+                durationDays: selectedPlan.days,
                 startDate: now,
                 lastUpdate: now,
                 earnings: 0,
@@ -435,7 +435,7 @@ export default function UsersPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {investmentPlans.map(plan => (
-                                            <SelectItem key={plan.id} value={plan.id}>{plan.amount} Rs. Plan ({plan.dailyReturnPercentage}% / {plan.durationDays} days)</SelectItem>
+                                            <SelectItem key={plan.id} value={plan.id}>{plan.amount} Rs. Plan ({plan.dailyInterest}% / {plan.days} days)</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>

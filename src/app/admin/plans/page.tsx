@@ -16,7 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Trash2, Loader2, ArrowUpDown, Shapes, Percent, CalendarDays, DollarSign } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -37,14 +36,13 @@ import { db } from '@/lib/firebase';
 import { addDoc, collection, deleteDoc, doc, getDocs, serverTimestamp, Timestamp, query, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
-type PlanSortableKeys = 'amount' | 'dailyReturnPercentage' | 'durationDays' | 'createdAt';
+type PlanSortableKeys = 'amount' | 'dailyInterest' | 'days' | 'createdAt';
 
 interface InvestmentPlan {
     id: string;
     amount: number;
-    dailyReturnPercentage: number;
-    durationDays: number;
-    isPopular: boolean;
+    dailyInterest: number;
+    days: number;
     createdAt: Timestamp;
 }
 
@@ -58,14 +56,14 @@ export default function PlansPage() {
 
     // Form state
     const [amount, setAmount] = useState('');
-    const [dailyReturnPercentage, setDailyReturnPercentage] = useState('');
-    const [durationDays, setDurationDays] = useState('');
+    const [dailyInterest, setDailyInterest] = useState('');
+    const [days, setDays] = useState('');
 
      useEffect(() => {
         const fetchPlans = async () => {
             setLoading(true);
             try {
-                const q = query(collection(db, 'investmentPlans'), orderBy('createdAt', 'desc'));
+                const q = query(collection(db, 'plans'), orderBy('createdAt', 'desc'));
                 const plansSnapshot = await getDocs(q);
                 const plansData: InvestmentPlan[] = plansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InvestmentPlan));
                 setPlans(plansData);
@@ -106,7 +104,7 @@ export default function PlansPage() {
 
     const handleCreatePlan = async () => {
         setIsSubmitting(true);
-        if (!amount || !dailyReturnPercentage || !durationDays) {
+        if (!amount || !dailyInterest || !days) {
             toast({
                 variant: 'destructive',
                 title: 'Missing Information',
@@ -118,13 +116,12 @@ export default function PlansPage() {
 
         const newPlanData: Omit<InvestmentPlan, 'id' | 'createdAt'> = {
             amount: Number(amount),
-            dailyReturnPercentage: Number(dailyReturnPercentage),
-            durationDays: Number(durationDays),
-            isPopular: false,
+            dailyInterest: Number(dailyInterest),
+            days: Number(days),
         };
 
         try {
-            const docRef = await addDoc(collection(db, 'investmentPlans'), {
+            const docRef = await addDoc(collection(db, 'plans'), {
                 ...newPlanData,
                 createdAt: serverTimestamp(),
             });
@@ -143,8 +140,8 @@ export default function PlansPage() {
 
             // Reset form
             setAmount('');
-            setDailyReturnPercentage('');
-            setDurationDays('');
+            setDailyInterest('');
+            setDays('');
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -158,7 +155,7 @@ export default function PlansPage() {
 
     const deletePlan = async (id: string) => {
         try {
-            await deleteDoc(doc(db, 'investmentPlans', id));
+            await deleteDoc(doc(db, 'plans', id));
             toast({
                 title: 'Plan Deleted!',
                 description: `The investment plan has been deleted.`,
@@ -194,17 +191,17 @@ export default function PlansPage() {
             </div>
         </div>
          <div className="space-y-2">
-            <Label htmlFor="percentage">Daily Return (%)</Label>
+            <Label htmlFor="percentage">Daily Interest (%)</Label>
             <div className="relative">
               <Percent className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input id="percentage" className="pl-10" type="number" placeholder="e.g., 10" value={dailyReturnPercentage} onChange={e => setDailyReturnPercentage(e.target.value)} disabled={isSubmitting}/>
+              <Input id="percentage" className="pl-10" type="number" placeholder="e.g., 10" value={dailyInterest} onChange={e => setDailyInterest(e.target.value)} disabled={isSubmitting}/>
             </div>
         </div>
          <div className="space-y-2">
             <Label htmlFor="duration">Duration (Days)</Label>
              <div className="relative">
               <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input id="duration" className="pl-10" type="number" placeholder="e.g., 30" value={durationDays} onChange={e => setDurationDays(e.target.value)} disabled={isSubmitting}/>
+              <Input id="duration" className="pl-10" type="number" placeholder="e.g., 30" value={days} onChange={e => setDays(e.target.value)} disabled={isSubmitting}/>
             </div>
         </div>
       </CardContent>
@@ -236,13 +233,13 @@ export default function PlansPage() {
                  </Button>
               </TableHead>
               <TableHead>
-                 <Button variant="ghost" onClick={() => handleSort('dailyReturnPercentage')}>
+                 <Button variant="ghost" onClick={() => handleSort('dailyInterest')}>
                     Daily % <ArrowUpDown className="ml-2 h-4 w-4" />
                  </Button>
               </TableHead>
               <TableHead>Daily Return</TableHead>
                <TableHead>
-                 <Button variant="ghost" onClick={() => handleSort('durationDays')}>
+                 <Button variant="ghost" onClick={() => handleSort('days')}>
                     Duration <ArrowUpDown className="ml-2 h-4 w-4" />
                  </Button>
               </TableHead>
@@ -263,14 +260,14 @@ export default function PlansPage() {
                     </TableRow>
                 ))
             ) : sortedPlans.map((plan) => {
-                const dailyReturn = (plan.amount * plan.dailyReturnPercentage) / 100;
-                const totalProfit = dailyReturn * plan.durationDays;
+                const dailyReturn = (plan.amount * plan.dailyInterest) / 100;
+                const totalProfit = dailyReturn * plan.days;
                 return (
               <TableRow key={plan.id}>
                 <TableCell className="font-semibold">{plan.amount} Rs.</TableCell>
-                <TableCell>{plan.dailyReturnPercentage}%</TableCell>
+                <TableCell>{plan.dailyInterest}%</TableCell>
                 <TableCell>{dailyReturn.toFixed(2)} Rs.</TableCell>
-                <TableCell>{plan.durationDays} days</TableCell>
+                <TableCell>{plan.days} days</TableCell>
                 <TableCell className="font-semibold text-green-500">{totalProfit.toFixed(2)} Rs.</TableCell>
                 <TableCell className="text-right">
                     <div className='flex gap-2 justify-end'>

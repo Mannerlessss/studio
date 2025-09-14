@@ -9,8 +9,8 @@ import Link from 'next/link';
 interface InvestmentPlanCardProps {
   amount: number;
   dailyReturn: number;
-  dailyReturnPercentage: number;
-  proReturnPercentage?: number;
+  dailyInterest: number;
+  proDailyInterest?: number;
   duration: number;
   mostPurchased?: boolean;
   badgeText?: string;
@@ -20,8 +20,8 @@ interface InvestmentPlanCardProps {
 export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
   amount,
   dailyReturn,
-  dailyReturnPercentage,
-  proReturnPercentage,
+  dailyInterest,
+  proDailyInterest,
   duration,
   mostPurchased = false,
   badgeText = 'Popular',
@@ -42,8 +42,8 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
       <CardHeader>
         <CardTitle className={cn('text-2xl font-bold', mostPurchased ? 'text-primary' : '')}>Plan {amount} Rs.</CardTitle>
         <CardDescription>
-          Invest {amount} Rs. and get {dailyReturnPercentage}% daily.
-          {proReturnPercentage && <span className="text-accent font-semibold"> (PRO: {proReturnPercentage.toFixed(1)}%)</span>}
+          Invest {amount} Rs. and get {dailyInterest}% daily.
+          {proDailyInterest && <span className="text-accent font-semibold"> (PRO: {proDailyInterest.toFixed(1)}%)</span>}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

@@ -114,92 +114,95 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         try {
             await runTransaction(db, async (transaction) => {
+                // Phase 1: READS
                 const userDocRef = doc(db, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
+
                 if (!userDoc.exists()) {
-                    console.warn("processInvestmentEarnings: User document not found during transaction.");
+                    console.warn("processInvestmentEarnings: User document not found.");
                     return;
                 }
                 const currentData = userDoc.data() as UserData;
-    
+
                 const commissionParentRef = currentData.commissionParent ? doc(db, 'users', currentData.commissionParent) : null;
-                let commissionParentDoc: any = null;
-                if (commissionParentRef) {
-                    commissionParentDoc = await transaction.get(commissionParentRef);
-                }
-    
+                const commissionParentDoc = commissionParentRef ? await transaction.get(commissionParentRef) : null;
+
                 const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
                 const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
-                const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
-    
-                const investmentDocs = await Promise.all(
-                    activeInvestmentsSnapshot.docs.map(d => transaction.get(d.ref))
-                );
-    
+                const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery); // This is outside transaction but fine for a query
+                
+                const investmentDocsToUpdate: { ref: DocumentReference, data: Investment }[] = [];
+                for(const doc of activeInvestmentsSnapshot.docs) {
+                    investmentDocsToUpdate.push({ref: doc.ref, data: doc.data() as Investment});
+                }
+                
+                // Phase 2: CALCULATIONS
                 let totalEarningsToAdd = 0;
                 let totalCommissionToAdd = 0;
                 const now = new Date();
                 const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                 const writeOps: any[] = [];
-    
-                for (const investmentDoc of investmentDocs) {
-                    if (!investmentDoc.exists()) continue;
-    
-                    const investment = investmentDoc.data() as Investment;
+                
+                for (const investmentDoc of investmentDocsToUpdate) {
+                    const investment = investmentDoc.data;
                     const investmentRef = investmentDoc.ref;
-    
+
                     const lastUpdateDate = investment.lastUpdate.toDate();
                     const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
-    
+                    
                     const msInDay = 24 * 60 * 60 * 1000;
                     const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
-    
+                    
                     if (daysPassed <= 0) continue;
-    
+
                     const dailyReturn = investment.dailyReturn;
                     const durationDays = investment.durationDays;
                     if (!dailyReturn || !durationDays) continue;
-    
+
                     const daysAlreadyProcessed = Math.round((investment.earnings || 0) / dailyReturn);
                     const remainingDaysInPlan = durationDays - daysAlreadyProcessed;
                     const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
-    
+
                     if (daysToCredit > 0) {
                         const earningsForThisPlan = dailyReturn * daysToCredit;
                         totalEarningsToAdd += earningsForThisPlan;
-    
+
                         const newEarnings = (investment.earnings || 0) + earningsForThisPlan;
                         const newStatus = (daysAlreadyProcessed + daysToCredit) >= durationDays ? 'completed' : 'active';
-    
+                        
                         writeOps.push({ type: 'update', ref: investmentRef, data: { earnings: newEarnings, lastUpdate: serverTimestamp(), status: newStatus } });
-    
+
                         for (let i = 0; i < daysToCredit; i++) {
                             const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
                             const earningDay = new Date(startOfToday.getTime() - (daysPassed - i - 1) * msInDay);
                             writeOps.push({ type: 'set', ref: transactionRef, data: { type: 'earning', amount: dailyReturn, description: `Earning from Plan ${investment.planAmount}`, status: 'Completed', date: Timestamp.fromDate(earningDay) } });
                         }
-    
+
                         if (commissionParentDoc && commissionParentDoc.exists()) {
                             const commissionAmount = earningsForThisPlan * 0.03;
                             totalCommissionToAdd += commissionAmount;
                         }
                     }
                 }
-    
+                
+                // Phase 3: WRITES
                 if (totalEarningsToAdd > 0) {
-                    writeOps.push({ type: 'update', ref: userDocRef, data: { totalInvestmentEarnings: increment(totalEarningsToAdd), totalBalance: increment(totalEarningsToAdd), totalEarnings: increment(totalEarningsToAdd) } });
+                    transaction.update(userDocRef, { totalInvestmentEarnings: increment(totalEarningsToAdd), totalBalance: increment(totalEarningsToAdd), totalEarnings: increment(totalEarningsToAdd) });
                 }
     
                 if (totalCommissionToAdd > 0 && commissionParentRef) {
-                    writeOps.push({ type: 'update', ref: commissionParentRef, data: { totalBalance: increment(totalCommissionToAdd), totalReferralEarnings: increment(totalCommissionToAdd), totalEarnings: increment(totalCommissionToAdd) } });
+                    transaction.update(commissionParentRef, { totalBalance: increment(totalCommissionToAdd), totalReferralEarnings: increment(totalCommissionToAdd), totalEarnings: increment(totalCommissionToAdd) });
                     const commissionTransactionRef = doc(collection(db, `users/${commissionParentRef.id}/transactions`));
-                    writeOps.push({ type: 'set', ref: commissionTransactionRef, data: { type: 'referral', amount: totalCommissionToAdd, description: `3% commission from ${currentData.name}`, status: 'Completed', date: serverTimestamp() } });
+                    transaction.set(commissionTransactionRef, { type: 'referral', amount: totalCommissionToAdd, description: `3% commission from ${currentData.name}`, status: 'Completed', date: serverTimestamp() });
                 }
-    
-                writeOps.forEach(op => {
-                    if (op.type === 'update') transaction.update(op.ref, op.data);
-                    else if (op.type === 'set') transaction.set(op.ref, op.data);
-                });
+
+                for (const op of writeOps) {
+                    if (op.type === 'update') {
+                        transaction.update(op.ref, op.data);
+                    } else if (op.type === 'set') {
+                        transaction.set(op.ref, op.data);
+                    }
+                }
             });
         } catch (error) {
             console.error("Error processing investment earnings transaction: ", error);
