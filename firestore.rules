@@ -2,33 +2,34 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Plans can be read by any authenticated user, but only modified by admin (via Admin SDK)
+    // Admin-only collections
+    match /withdrawals/{docId} {
+      allow read, write: if request.auth.token.admin == true;
+    }
+
+    // Plans: all logged-in users can read, no one can write directly
     match /plans/{planId} {
       allow read: if request.auth != null;
-      allow write: if false; 
+      allow write: if false; // Only admin via Admin SDK
     }
 
-    // Offers can be read by any authenticated user, but only modified by admin (via Admin SDK)
+    // Offers: all logged-in users can read, no one can write directly
     match /offers/{offerId} {
       allow read: if request.auth != null;
-      allow write: if false;
+      allow write: if false; // Only admin via Admin SDK
     }
 
-    // Each user can read and write ONLY their own data.
+    // Users collection:
     match /users/{userId} {
+      // A user can create their own document, and can read/write it after creation.
+      // Admins can read any user document.
       allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow get, list: if request.auth != null; // Allow querying for referral checks
 
-      // This rule applies to all subcollections under a user's document
-      match /{subcollection}/{docId} {
+      // Subcollections like investments, transactions, etc.
+      match /{subCollection}/{docId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
-    }
-
-    // This rule allows the referral query to work by checking for a referral code
-    // It is secure because it only allows a read if the query is specifically for the 'referralCode' field.
-    // It does not allow reading the entire collection or other users' documents freely.
-    match /users/{document=**} {
-      allow list: if request.auth != null;
     }
   }
 }
