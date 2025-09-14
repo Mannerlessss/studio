@@ -2,7 +2,7 @@
 import type { FC } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { HandCoins, Users, Gift, Home } from 'lucide-react';
+import { HandCoins, Users, Gift, Home, Shapes } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -10,8 +10,8 @@ export const AdminBottomNav: FC = () => {
   const pathname = usePathname();
   const navItems = [
     { href: '/admin', icon: Home, label: 'Dashboard' },
-    { href: '/admin/withdrawals', icon: HandCoins, label: 'Withdrawals' },
     { href: '/admin/users', icon: Users, label: 'Users' },
+    { href: '/admin/withdrawals', icon: HandCoins, label: 'Withdrawals' },
     { href: '/admin/offers', icon: Gift, label: 'Offers' },
   ];
 

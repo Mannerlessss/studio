@@ -1,7 +1,7 @@
 'use client';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { CircleUser, Gem, HandCoins, Users, Gift, Home } from 'lucide-react';
+import { CircleUser, Gem, Search, HandCoins, Users, Gift, Home, Shapes } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
