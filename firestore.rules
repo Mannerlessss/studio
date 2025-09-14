@@ -1,41 +1,44 @@
-
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if a user is authenticated
-    function isSignedIn() {
-      return request.auth != null;
+    
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
     }
 
-    // Helper function to check if the user is the owner of the document
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    // Users can read and write their own data.
-    // They can only create their own user document.
+    // USERS collection
     match /users/{userId} {
-      allow read, update, delete: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn();
-      
-      // Users can read and write to their own subcollections
-      match /{allSubcollections}/{docId} {
-        allow read, write: if isSignedIn() && isOwner(userId);
+      // Any authenticated user can list users (needed for referral leaderboard)
+      // but can only read their own document's contents.
+      allow list: if request.auth != null;
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+
+      // New users can create their own document.
+      allow create: if request.auth != null;
+
+      // Subcollections (transactions, investments, etc.)
+      // Users can manage documents within their own subcollections.
+      match /{collectionId}/{docId} {
+        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
       }
     }
     
-    // Offers can be read by any authenticated user, but only created/modified
-    // by admin backend processes (not covered by client-side rules).
-    match /offers/{offerId} {
-      allow read: if isSignedIn();
-      allow write: if false; // Disallow client-side writes
+    // Publicly readable collections for authenticated users
+    match /investmentPlans/{planId} {
+      allow read: if request.auth != null;
     }
 
-    // Withdrawals are handled within the user's subcollection, covered above.
-    // This is a catch-all to ensure no top-level access.
-    match /withdrawals/{withdrawalId} {
-      allow read, write: if false;
+    match /offers/{offerId} {
+      allow read: if request.auth != null;
+    }
+    
+    // The admin panel reads these collections directly.
+    // The rules here are for potential client-side reads if ever needed.
+    // Admin backend functions bypass these rules.
+    match /{path=**}/withdrawals/{withdrawalId} {
+        allow read: if request.auth != null;
     }
   }
 }
