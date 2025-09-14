@@ -13,6 +13,7 @@ import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReferralMilestonesCard } from '@/components/vaultboost/referral-milestones-card';
+import { ReferralLeaderboardCard } from '@/components/vaultboost/referral-leaderboard-card';
 
 interface ReferredUser {
     id: string;
@@ -166,6 +167,7 @@ const ReferPage: NextPage = () => {
             </CardContent>
         </Card>
         
+        <ReferralLeaderboardCard />
         <ReferralMilestonesCard successfullyInvested={userData?.investedReferralCount || 0} />
 
          <Card className="text-left shadow-lg">
