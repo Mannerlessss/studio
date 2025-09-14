@@ -17,10 +17,10 @@ import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collectio
 export interface Investment {
     id: string;
     planAmount: number;
-    perMinuteReturn: number;
+    dailyReturn: number;
     startDate: Timestamp;
     lastUpdate: Timestamp;
-    durationMinutes: number;
+    durationDays: number;
     earnings: number;
     status: 'active' | 'completed';
 }
@@ -111,21 +111,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Function to process earnings for all active investments for a user
     const processInvestmentEarnings = async (currentUserId: string) => {
         if (!currentUserId) return;
-    
+        
         try {
-            // Run a transaction to ensure atomic reads and writes.
             await runTransaction(db, async (transaction) => {
                 const userDocRef = doc(db, 'users', currentUserId);
-                
-                // =============================================================
-                // PHASE 1: READ ALL NECESSARY DOCUMENTS FIRST
-                // =============================================================
                 const userDoc = await transaction.get(userDocRef);
                 if (!userDoc.exists()) {
-                    console.warn("processInvestmentEarnings: User document not found.");
-                    return; // Abort transaction
+                    console.warn("processInvestmentEarnings: User document not found during transaction.");
+                    return;
                 }
-    
                 const currentData = userDoc.data() as UserData;
     
                 const commissionParentRef = currentData.commissionParent ? doc(db, 'users', currentData.commissionParent) : null;
@@ -134,23 +128,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     commissionParentDoc = await transaction.get(commissionParentRef);
                 }
     
-                // Fetch all active investments for the user
                 const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
                 const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
                 const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
     
-                // Now, re-read each active investment document *within* the transaction to lock it
                 const investmentDocs = await Promise.all(
                     activeInvestmentsSnapshot.docs.map(d => transaction.get(d.ref))
                 );
     
-                // =============================================================
-                // PHASE 2: PERFORM CALCULATIONS
-                // =============================================================
-                let totalBatchEarnings = 0;
-                let totalBatchCommission = 0;
+                let totalEarningsToAdd = 0;
+                let totalCommissionToAdd = 0;
                 const now = new Date();
-                const writeOperations: any[] = [];
+                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const writeOps: any[] = [];
     
                 for (const investmentDoc of investmentDocs) {
                     if (!investmentDoc.exists()) continue;
@@ -158,140 +148,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const investment = investmentDoc.data() as Investment;
                     const investmentRef = investmentDoc.ref;
     
-                    const lastUpdate = investment.lastUpdate.toDate();
-                    const msInMinute = 60 * 1000;
-                    const minutesPassed = Math.floor((now.getTime() - lastUpdate.getTime()) / msInMinute);
+                    const lastUpdateDate = investment.lastUpdate.toDate();
+                    const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
     
-                    if (minutesPassed <= 0) continue;
+                    const msInDay = 24 * 60 * 60 * 1000;
+                    const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
     
-                    const perMinuteReturn = investment.perMinuteReturn;
-                    const durationMinutes = investment.durationMinutes;
+                    if (daysPassed <= 0) continue;
     
-                    if (!perMinuteReturn || !durationMinutes) continue;
+                    const dailyReturn = investment.dailyReturn;
+                    const durationDays = investment.durationDays;
+                    if (!dailyReturn || !durationDays) continue;
     
-                    const minutesAlreadyProcessed = Math.floor((investment.earnings || 0) / perMinuteReturn);
-                    const remainingMinutesInPlan = durationMinutes - minutesAlreadyProcessed;
-                    const minutesToCredit = Math.min(minutesPassed, remainingMinutesInPlan);
+                    const daysAlreadyProcessed = Math.round((investment.earnings || 0) / dailyReturn);
+                    const remainingDaysInPlan = durationDays - daysAlreadyProcessed;
+                    const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
     
-                    if (minutesToCredit > 0) {
-                        const earningsForThisPlan = perMinuteReturn * minutesToCredit;
-                        totalBatchEarnings += earningsForThisPlan;
+                    if (daysToCredit > 0) {
+                        const earningsForThisPlan = dailyReturn * daysToCredit;
+                        totalEarningsToAdd += earningsForThisPlan;
     
                         const newEarnings = (investment.earnings || 0) + earningsForThisPlan;
-                        const newStatus = (minutesAlreadyProcessed + minutesToCredit) >= durationMinutes ? 'completed' : 'active';
+                        const newStatus = (daysAlreadyProcessed + daysToCredit) >= durationDays ? 'completed' : 'active';
     
-                        // Queue the investment update
-                        writeOperations.push({
-                            type: 'update',
-                            ref: investmentRef,
-                            data: {
-                                earnings: newEarnings,
-                                lastUpdate: serverTimestamp(),
-                                status: newStatus
-                            }
-                        });
+                        writeOps.push({ type: 'update', ref: investmentRef, data: { earnings: newEarnings, lastUpdate: serverTimestamp(), status: newStatus } });
     
-                        // Queue transaction records for each minute
-                        for (let i = 0; i < minutesToCredit; i++) {
+                        for (let i = 0; i < daysToCredit; i++) {
                             const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                            const earningTime = new Date(lastUpdate.getTime() + (i + 1) * msInMinute);
-                            writeOperations.push({
-                                type: 'set',
-                                ref: transactionRef,
-                                data: {
-                                    type: 'earning',
-                                    amount: perMinuteReturn,
-                                    description: `Earning from Plan ${investment.planAmount}`,
-                                    status: 'Completed',
-                                    date: Timestamp.fromDate(earningTime),
-                                }
-                            });
+                            const earningDay = new Date(startOfToday.getTime() - (daysPassed - i - 1) * msInDay);
+                            writeOps.push({ type: 'set', ref: transactionRef, data: { type: 'earning', amount: dailyReturn, description: `Earning from Plan ${investment.planAmount}`, status: 'Completed', date: Timestamp.fromDate(earningDay) } });
                         }
     
-                        // Calculate commission
                         if (commissionParentDoc && commissionParentDoc.exists()) {
-                            const commissionForThisPlan = earningsForThisPlan * 0.03;
-                            totalBatchCommission += commissionForThisPlan;
+                            const commissionAmount = earningsForThisPlan * 0.03;
+                            totalCommissionToAdd += commissionAmount;
                         }
                     }
                 }
     
-                // Queue user balance update
-                if (totalBatchEarnings > 0) {
-                    writeOperations.push({
-                        type: 'update',
-                        ref: userDocRef,
-                        data: {
-                            totalInvestmentEarnings: increment(totalBatchEarnings),
-                            totalBalance: increment(totalBatchEarnings),
-                            totalEarnings: increment(totalBatchEarnings),
-                        }
-                    });
+                if (totalEarningsToAdd > 0) {
+                    writeOps.push({ type: 'update', ref: userDocRef, data: { totalInvestmentEarnings: increment(totalEarningsToAdd), totalBalance: increment(totalEarningsToAdd), totalEarnings: increment(totalEarningsToAdd) } });
                 }
     
-                // Queue referrer balance update and transaction
-                if (totalBatchCommission > 0 && commissionParentRef) {
-                    writeOperations.push({
-                        type: 'update',
-                        ref: commissionParentRef,
-                        data: {
-                            totalBalance: increment(totalBatchCommission),
-                            totalReferralEarnings: increment(totalBatchCommission),
-                            totalEarnings: increment(totalBatchCommission),
-                        }
-                    });
+                if (totalCommissionToAdd > 0 && commissionParentRef) {
+                    writeOps.push({ type: 'update', ref: commissionParentRef, data: { totalBalance: increment(totalCommissionToAdd), totalReferralEarnings: increment(totalCommissionToAdd), totalEarnings: increment(totalCommissionToAdd) } });
                     const commissionTransactionRef = doc(collection(db, `users/${commissionParentRef.id}/transactions`));
-                    writeOperations.push({
-                        type: 'set',
-                        ref: commissionTransactionRef,
-                        data: {
-                            type: 'referral',
-                            amount: totalBatchCommission,
-                            description: `3% commission from ${currentData.name}`,
-                            status: 'Completed',
-                            date: serverTimestamp(),
-                        }
-                    });
+                    writeOps.push({ type: 'set', ref: commissionTransactionRef, data: { type: 'referral', amount: totalCommissionToAdd, description: `3% commission from ${currentData.name}`, status: 'Completed', date: serverTimestamp() } });
                 }
     
-                // =============================================================
-                // PHASE 3: EXECUTE ALL WRITES
-                // =============================================================
-                writeOperations.forEach(op => {
-                    if (op.type === 'update') {
-                        transaction.update(op.ref, op.data);
-                    } else if (op.type === 'set') {
-                        transaction.set(op.ref, op.data);
-                    }
+                writeOps.forEach(op => {
+                    if (op.type === 'update') transaction.update(op.ref, op.data);
+                    else if (op.type === 'set') transaction.set(op.ref, op.data);
                 });
             });
         } catch (error) {
             console.error("Error processing investment earnings transaction: ", error);
         }
     };
-    
-
-     // Set up an interval to process earnings every minute
-    useEffect(() => {
-        let earningsInterval: NodeJS.Timeout;
-
-        if (user && !isAdmin) {
-            // Run once immediately on login
-            processInvestmentEarnings(user.uid);
-            
-            // Then set up the interval
-            earningsInterval = setInterval(() => {
-                processInvestmentEarnings(user.uid);
-            }, 60000); // 60,000 milliseconds = 1 minute
-        }
-
-        // Cleanup interval on component unmount or when user logs out
-        return () => {
-            if (earningsInterval) {
-                clearInterval(earningsInterval);
-            }
-        };
-    }, [user, isAdmin]);
 
     useEffect(() => {
         let unsubFromUser: (() => void) | undefined;
@@ -304,6 +217,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (unsubFromInvestments) unsubFromInvestments();
             
             if (currentUser) {
+                await processInvestmentEarnings(currentUser.uid);
+                
                 const idTokenResult = await currentUser.getIdTokenResult();
                 const userIsAdmin = !!idTokenResult.claims.admin;
                 
@@ -331,8 +246,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                                 return {
                                     id: docSnap.id,
                                     ...data,
-                                    perMinuteReturn: data.perMinuteReturn || 0,
-                                    durationMinutes: data.durationMinutes || 0,
                                 } as Investment;
                             });
                             setUserData({ ...baseUserData, investments });

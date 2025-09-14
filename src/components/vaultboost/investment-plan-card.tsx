@@ -23,7 +23,7 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
   badgeText = 'Most Purchased',
   userName = 'User',
 }) => {
-  const totalProfit = dailyReturn * 30; // Kept as 30 for display purposes
+  const totalProfit = dailyReturn * duration;
   const message = `Hi, I'm ${userName} and I want to buy the plan for ${amount} Rs.`;
   const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
 
@@ -37,16 +37,16 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
       )}
       <CardHeader>
         <CardTitle className={cn('text-2xl font-bold', mostPurchased ? 'text-primary' : '')}>Plan {amount} Rs.</CardTitle>
-        <CardDescription>Invest {amount} Rs. to get 10% per minute.</CardDescription>
+        <CardDescription>Invest {amount} Rs. and get 10% daily.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex justify-between items-center">
-          <span className="text-muted-foreground">Earning per Minute</span>
+          <span className="text-muted-foreground">Daily Earning</span>
           <span className="font-semibold">{dailyReturn} Rs.</span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-muted-foreground">Contract Duration</span>
-          <span className="font-semibold">30 Minutes</span>
+          <span className="text-muted-foreground">Contract Days</span>
+          <span className="font-semibold">{duration} Days</span>
         </div>
         <div className="flex justify-between items-center text-lg">
           <span className="text-muted-foreground font-semibold">Total Profit</span>

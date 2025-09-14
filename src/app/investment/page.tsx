@@ -35,8 +35,8 @@ const InvestmentPage: NextPage = () => {
                 </div>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
-                <p>• Investment plans are currently in a 30-minute test cycle.</p>
-                <p>• Earnings are credited to your account every minute.</p>
+                <p>• All investment plans will automatically expire after 30 days from the date of purchase.</p>
+                <p>• Daily earnings are credited to your account every 24 hours.</p>
             </CardContent>
         </Card>
 
