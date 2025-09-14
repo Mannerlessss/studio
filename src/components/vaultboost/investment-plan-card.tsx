@@ -9,8 +9,6 @@ import Link from 'next/link';
 interface InvestmentPlanCardProps {
   amount: number;
   dailyReturn: number;
-  dailyInterest: number;
-  proDailyInterest?: number;
   duration: number;
   mostPurchased?: boolean;
   badgeText?: string;
@@ -20,11 +18,9 @@ interface InvestmentPlanCardProps {
 export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
   amount,
   dailyReturn,
-  dailyInterest,
-  proDailyInterest,
   duration,
   mostPurchased = false,
-  badgeText = 'Popular',
+  badgeText = 'Most Purchased',
   userName = 'User',
 }) => {
   const totalProfit = dailyReturn * duration;
@@ -41,15 +37,12 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
       )}
       <CardHeader>
         <CardTitle className={cn('text-2xl font-bold', mostPurchased ? 'text-primary' : '')}>Plan {amount} Rs.</CardTitle>
-        <CardDescription>
-          Invest {amount} Rs. and get {dailyInterest}% daily.
-          {proDailyInterest && <span className="text-accent font-semibold"> (PRO: {proDailyInterest.toFixed(1)}%)</span>}
-        </CardDescription>
+        <CardDescription>Invest {amount} Rs. and get 10% daily.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex justify-between items-center">
           <span className="text-muted-foreground">Daily Earning</span>
-          <span className="font-semibold">{dailyReturn.toFixed(2)} Rs.</span>
+          <span className="font-semibold">{dailyReturn} Rs.</span>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-muted-foreground">Contract Days</span>
@@ -57,7 +50,7 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
         </div>
         <div className="flex justify-between items-center text-lg">
           <span className="text-muted-foreground font-semibold">Total Profit</span>
-          <span className="font-bold text-green-500">{totalProfit.toFixed(2)} Rs.</span>
+          <span className="font-bold text-green-500">{totalProfit} Rs.</span>
         </div>
       </CardContent>
       <CardFooter>

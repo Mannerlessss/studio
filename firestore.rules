@@ -1,43 +1,35 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Plans: Authenticated users can read, only Admin SDK can write.
+    
+    // Public read for plans
     match /plans/{planId} {
       allow read: if request.auth != null;
-      allow write: if false; // Must be written via Admin SDK
+      allow write: if request.auth.token.admin == true;
     }
-    
-    // Offers: Authenticated users can read, only Admin SDK can write.
+
+    // Offers can be read by any user, written by admin
     match /offers/{offerId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.token.admin == true;
-    }
-
-    // Users Collection
-    match /users/{userId} {
-      // Allow a user to create their own user document
-      allow create: if request.auth != null && request.auth.uid == userId;
-
-      // A user can only read and update their own document
-      allow get, update: if request.auth != null && request.auth.uid == userId;
-
-      // Allow authenticated users to query the users collection (for referral lookup),
-      // but not to read the full contents of any document other than their own.
-      allow list: if request.auth != null;
-      
-      // Do not allow general delete or write (update is specified above)
-      allow delete, write: if false;
-
-      // Subcollections (investments, transactions, etc.)
-      match /{subcollection=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
+      allow write: if request.auth.token.admin == true;
     }
     
-    // Withdrawals (as a collection group query for admin)
-    match /{path=**}/withdrawals/{withdrawalId} {
-      allow read, list: if request.auth != null && request.auth.token.admin == true;
+    // Users can be created by anyone (for signup), but only queried by authenticated users.
+    // A user can only get/update/delete their own document.
+    match /users/{userId} {
+      allow create: if request.auth != null;
+      allow get, update, delete: if request.auth != null && request.auth.uid == userId;
+      allow list: if request.auth != null; // Allows querying for referral lookup
+    }
+
+    // Users can manage all their own subcollections
+    match /users/{userId}/{allPaths=**} {
+      allow read, write, create, delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Admin can read/write all withdrawals
+    match /withdrawals/{withdrawalId} {
+       allow read, write: if request.auth.token.admin == true;
     }
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { CircleUser, Gem, Shapes, HandCoins, Users, Gift, Home } from 'lucide-react';
+import { CircleUser, Gem, HandCoins, Users, Gift, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -23,7 +23,6 @@ const navItems = [
     { href: '/admin/users', icon: Users, label: 'Users' },
     { href: '/admin/withdrawals', icon: HandCoins, label: 'Withdrawals' },
     { href: '/admin/offers', icon: Gift, label: 'Offers' },
-    { href: '/admin/plans', icon: Shapes, label: 'Plans' },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
