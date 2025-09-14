@@ -23,6 +23,7 @@ const navItems = [
     { href: '/admin/users', icon: Users, label: 'Users' },
     { href: '/admin/withdrawals', icon: HandCoins, label: 'Withdrawals' },
     { href: '/admin/offers', icon: Gift, label: 'Offers' },
+    { href: '/admin/plans', icon: Shapes, label: 'Plans' },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {

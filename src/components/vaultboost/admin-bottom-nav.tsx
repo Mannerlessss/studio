@@ -13,6 +13,7 @@ export const AdminBottomNav: FC = () => {
     { href: '/admin/users', icon: Users, label: 'Users' },
     { href: '/admin/withdrawals', icon: HandCoins, label: 'Withdrawals' },
     { href: '/admin/offers', icon: Gift, label: 'Offers' },
+    { href: '/admin/plans', icon: Shapes, label: 'Plans' },
   ];
 
   return (
