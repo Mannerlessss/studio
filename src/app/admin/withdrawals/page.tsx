@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Loader2, Search, ArrowUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, updateDoc, writeBatch, getDoc, collectionGroup, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, updateDoc, writeBatch, getDoc, collectionGroup, query, where, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 
@@ -57,13 +57,15 @@ export default function WithdrawalsPage() {
         const fetchWithdrawals = async () => {
             setLoading(true);
             try {
-                const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'));
+                // Use a collectionGroup query to get all withdrawals from all users.
+                // This requires a specific index in Firestore.
+                const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'), orderBy('date', 'desc'));
                 const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
                 const requests: WithdrawalRequest[] = [];
                  withdrawalsSnapshot.forEach(doc => {
                     requests.push({ 
                         id: doc.id,
-                        userId: doc.ref.parent.parent!.id,
+                        userId: doc.ref.parent.parent!.id, // Get the userId from the path
                         ...doc.data()
                     } as WithdrawalRequest);
                 });
@@ -71,7 +73,7 @@ export default function WithdrawalsPage() {
                 setWithdrawals(requests);
             } catch (error: any) {
                 console.error("Error fetching withdrawals: ", error);
-                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch withdrawal requests. Check permissions.' });
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch withdrawal requests. Check permissions & indexes.' });
             } finally {
                 setLoading(false);
             }
@@ -295,3 +297,5 @@ export default function WithdrawalsPage() {
     </Card>
   );
 }
+
+    
