@@ -2,34 +2,49 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Admin-only collections
-    match /withdrawals/{docId} {
-      allow read, write: if request.auth.token.admin == true;
-    }
-
-    // Plans: all logged-in users can read, no one can write directly
+    // Plans: All authenticated users can read, but only admin can write.
     match /plans/{planId} {
       allow read: if request.auth != null;
-      allow write: if false; // Only admin via Admin SDK
+      // Writes should only happen via a trusted server (Admin SDK)
+      allow write: if request.auth.token.admin == true;
     }
 
-    // Offers: all logged-in users can read, no one can write directly
+    // Offers: All authenticated users can read.
     match /offers/{offerId} {
       allow read: if request.auth != null;
-      allow write: if false; // Only admin via Admin SDK
+      // Writes should only happen via a trusted server (Admin SDK)
+      allow write: if request.auth.token.admin == true;
     }
 
-    // Users collection:
+    // Users Collection
     match /users/{userId} {
-      // A user can create their own document, and can read/write it after creation.
-      // Admins can read any user document.
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      allow get, list: if request.auth != null; // Allow querying for referral checks
+      // A user can create their own document.
+      // A user can get, update, or delete their own document.
+      // An admin can read or write any user document.
+      allow create: if request.auth != null;
+      allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
+      
+      // Allow admins to list users, and allow logged-in users to query for referral codes.
+      allow list: if request.auth != null;
 
-      // Subcollections like investments, transactions, etc.
-      match /{subCollection}/{docId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Subcollections within a user's document
+      match /{subcollection}/{docId} {
+        // A user can read/write any document in their own subcollections.
+        // An admin can also read/write to any user's subcollections.
+        allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
       }
+    }
+    
+    // Withdrawals (as a subcollection of users)
+    // This is already covered by the generic subcollection rule above, 
+    // but can be made more explicit if needed.
+    match /users/{userId}/withdrawals/{withdrawalId} {
+       allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
+    }
+
+    // This rule allows the admin panel to query the withdrawals collection group.
+    match /{path=**}/withdrawals/{withdrawalId} {
+        allow read: if request.auth != null && request.auth.token.admin == true;
     }
   }
 }
