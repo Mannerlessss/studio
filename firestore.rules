@@ -1,48 +1,61 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper function to check for admin role
     function isAdmin() {
-      // The custom claim is 'admin', not 'role'.
-      return request.auth.token.admin == true;
+      // Check for a custom claim named 'admin' set to true
+      return request.auth != null && request.auth.token.admin == true;
     }
 
-    // Rules for the 'users' collection
+    // USER-SPECIFIC RULES
     match /users/{userId} {
-      // A user can get, write, update and delete their OWN document.
-      // An admin can do anything to any user document.
-      allow read, write: if request.auth.uid == userId || isAdmin();
+      // A user can read and write to their own document.
+      allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      // Allow users to access their own subcollections.
+      // Users can access their own subcollections.
       match /investments/{investmentId} {
-        allow read, write: if request.auth.uid == userId || isAdmin();
+        allow read, write: if request.auth != null && request.auth.uid == userId;
       }
       match /transactions/{transactionId} {
-        allow read, write: if request.auth.uid == userId || isAdmin();
+        allow read, write: if request.auth != null && request.auth.uid == userId;
       }
       match /withdrawals/{withdrawalId} {
-        allow read, write: if request.auth.uid == userId || isAdmin();
+         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
-       match /referrals/{referralId} {
-        allow read, write: if request.auth.uid == userId || isAdmin();
+      match /referrals/{referralId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
 
-    // Rules for global 'plans' and 'offers' that admins manage
+    // ADMIN-SPECIFIC RULES
+    // Admins need broader access to manage the app.
+    match /users/{userId} {
+        // Admins can read and list all user documents.
+        allow get, list: if isAdmin();
+        // Admins can also update user documents (e.g., upgrade membership).
+        allow update: if isAdmin();
+    }
+     match /users/{userId}/{anySubCollection}/{docId} {
+      // Admins can read/write to any document in any user's subcollection
+      // This is needed for crediting investments, approving withdrawals etc.
+      allow read, write: if isAdmin();
+    }
+
+
+    // GLOBAL COLLECTIONS
     match /plans/{planId} {
-        allow read: if request.auth != null; // Any authenticated user can read
-        allow write: if isAdmin(); // Only admins can write
+      // Any authenticated user can read the plans.
+      allow read: if request.auth != null;
+      // Only admins can create, update, or delete plans.
+      allow write: if isAdmin();
     }
+
     match /offers/{offerId} {
-        allow read: if request.auth != null;
-        allow write: if isAdmin();
-    }
-    
-    // Collection group queries for Admin panel
-    // This allows admins to query across subcollections of all users.
-    match /{path=**}/withdrawals/{withdrawalId} {
-      allow read, list: if isAdmin();
+      // Any authenticated user can read offers (for redemption).
+      allow read: if request.auth != null;
+       // Only admins can create, update, or delete offers.
+      allow write: if isAdmin();
     }
   }
 }
