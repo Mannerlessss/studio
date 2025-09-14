@@ -1,50 +1,64 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper function to check for admin custom claim
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    //
+    // USER-ACCESSIBLE COLLECTIONS
+    //
     
-    // Plans: All authenticated users can read, but only admin can write.
-    match /plans/{planId} {
-      allow read: if request.auth != null;
-      // Writes should only happen via a trusted server (Admin SDK)
-      allow write: if request.auth.token.admin == true;
-    }
-
-    // Offers: All authenticated users can read.
-    match /offers/{offerId} {
-      allow read: if request.auth != null;
-      // Writes should only happen via a trusted server (Admin SDK)
-      allow write: if request.auth.token.admin == true;
-    }
-
-    // Users Collection
+    // Users can only read and write to their OWN document and subcollections.
     match /users/{userId} {
-      // A user can create their own document.
-      // A user can get, update, or delete their own document.
-      // An admin can read or write any user document.
-      allow create: if request.auth != null;
-      allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
-      
-      // Allow admins to list users, and allow logged-in users to query for referral codes.
-      allow list: if request.auth != null;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      // Subcollections within a user's document
-      match /{subcollection}/{docId} {
-        // A user can read/write any document in their own subcollections.
-        // An admin can also read/write to any user's subcollections.
-        allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
+      // Allow users to read and write to THEIR OWN subcollections
+      match /investments/{investmentId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      match /transactions/{transactionId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      match /referrals/{referralId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      match /withdrawals/{withdrawalId} {
+      	allow create, read: if request.auth.uid == userId;
+        allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])) && isAdmin();
       }
     }
     
-    // Withdrawals (as a subcollection of users)
-    // This is already covered by the generic subcollection rule above, 
-    // but can be made more explicit if needed.
-    match /users/{userId}/withdrawals/{withdrawalId} {
-       allow read, write: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
+    // Any authenticated user can read the global investment plans and offers.
+    // Only admins can create, update, or delete them.
+    match /plans/{planId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    match /offers/{offerId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
 
-    // This rule allows the admin panel to query the withdrawals collection group.
-    match /{path=**}/withdrawals/{withdrawalId} {
-        allow read: if request.auth != null && request.auth.token.admin == true;
+    //
+    // ADMIN-ONLY ACCESS
+    // These rules allow admins to query collections for the admin panel.
+    //
+    match /users/{userId} {
+      // Admins can list and get any user document
+      allow list, get: if isAdmin();
+    }
+    
+    match /withdrawals/{docId} {
+       allow read, list: if isAdmin();
+    }
+    
+    // Firestore requires a rule for the collection group query used by the admin panel.
+    match /{path=**}/withdrawals/{docId} {
+        allow read: if isAdmin();
     }
   }
 }
