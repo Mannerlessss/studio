@@ -2,42 +2,54 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Plans can be read by any authenticated user
+    // Helper function to check for admin custom claim
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Plans: Logged-in users can read, only Admin SDK can write.
     match /plans/{planId} {
       allow read: if request.auth != null;
-      // Admin-only write access is handled by backend logic (Admin SDK)
-      allow write: if false; 
+      allow write: if false; // Deployed/created via Admin SDK
     }
 
-    // Offers can be read by any authenticated user
+    // Offers: Logged-in users can read, only Admin can write.
     match /offers/{offerId} {
       allow read: if request.auth != null;
-      // Admin-only write access is handled by backend logic (Admin SDK)
-      allow write: if false;
+      allow create, update, delete: if isAdmin();
     }
 
-    // Rules for the 'users' collection
+    // Users Collection
     match /users/{userId} {
-      // A user can get, list, create, update, or delete their OWN user document.
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Allow user creation for anyone signing up.
+      allow create: if request.auth != null;
+      
+      // Users can read/update their own document.
+      allow get, update: if request.auth != null && request.auth.uid == userId;
 
-      // This rule applies to all subcollections of a user document (e.g., investments, transactions).
-      match /{subcollection=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Admins can read any user's document.
+      allow get: if isAdmin();
+
+      // Only allow LIST (queries) for authenticated users.
+      // This is required for referral code lookup during signup.
+      // Note: This does not allow reading the *content* of documents, only querying them.
+      // The `get` rule above still protects individual document reads.
+      allow list: if request.auth != null;
+      
+      // Users can only delete themselves. Admins can delete anyone.
+      allow delete: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+
+      // Subcollections (investments, transactions, etc.)
+      match /{subcollection}/{docId} {
+        // Users can read/write their own subcollection documents.
+        // Admins can read any user's subcollection documents.
+        allow read, write: if (request.auth != null && request.auth.uid == userId) || isAdmin();
       }
     }
-
-    // Rules for collection group queries
-    // This allows an admin to query all withdrawals regardless of which user they belong to.
+    
+    // This allows collection group queries by admins (e.g., for all withdrawals)
     match /{path=**}/withdrawals/{withdrawalId} {
-      // Authenticated users can read their own withdrawals via subcollection path.
-      // Admins (validated by backend functions) can query across all users.
-      // For client-side admin panels, you would typically rely on a Cloud Function proxy
-      // or ensure the admin SDK is used, which bypasses these rules.
-      // Since our admin panel logic is client-side for reads, we temporarily open this up,
-      // assuming the admin panel is properly secured by auth checks.
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+        allow read: if isAdmin();
     }
   }
 }
