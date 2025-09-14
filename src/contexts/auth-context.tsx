@@ -244,7 +244,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             if (currentUser) {
                 const idTokenResult = await currentUser.getIdTokenResult();
-                const userIsAdmin = !!idTokenResult.claims.admin;
+                const userIsAdmin = idTokenResult.claims.role === 'admin';
                 
                 setUser(currentUser);
                 setIsAdmin(userIsAdmin);
