@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // helper: check admin role
+    function isAdmin() {
+      return request.auth != null && request.auth.token.role == "admin";
+    }
+
+    // USERS collection
+    match /users/{userId} {
+      // user can access only their own doc; admin can access all
+      allow read, write: if request.auth != null && (
+        request.auth.uid == userId || isAdmin()
+      );
+
+      // user subcollections (investments, transactions, withdrawals, etc.)
+      match /{subCollection}/{docId} {
+        allow read, write: if request.auth != null && (
+          request.auth.uid == userId || isAdmin()
+        );
+      }
+    }
+
+    // GLOBAL collections
+    match /plans/{planId} {
+      allow read: if request.auth != null;   // all logged-in users can view
+      allow write: if isAdmin();             // only admin can create/update
+    }
+
+    match /offers/{offerId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // COLLECTION GROUP queries for admin panel
+    // lets admin read/write across all sub-collections in all users
+    match /{path=**}/withdrawals/{docId} {
+        allow read, list: if isAdmin();
+    }
+  }
+}
