@@ -5,7 +5,7 @@ import { Header } from '@/components/vaultboost/header';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
 import { InvestmentPlanCard } from '@/components/vaultboost/investment-plan-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Info, Loader2 } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';

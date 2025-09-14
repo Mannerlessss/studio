@@ -186,14 +186,15 @@ export default function UsersPage() {
             const batch = writeBatch(db);
             const now = serverTimestamp();
 
-            const userMembershipRate = user.membership === 'Pro' ? 0.13 : 0.10;
+            const userMembershipRate = user.membership === 'Pro' ? 1.3 : 1.0;
             const planDailyReturnRate = selectedPlan.dailyReturnPercentage / 100;
+            const finalDailyReturn = amount * planDailyReturnRate * userMembershipRate;
 
             // 1. Create a new document in the `investments` subcollection
             const newInvestmentRef = doc(collection(db, `users/${user.id}/investments`));
             batch.set(newInvestmentRef, {
                 planAmount: amount,
-                dailyReturn: amount * planDailyReturnRate,
+                dailyReturn: finalDailyReturn,
                 durationDays: selectedPlan.durationDays,
                 startDate: now,
                 lastUpdate: now,
