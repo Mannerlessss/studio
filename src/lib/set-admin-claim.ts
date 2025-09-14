@@ -1,4 +1,3 @@
-
 'use server';
 import 'dotenv/config';
 import * as admin from 'firebase-admin';
@@ -34,13 +33,13 @@ async function setAdminClaim() {
     console.log(`⏳ Looking up user by email: ${adminEmail}...`);
     const user = await admin.auth().getUserByEmail(adminEmail);
     
-    if (user.customClaims && (user.customClaims as any).admin === true) {
+    if (user.customClaims && (user.customClaims as any).role === 'admin') {
         console.log(`✅ User ${adminEmail} (UID: ${user.uid}) is already an admin.`);
         return;
     }
 
     console.log(`Found user. UID: ${user.uid}. Setting admin claim...`);
-    await admin.auth().setCustomUserClaims(user.uid, { admin: true });
+    await admin.auth().setCustomUserClaims(user.uid, { role: 'admin' });
     
     console.log(`✅ Success! Admin claim has been set for ${adminEmail}.`);
     console.log('It may take a few minutes to propagate. Please log out and log back in to see the changes.');
