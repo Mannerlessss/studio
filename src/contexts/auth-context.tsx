@@ -1,4 +1,3 @@
-
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
 import { 
@@ -115,14 +114,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
         
         try {
-            // First, get all active investments outside of a transaction.
             const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
 
             if (activeInvestmentsSnapshot.empty) {
-                return; // No active investments to process
+                return;
             }
 
-            // Now, run a transaction to update user and investment docs together.
              await runTransaction(db, async (transaction) => {
                 const userDocRef = doc(db, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
@@ -135,7 +132,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 let totalEarningsToAdd = 0;
                 const currentData = userDoc.data() as UserData;
                 const now = new Date();
-                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                 
                 const commissionParentRef = currentData.commissionParent ? doc(db, 'users', currentData.commissionParent) : null;
                 let commissionParentDoc: any = null;
@@ -145,19 +141,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
                 for (const investmentDoc of activeInvestmentsSnapshot.docs) {
-                    // We must re-fetch inside the transaction to ensure we have the latest data
                     const currentInvestmentRef = doc(db, `users/${currentUserId}/investments`, investmentDoc.id);
                     const currentInvestmentDoc = await transaction.get(currentInvestmentRef);
 
                     if (!currentInvestmentDoc.exists()) continue;
 
                     const investment = currentInvestmentDoc.data() as Investment;
-
-                    const lastUpdateDate = investment.lastUpdate.toDate();
-                    const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
-                    
+                    const lastUpdate = investment.lastUpdate.toDate();
                     const msInDay = 24 * 60 * 60 * 1000;
-                    const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
+                    
+                    const timeSinceLastUpdate = now.getTime() - lastUpdate.getTime();
+                    const daysPassed = Math.floor(timeSinceLastUpdate / msInDay);
                     
                     if (daysPassed <= 0) continue;
 
@@ -180,7 +174,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                         for (let i = 0; i < daysToCredit; i++) {
                             const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                            const earningDay = new Date(startOfToday.getTime() - (daysPassed - i - 1) * msInDay);
+                            const earningDay = new Date(lastUpdate.getTime() + (i + 1) * msInDay);
                             transaction.set(transactionRef, {
                                 type: 'earning',
                                 amount: investment.dailyReturn,
@@ -190,7 +184,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             });
                         }
 
-                        // Handle lifetime commission
                         if (commissionParentDoc && commissionParentDoc.exists()) {
                             const commissionAmount = earningsForThisPlan * 0.03;
                             const parentData = commissionParentDoc.data();
@@ -251,7 +244,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                      setUserData(null);
                      setLoading(false);
                 } else {
-                    // Process earnings ONCE before setting up listeners
                     await processInvestmentEarnings(currentUser.uid); 
                     
                     const userDocRef = doc(db, 'users', currentUser.uid);
@@ -263,7 +255,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         
                         const baseUserData = { uid: userDocSnap.id, ...userDocSnap.data() } as UserData;
                         
-                        // Now listen to investments subcollection
                         const investmentsColRef = collection(db, `users/${currentUser.uid}/investments`);
                         unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
                             const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));
@@ -271,7 +262,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             setLoading(false);
                         }, (error) => {
                             console.error("Error fetching investments:", error);
-                            setUserData(baseUserData); // Set base data even if investments fail
+                            setUserData(baseUserData);
                             setLoading(false);
                         });
 
@@ -329,11 +320,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signUpWithEmail = async ({ name, email, phone, password, referralCode: providedCode }: any) => {
         setLoading(true);
         try {
-            // Step 1: Create Auth User
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const newUser = userCredential.user;
 
-            // Step 2: Create User Doc
             const referralCode = `${name.split(' ')[0].toUpperCase().substring(0, 5)}${(Math.random() * 9000 + 1000).toFixed(0)}`;
             const userDocRef = doc(db, 'users', newUser.uid);
 
@@ -372,8 +361,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
              
             await setDoc(userDocRef, newUserDocData);
 
-
-            // Step 3: If referral code was used, add to referrer's subcollection
             if (newUserDocData.referredBy) {
                 const referrerId = newUserDocData.referredBy;
                  if (referrerId !== newUser.uid) {
