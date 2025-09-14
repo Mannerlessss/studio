@@ -53,6 +53,12 @@ import {
 } from '@/components/ui/select';
 import { deleteUser } from '@/ai/flows/delete-user-flow';
 
+interface InvestmentPlan {
+  id: string;
+  amount: number;
+  dailyReturnPercentage: number;
+  durationDays: number;
+}
 
 type UserSortableKeys = 'name' | 'email' | 'membership';
 
@@ -73,7 +79,6 @@ interface User {
     createdAt?: Timestamp;
 }
 
-const investmentPlans = [100, 300, 500, 1000, 2000];
 const milestones: { [key: number]: number } = {
   5: 250, 10: 500, 20: 1000, 30: 1500, 40: 2000, 50: 2500,
 };
@@ -81,9 +86,10 @@ const milestones: { [key: number]: number } = {
 export default function UsersPage() {
     const { toast } = useToast();
     const [users, setUsers] = useState<User[]>([]);
+    const [investmentPlans, setInvestmentPlans] = useState<InvestmentPlan[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
-    const [creditAmount, setCreditAmount] = useState('100'); // Default to the smallest plan
+    const [creditPlanId, setCreditPlanId] = useState<string>('');
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortKey, setSortKey] = useState<UserSortableKeys>('name');
@@ -91,21 +97,29 @@ export default function UsersPage() {
 
 
     useEffect(() => {
-        const fetchUsers = async () => {
+        const fetchUsersAndPlans = async () => {
             setLoading(true);
             try {
                 const usersSnapshot = await getDocs(collection(db, 'users'));
                 const usersData: User[] = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
                 setUsers(usersData);
+
+                const plansSnapshot = await getDocs(collection(db, 'investmentPlans'));
+                const plansData: InvestmentPlan[] = plansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InvestmentPlan));
+                setInvestmentPlans(plansData);
+                if (plansData.length > 0) {
+                    setCreditPlanId(plansData[0].id);
+                }
+
             } catch (error: any) {
-                console.error("Error fetching users: ", error);
-                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch users. Check permissions.' });
+                console.error("Error fetching data: ", error);
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch users or plans. Check permissions.' });
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchUsers();
+        fetchUsersAndPlans();
     }, [toast]);
     
     const filteredAndSortedUsers = useMemo(() => {
@@ -154,31 +168,35 @@ export default function UsersPage() {
 
     const handleCredit = async (user: User) => {
         setIsSubmitting(user.id);
-        const amount = Number(creditAmount);
-        if (isNaN(amount) || !investmentPlans.includes(amount)) {
+        const selectedPlan = investmentPlans.find(p => p.id === creditPlanId);
+        
+        if (!selectedPlan) {
             toast({
                 variant: 'destructive',
-                title: 'Invalid Amount',
-                description: 'Please select a valid investment plan amount.',
+                title: 'Invalid Plan',
+                description: 'Please select a valid investment plan.',
             });
             setIsSubmitting(null);
             return;
         }
+        const amount = selectedPlan.amount;
 
         try {
             const userDocRef = doc(db, 'users', user.id);
             const batch = writeBatch(db);
             const now = serverTimestamp();
 
+            const userMembershipRate = user.membership === 'Pro' ? 0.13 : 0.10;
+            const planDailyReturnRate = selectedPlan.dailyReturnPercentage / 100;
+
             // 1. Create a new document in the `investments` subcollection
             const newInvestmentRef = doc(collection(db, `users/${user.id}/investments`));
-            const dailyReturnRate = user.membership === 'Pro' ? 0.13 : 0.10;
             batch.set(newInvestmentRef, {
                 planAmount: amount,
-                dailyReturn: amount * dailyReturnRate,
+                dailyReturn: amount * planDailyReturnRate,
+                durationDays: selectedPlan.durationDays,
                 startDate: now,
                 lastUpdate: now,
-                durationDays: 30,
                 earnings: 0,
                 status: 'active',
             });
@@ -216,9 +234,9 @@ export default function UsersPage() {
 
                     // Give welcome bonus to the new investor
                     batch.update(userDocRef, {
-                        totalBalance: (user.totalBalance || 0) + bonusAmount,
-                        totalBonusEarnings: (user.totalBonusEarnings || 0) + bonusAmount,
-                        totalEarnings: ((user as any).totalEarnings || 0) + bonusAmount,
+                        totalBalance: increment(bonusAmount),
+                        totalBonusEarnings: increment(bonusAmount),
+                        totalEarnings: increment(bonusAmount),
                     });
                     const userBonusTransactionRef = doc(collection(db, `users/${user.id}/transactions`));
                     batch.set(userBonusTransactionRef, {
@@ -228,9 +246,9 @@ export default function UsersPage() {
                     // Give standard referral bonus to the referrer & increment their count
                     const newReferralCount = (referrerData.investedReferralCount || 0) + 1;
                     batch.update(referrerDocRef, {
-                        totalBalance: (referrerData.totalBalance || 0) + bonusAmount,
-                        totalReferralEarnings: (referrerData.totalReferralEarnings || 0) + bonusAmount,
-                        totalEarnings: ((referrerData as any).totalEarnings || 0) + bonusAmount,
+                        totalBalance: increment(bonusAmount),
+                        totalReferralEarnings: increment(bonusAmount),
+                        totalEarnings: increment(bonusAmount),
                         investedReferralCount: newReferralCount,
                     });
                     const referrerBonusTransactionRef = doc(collection(db, `users/${user.referredBy}/transactions`));
@@ -264,7 +282,6 @@ export default function UsersPage() {
                     const referredUserDocs = await getDocs(q);
                     
                     if (referredUserDocs.empty) {
-                         // Add them if they don't exist
                         const newReferralSubDocRef = doc(referrerReferralsRef);
                         batch.set(newReferralSubDocRef, {
                             userId: user.id,
@@ -274,7 +291,6 @@ export default function UsersPage() {
                             joinedAt: user.createdAt || serverTimestamp() 
                         });
                     } else {
-                        // User already exists, just update their investment status
                         const referredUserDocRef = referredUserDocs.docs[0].ref;
                         batch.update(referredUserDocRef, { hasInvested: true });
                     }
@@ -292,7 +308,7 @@ export default function UsersPage() {
                 hasInvested: true, 
                 totalInvested: (u.totalInvested || 0) + amount,
             } : u));
-            setCreditAmount('100');
+            if (investmentPlans.length > 0) setCreditPlanId(investmentPlans[0].id);
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -397,7 +413,7 @@ export default function UsersPage() {
                                 </Button>
                             </DialogTrigger>
                         </Dialog>
-                       <AlertDialog onOpenChange={(open) => !open && setCreditAmount('100')}>
+                       <AlertDialog onOpenChange={(open) => !open && creditPlanId && setCreditPlanId(investmentPlans[0]?.id || '')}>
                           <AlertDialogTrigger asChild>
                              <Button variant="outline" size="sm" disabled={!!isSubmitting}>
                                 <DollarSign className='w-4 h-4 mr-1' /> Credit
@@ -412,13 +428,13 @@ export default function UsersPage() {
                             </AlertDialogHeader>
                             <div className="space-y-2">
                                 <Label htmlFor="credit-amount">Plan Amount (in Rs.)</Label>
-                                <Select onValueChange={(value) => setCreditAmount(value)} value={creditAmount} disabled={!!isSubmitting}>
+                                <Select onValueChange={(value) => setCreditPlanId(value)} value={creditPlanId} disabled={!!isSubmitting}>
                                     <SelectTrigger id="credit-amount">
                                         <SelectValue placeholder="Select a plan" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {investmentPlans.map(plan => (
-                                            <SelectItem key={plan} value={String(plan)}>{plan} Rs. Plan</SelectItem>
+                                            <SelectItem key={plan.id} value={plan.id}>{plan.amount} Rs. Plan ({plan.dailyReturnPercentage}% / {plan.durationDays} days)</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
