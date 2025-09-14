@@ -160,7 +160,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     
                     if (daysPassed <= 0) continue;
 
-                    const daysAlreadyProcessed = Math.round(investment.earnings / investment.dailyReturn);
+                    const daysAlreadyProcessed = investment.dailyReturn > 0 ? Math.round(investment.earnings / investment.dailyReturn) : 0;
                     const remainingDaysInPlan = investment.durationDays - daysAlreadyProcessed;
                     const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
 
@@ -270,6 +270,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             setLoading(false);
                         }, (error) => {
                             console.error("Error fetching investments:", error);
+                            toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load investments. Check Firestore rules." });
                             setUserData(baseUserData); // Set base data even if investments fail
                             setLoading(false);
                         });
@@ -342,6 +343,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 email,
                 phone,
                 membership: 'Basic',
+                rank: 'Bronze',
                 totalBalance: 0,
                 totalInvested: 0,
                 totalEarnings: 0,
@@ -441,67 +443,87 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     const claimDailyBonus = async (amount: number) => {
-        if (!user || !userData) throw new Error("User not found");
+        if (!user || !userData) {
+            toast({ variant: 'destructive', title: "Claim Failed", description: "You must be logged in to claim a bonus." });
+            return;
+        }
 
         const now = Timestamp.now();
         if (userData.lastBonusClaim) {
             const fourHours = 4 * 60 * 60 * 1000;
             const lastClaimMillis = userData.lastBonusClaim.toMillis();
             if (now.toMillis() - lastClaimMillis < fourHours) {
-                throw new Error("You have already claimed your bonus recently.");
+                toast({ variant: 'destructive', title: "Too Soon!", description: "You can only claim a bonus every 4 hours." });
+                return;
             }
         }
         
-        const batch = writeBatch(db);
-        const userDocRef = doc(db, 'users', user.uid);
-        
-        batch.update(userDocRef, {
-            totalBalance: userData.totalBalance + amount,
-            totalBonusEarnings: userData.totalBonusEarnings + amount,
-            totalEarnings: userData.totalEarnings + amount,
-            lastBonusClaim: now
-        });
-        
-        const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
-        batch.set(transactionRef, {
-            type: 'bonus',
-            amount: amount,
-            description: 'Daily Bonus Claim',
-            status: 'Completed',
-            date: now
-        });
+        try {
+            const batch = writeBatch(db);
+            const userDocRef = doc(db, 'users', user.uid);
+            
+            batch.update(userDocRef, {
+                totalBalance: increment(amount),
+                totalBonusEarnings: increment(amount),
+                totalEarnings: increment(amount),
+                lastBonusClaim: now
+            });
+            
+            const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+            batch.set(transactionRef, {
+                type: 'bonus',
+                amount: amount,
+                description: 'Daily Bonus Claim',
+                status: 'Completed',
+                date: now
+            });
 
-        await batch.commit();
-        toast({ title: 'Bonus Claimed!', description: `You received ${amount} Rs.` });
+            await batch.commit();
+            toast({ title: 'Bonus Claimed!', description: `You received ${amount} Rs.` });
+        } catch (error: any) {
+            console.error("Error claiming daily bonus: ", error);
+            toast({ variant: 'destructive', title: 'Claim Failed', description: error.message });
+        }
     };
 
     const collectSignupBonus = async () => {
-        if (!user || !userData) throw new Error("User not found");
-        if (userData.hasCollectedSignupBonus) throw new Error("Sign-up bonus already collected.");
+         if (!user || !userData) {
+            toast({ variant: 'destructive', title: "Collect Failed", description: "You must be logged in." });
+            return;
+        }
+        if (userData.hasCollectedSignupBonus) {
+            toast({ variant: 'destructive', title: "Already Collected", description: "Sign-up bonus has already been collected." });
+            return;
+        }
 
         const signupBonusAmount = 200;
         
-        const batch = writeBatch(db);
-        const userDocRef = doc(db, 'users', user.uid);
-        
-        batch.update(userDocRef, {
-            totalBalance: userData.totalBalance + signupBonusAmount,
-            totalBonusEarnings: userData.totalBonusEarnings + signupBonusAmount,
-            totalEarnings: userData.totalEarnings + signupBonusAmount,
-            hasCollectedSignupBonus: true,
-        });
-        
-        const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
-        batch.set(transactionRef, {
-            type: 'bonus',
-            amount: signupBonusAmount,
-            description: 'Sign-up Bonus',
-            status: 'Completed',
-            date: serverTimestamp()
-        });
+        try {
+            const batch = writeBatch(db);
+            const userDocRef = doc(db, 'users', user.uid);
+            
+            batch.update(userDocRef, {
+                totalBalance: increment(signupBonusAmount),
+                totalBonusEarnings: increment(signupBonusAmount),
+                totalEarnings: increment(signupBonusAmount),
+                hasCollectedSignupBonus: true,
+            });
+            
+            const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+            batch.set(transactionRef, {
+                type: 'bonus',
+                amount: signupBonusAmount,
+                description: 'Sign-up Bonus',
+                status: 'Completed',
+                date: serverTimestamp()
+            });
 
-        await batch.commit();
-        toast({ title: 'Bonus Collected!', description: `You received ${signupBonusAmount} Rs.` });
+            await batch.commit();
+            toast({ title: 'Bonus Collected!', description: `You received ${signupBonusAmount} Rs.` });
+        } catch (error: any) {
+            console.error("Error collecting signup bonus: ", error);
+            toast({ variant: 'destructive', title: 'Collect Failed', description: error.message });
+        }
     }
 
     const value: AuthContextType = {

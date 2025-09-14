@@ -1,22 +1,13 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check for admin custom claim
-    function isAdmin() {
-      return request.auth != null && request.auth.token.admin == true;
-    }
-
-    //
-    // USER-ACCESSIBLE COLLECTIONS
-    //
-    
-    // Users can only read and write to their OWN document and subcollections.
+    // Rule for the 'users' collection
     match /users/{userId} {
+      // Users can read and write to their own document
       allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      // Allow users to read and write to THEIR OWN subcollections
+      // Allow users to read and write to their own subcollections
       match /investments/{investmentId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
@@ -27,38 +18,28 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
       match /withdrawals/{withdrawalId} {
-      	allow create, read: if request.auth.uid == userId;
-        allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])) && isAdmin();
+      	allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
-    
-    // Any authenticated user can read the global investment plans and offers.
-    // Only admins can create, update, or delete them.
-    match /plans/{planId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
-    }
-    match /offers/{offerId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
+
+    // Rule for reading the 'users' collection to find referrers
+    match /users/{userId} {
+      // Allow any authenticated user to perform a query on the collection
+      // This is needed for the referral code lookup during signup
+      allow list: if request.auth != null;
     }
 
-    //
-    // ADMIN-ONLY ACCESS
-    // These rules allow admins to query collections for the admin panel.
-    //
-    match /users/{userId} {
-      // Admins can list and get any user document
-      allow list, get: if isAdmin();
+    // Rule for the 'offers' collection
+    match /offers/{offerId} {
+      // Authenticated users can read offers
+      allow read: if request.auth != null;
+      // Only admins can create, update, or delete offers
+      allow write: if request.auth != null && request.auth.token.admin == true;
     }
-    
-    match /withdrawals/{docId} {
-       allow read, list: if isAdmin();
-    }
-    
-    // Firestore requires a rule for the collection group query used by the admin panel.
-    match /{path=**}/withdrawals/{docId} {
-        allow read: if isAdmin();
+
+    // Admins can read from withdrawals and users collections for the admin panel
+    match /{document=**} {
+      allow read: if request.auth != null && request.auth.token.admin == true;
     }
   }
 }
