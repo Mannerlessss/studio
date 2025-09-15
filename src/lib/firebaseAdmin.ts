@@ -4,22 +4,16 @@ import * as admin from 'firebase-admin';
 export function getFirebaseAdmin() {
   if (admin.apps.length === 0) {
     try {
-      const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-      if (!privateKey) {
-        throw new Error('FIREBASE_PRIVATE_KEY is not set in the environment variables.');
-      }
-
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: process.env.FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: privateKey.replace(/\\n/g, '\n'),
-        }),
-      });
+      // The SDK will automatically pick up credentials from the environment.
+      // In a deployed environment (like Vercel, Firebase Hosting), this is handled by setting environment variables.
+      // In a local environment, it will look for the GOOGLE_APPLICATION_CREDENTIALS
+      // environment variable, which can be pointed to the serviceAccountKey.json file.
+      // The .env file we created handles this for local development.
+      admin.initializeApp();
     } catch (error: any) {
       console.error('Firebase admin initialization error', error.stack);
       // We re-throw the error to make it clear that initialization failed.
-      throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
+      throw new Error('Failed to initialize Firebase Admin SDK. Check server logs for details.');
     }
   }
 
