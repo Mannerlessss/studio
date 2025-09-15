@@ -13,7 +13,6 @@ import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc, increment } from 'firebase/firestore';
-import { redeemCode } from '@/ai/flows/redeem-code-flow';
 
 export interface Investment {
     id: string;
@@ -233,41 +232,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         let unsubFromUser: (() => void) | undefined;
         let unsubFromInvestments: (() => void) | undefined;
+        let authTimeout: NodeJS.Timeout;
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            clearTimeout(authTimeout); 
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             
             if (currentUser) {
-                setUser(currentUser);
                 const idTokenResult = await currentUser.getIdTokenResult();
                 const userIsAdmin = !!idTokenResult.claims.admin;
+                
+                setUser(currentUser);
                 setIsAdmin(userIsAdmin);
 
                 if (userIsAdmin) {
                      setUserData(null);
                      setLoading(false);
                 } else {
+                    // Process earnings ONCE before setting up listeners
                     await processInvestmentEarnings(currentUser.uid); 
                     
                     const userDocRef = doc(db, 'users', currentUser.uid);
                     unsubFromUser = onSnapshot(userDocRef, (userDocSnap) => {
-                        if (userDocSnap.exists()) {
-                            const baseUserData = { uid: userDocSnap.id, ...userDocSnap.data() } as UserData;
-                            
-                            const investmentsColRef = collection(db, `users/${currentUser.uid}/investments`);
-                            unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
-                                const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));
-                                setUserData({ ...baseUserData, investments });
-                                setLoading(false);
-                            }, (error) => {
-                                console.error("Error fetching investments:", error);
-                                setUserData(baseUserData);
-                                setLoading(false);
-                            });
-                        } else {
-                            setLoading(false);
+                        if (!userDocSnap.exists()) {
+                            console.warn(`No Firestore document found for user ${currentUser.uid}. Waiting...`);
+                            return;
                         }
+                        
+                        const baseUserData = { uid: userDocSnap.id, ...userDocSnap.data() } as UserData;
+                        
+                        // Now listen to investments subcollection
+                        const investmentsColRef = collection(db, `users/${currentUser.uid}/investments`);
+                        unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
+                            const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));
+                            setUserData({ ...baseUserData, investments });
+                            setLoading(false);
+                        }, (error) => {
+                            console.error("Error fetching investments:", error);
+                            setUserData(baseUserData); // Set base data even if investments fail
+                            setLoading(false);
+                        });
+
                     }, (error) => {
                         console.error("Error fetching user data:", error);
                         toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile. Logging out." });
@@ -282,10 +288,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
+        authTimeout = setTimeout(() => {
+            if (loading) {
+                console.warn("Auth state change timed out. Forcing loading to false.");
+                setLoading(false);
+            }
+        }, 10000); 
+
         return () => {
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             unsubscribe();
+            clearTimeout(authTimeout);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -500,22 +514,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!user || !userData) {
             throw new Error("You must be logged in to redeem a code.");
         }
-        
-        try {
-            const result = await redeemCode({
-                userId: user.uid,
-                userName: userData.name,
-                userEmail: userData.email,
-                code: code,
-            });
-            toast({
-                title: 'Code Redeemed!',
-                description: result.message,
-            });
-        } catch (e: any) {
-            // The flow will throw an error with a user-friendly message
-            throw new Error(e.message || 'An unknown error occurred.');
+        if (userData.usedReferralCode) {
+            throw new Error("A referral code has already been used for this account.");
         }
+
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("referralCode", "==", code.toUpperCase()));
+
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            throw new Error("Invalid referral code.");
+        }
+
+        const referrerDoc = querySnapshot.docs[0];
+        const referrerId = referrerDoc.id;
+
+        if (referrerId === user.uid) {
+            throw new Error("You cannot use your own referral code.");
+        }
+
+        const userDocRef = doc(db, 'users', user.uid);
+        const referrerDocRef = doc(db, 'users', referrerId);
+        const welcomeBonus = 75;
+
+        const batch = writeBatch(db);
+
+        // 1. Update the user who redeemed the code
+        batch.update(userDocRef, {
+            usedReferralCode: code.toUpperCase(),
+            referredBy: referrerId,
+            totalBalance: increment(welcomeBonus),
+            totalBonusEarnings: increment(welcomeBonus),
+            totalEarnings: increment(welcomeBonus),
+        });
+
+        // 2. Create a transaction record for the bonus
+        const userTransactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+        batch.set(userTransactionRef, {
+            type: 'bonus',
+            amount: welcomeBonus,
+            description: `Referral code redeemed`,
+            status: 'Completed',
+            date: serverTimestamp(),
+        });
+
+        // 3. Add the new user to the referrer's `referrals` subcollection
+        const newReferralRef = doc(collection(db, `users/${referrerId}/referrals`));
+         batch.set(newReferralRef, {
+            userId: user.uid,
+            name: userData.name,
+            email: userData.email,
+            hasInvested: false,
+            joinedAt: serverTimestamp(),
+        });
+
+        await batch.commit();
+
+        toast({
+            title: 'Code Redeemed!',
+            description: `You received a ${welcomeBonus} Rs. bonus.`,
+        });
     };
 
     const value: AuthContextType = {
