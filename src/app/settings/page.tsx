@@ -7,14 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Gift, Shield, LogOut, Loader2, Ticket } from 'lucide-react';
+import { User, Gift, Shield, LogOut, Loader2, Ticket, Gem } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
 const SettingsPage: NextPage = () => {
-    const { userData, logOut, updateUserPhone, updateUserName } = useAuth();
+    const { userData, loading, logOut, updateUserPhone, updateUserName } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
     
@@ -86,6 +86,17 @@ const SettingsPage: NextPage = () => {
             setIsUpdatingPhone(false);
         }
     };
+
+  if (loading || !userData) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-background">
+            <div className="text-center">
+                <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
+                <p className="text-lg text-muted-foreground">Loading Settings...</p>
+            </div>
+        </div>
+      );
+  }
 
   return (
     <div className="bg-background min-h-full">
