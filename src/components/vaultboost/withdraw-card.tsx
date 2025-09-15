@@ -164,7 +164,7 @@ export function WithdrawCard() {
       <Card>
         <CardHeader>
           <CardTitle>Withdraw Earnings</CardTitle>
-          <CardDescription>Available Balance: {userData?.totalBalance.toFixed(2) || '0.00'} Rs.</CardDescription>
+          <CardDescription>Available Balance: {(userData?.totalBalance || 0).toFixed(2)} Rs.</CardDescription>
         </CardHeader>
         <CardContent>
           {!showWithdrawForm ? (
