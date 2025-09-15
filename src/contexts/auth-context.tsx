@@ -11,7 +11,7 @@ import {
 import { useRouter, usePathname } from 'next/navigation';
 import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import type { Timestamp } from 'firebase/firestore';
 
 
@@ -82,6 +82,12 @@ const MOCK_USER_DATA: UserData = {
     ]
 };
 
+// Mock admin user for demonstration
+const MOCK_ADMIN_USER = {
+    uid: 'mock-admin-123',
+    email: 'admin@example.com',
+};
+
 
 interface AuthContextType {
   user: User | null;
@@ -104,7 +110,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [userData, setUserData] = useState<UserData | null>(MOCK_USER_DATA);
+    const [userData, setUserData] = useState<UserData | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
@@ -124,7 +130,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logOut = async () => {
         setLoading(true);
         try {
-            await signOut(auth);
+            // In a real app, you'd call signOut(auth)
+            console.log("Logging out.");
         } catch (error) {
             console.error("Error signing out: ", error);
         } finally {
@@ -137,44 +144,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
-                // In a real app, you'd fetch user data here.
-                // We're just using mock data now.
-                setUserData({
-                    ...MOCK_USER_DATA,
-                    email: currentUser.email || 'user@example.com',
-                    uid: currentUser.uid,
-                });
-            } else {
-                setUser(null);
-                setUserData(null);
+        // This effect now only manages routing based on a simulated auth state.
+        const handleAuthState = () => {
+            const isAuthPage = pathname === '/login' || pathname.startsWith('/ref/');
+            const isAdminPage = pathname.startsWith('/admin');
+
+            if (!user && !isAuthPage) {
+                router.push('/login');
+            } else if (user && isAuthPage) {
+                router.push(isAdmin ? '/admin' : '/');
+            } else if (user && !isAdmin && isAdminPage) {
+                router.push('/');
+            } else if (user && isAdmin && !isAdminPage) {
+                router.push('/admin');
             }
-            setLoading(false);
-        });
+        };
 
-        return () => unsubscribe();
-    }, []);
-
-     useEffect(() => {
-        if (loading) return;
-
-        const isAuthPage = pathname === '/login' || pathname.startsWith('/ref/');
-        const isAdminPage = pathname.startsWith('/admin');
-
-        // Since admin is removed, always redirect from admin pages
-        if (isAdminPage) {
-            router.push('/');
-            return;
+        // If loading is finished, handle the auth state.
+        if (!loading) {
+            handleAuthState();
         }
-
-        if (!user && !isAuthPage) {
-            router.push('/login');
-        } else if (user && isAuthPage) {
-            router.push('/');
-        }
-    }, [user, loading, pathname, router]);
+    }, [user, isAdmin, loading, pathname, router]);
 
     // --- Mock Functions ---
     const signInWithGoogle = async () => {
@@ -183,39 +173,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const signUpWithEmail = async ({ email, password }: any) => {
         setLoading(true);
-        try {
-            await createUserWithEmailAndPassword(auth, email, password);
-            // No data is created in firestore anymore
-            toast({ title: 'Account Created!', description: 'You can now log in.' });
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Sign Up Failed', description: error.message });
-        } finally {
-            setLoading(false);
-        }
+        toast({ title: 'Account Created (Prototype)!', description: 'You can now log in.' });
+        // Simulate a successful signup
+        setTimeout(() => setLoading(false), 500);
     };
 
     const signInWithEmail = async ({ email, password }: any) => {
         setLoading(true);
-        try {
-            await signInWithEmailAndPassword(auth, email, password);
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Sign In Failed', description: error.message });
-             setLoading(false);
-        }
+
+        // Simulate a login attempt
+        setTimeout(() => {
+            if (email === 'admin@example.com') {
+                setUser(MOCK_ADMIN_USER as User);
+                setUserData(null);
+                setIsAdmin(true);
+            } else {
+                setUser({ email } as User);
+                setUserData(MOCK_USER_DATA);
+                setIsAdmin(false);
+            }
+            setLoading(false);
+        }, 500);
     };
 
     const sendPasswordReset = async (email: string) => {
-        try {
-            await sendPasswordResetEmail(auth, email);
-            toast({ title: 'Password Reset Link Sent' });
-        } catch (error: any) {
-             toast({ variant: 'destructive', title: 'Error', description: error.message });
-        }
+        toast({ title: 'Password Reset Link Sent (Prototype)' });
     };
     
     const mockAction = async (actionName: string) => {
-        toast({ title: 'Prototype Mode', description: `${actionName} is not functional without a backend.` });
+        toast({ title: 'Prototype Mode', description: `${actionName} is for demonstration only.` });
     };
+    
+    // Simulate initial loading
+    useEffect(() => {
+        const timer = setTimeout(() => setLoading(false), 500);
+        return () => clearTimeout(timer);
+    }, []);
 
     const value: AuthContextType = {
         user,
@@ -227,14 +220,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signUpWithEmail,
         signInWithEmail,
         logOut,
-        updateUserPhone: () => mockAction('Updating phone'),
-        updateUserName: () => mockAction('Updating name'),
-        claimDailyBonus: () => mockAction('Claiming bonus'),
-        collectSignupBonus: () => mockAction('Collecting bonus'),
+        updateUserPhone: (phone) => mockAction(`Updating phone to ${phone}`),
+        updateUserName: (name) => mockAction(`Updating name to ${name}`),
+        claimDailyBonus: (amount) => mockAction(`Claiming ${amount} Rs. bonus`),
+        collectSignupBonus: () => mockAction('Collecting sign-up bonus'),
         sendPasswordReset,
     };
     
-    if (loading) {
+    if (loading && pathname !== '/login' && !pathname.startsWith('/ref/')) {
          return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <div className="text-center">
