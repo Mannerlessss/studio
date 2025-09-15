@@ -1,17 +1,13 @@
-
 'use client';
-
 import { FC, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Gift, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { useToast } from '@/hooks/use-toast';
 
 export const CollectBonusCard: FC = () => {
     const { userData, collectSignupBonus } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
-    const { toast } = useToast();
 
     if (!userData || userData.hasCollectedSignupBonus) {
         return null;
@@ -19,17 +15,8 @@ export const CollectBonusCard: FC = () => {
 
     const handleCollect = async () => {
         setIsLoading(true);
-        try {
-            await collectSignupBonus();
-        } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Error collecting bonus',
-                description: error.message,
-            });
-        } finally {
-            setIsLoading(false);
-        }
+        await collectSignupBonus(); // This will show a toast from the context
+        setIsLoading(false);
     };
 
     return (

@@ -1,14 +1,10 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Gift, TrendingUp, Banknote, ArrowUpCircle, ArrowDownCircle, Users } from 'lucide-react';
+import { Clock, Gift, TrendingUp, Users, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
-import { useAuth } from '@/contexts/auth-context';
-import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 
 type TransactionType = 'bonus' | 'investment' | 'earning' | 'withdrawal' | 'referral';
@@ -22,33 +18,33 @@ interface Transaction {
     date: Date;
 }
 
+// Mock Data since backend is removed
+const MOCK_TRANSACTIONS: Transaction[] = [
+    { id: '1', type: 'earning', amount: 50, description: 'Earning from Plan 500', status: 'Completed', date: new Date() },
+    { id: '2', type: 'referral', amount: 75, description: 'Referral bonus from Friend', status: 'Completed', date: new Date(Date.now() - 3600000 * 2) },
+    { id: '3', type: 'withdrawal', amount: 200, description: 'Withdrawal request', status: 'Pending', date: new Date(Date.now() - 3600000 * 5) },
+    { id: '4', type: 'investment', amount: 500, description: 'Invested in Plan 500', status: 'Completed', date: new Date(Date.now() - 3600000 * 10) },
+    { id: '5', type: 'bonus', amount: 5, description: 'Daily Bonus Claim', status: 'Completed', date: new Date(Date.now() - 3600000 * 12) },
+];
+
+
 const getTransactionIcon = (type: string) => {
     switch(type) {
-        case 'bonus':
-            return <Gift className="h-5 w-5 text-muted-foreground" />;
-        case 'investment':
-            return <TrendingUp className="h-5 w-5 text-muted-foreground" />;
-        case 'earning':
-            return <ArrowUpCircle className="h-5 w-5 text-muted-foreground" />;
-        case 'withdrawal':
-            return <ArrowDownCircle className="h-5 w-5 text-muted-foreground" />;
-        case 'referral':
-             return <Users className="h-5 w-5 text-muted-foreground" />;
-        default:
-            return <Clock className="h-5 w-5 text-muted-foreground" />;
+        case 'bonus': return <Gift className="h-5 w-5 text-muted-foreground" />;
+        case 'investment': return <TrendingUp className="h-5 w-5 text-muted-foreground" />;
+        case 'earning': return <ArrowUpCircle className="h-5 w-5 text-muted-foreground" />;
+        case 'withdrawal': return <ArrowDownCircle className="h-5 w-5 text-muted-foreground" />;
+        case 'referral': return <Users className="h-5 w-5 text-muted-foreground" />;
+        default: return <Clock className="h-5 w-5 text-muted-foreground" />;
     }
 }
 
 const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-        case 'Completed':
-            return 'default';
-        case 'Pending':
-            return 'secondary';
-        case 'Rejected':
-            return 'destructive';
-        default:
-            return 'outline';
+        case 'Completed': return 'default';
+        case 'Pending': return 'secondary';
+        case 'Rejected': return 'destructive';
+        default: return 'outline';
     }
 }
 
@@ -57,35 +53,15 @@ export function TransactionHistoryCard() {
   const [filter, setFilter] = useState<'all' | TransactionType>('all');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
 
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    };
-
-    const transactionsColRef = collection(db, `users/${user.uid}/transactions`);
-    const q = query(transactionsColRef, orderBy('date', 'desc'));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const fetchedTransactions: Transaction[] = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                date: (data.date as Timestamp)?.toDate(),
-            } as Transaction;
-        });
-        setTransactions(fetchedTransactions);
+    // Simulate fetching data
+    setLoading(true);
+    setTimeout(() => {
+        setTransactions(MOCK_TRANSACTIONS);
         setLoading(false);
-    }, (error) => {
-        console.error("Error fetching transactions: ", error);
-        setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
+    }, 500);
+  }, []);
 
 
   const filteredTransactions = transactions.filter(transaction => 
@@ -119,7 +95,6 @@ export function TransactionHistoryCard() {
                 <div className="space-y-2">
                     <Skeleton className="h-16 w-full" />
                     <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
                 </div>
             ) : filteredTransactions.length > 0 ? (
                 filteredTransactions.map((transaction) => (
@@ -131,7 +106,7 @@ export function TransactionHistoryCard() {
                             <div>
                                 <p className="font-semibold">{transaction.description}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {transaction.date ? new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(transaction.date) : '...'}
+                                    {new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(transaction.date)}
                                 </p>
                             </div>
                         </div>
