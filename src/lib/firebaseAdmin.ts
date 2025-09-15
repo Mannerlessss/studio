@@ -9,13 +9,13 @@ export function getFirebaseAdmin() {
       const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
       
       if (!fs.existsSync(serviceAccountPath)) {
-        // This log is for server-side debugging.
+        // This log is for server-side debugging. It will appear in your terminal.
         console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
         console.error('!!! serviceAccountKey.json not found.                          !!!');
         console.error('!!! Please download it from your Firebase project settings and !!!');
         console.error('!!! place it in the root directory of your project.            !!!');
         console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-        throw new Error('serviceAccountKey.json not found.');
+        throw new Error('serviceAccountKey.json not found. This is required for server-side operations.');
       }
       
       const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
@@ -26,7 +26,7 @@ export function getFirebaseAdmin() {
 
     } catch (error: any) {
       console.error('Firebase admin initialization error', error.stack);
-      // We re-throw the error to make it clear that initialization failed.
+      // Re-throw with a more generic message for the client, but keep logs for server.
       throw new Error('Failed to initialize Firebase Admin SDK. Check server logs for details.');
     }
   }
