@@ -229,10 +229,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         let unsubFromUser: (() => void) | undefined;
         let unsubFromInvestments: (() => void) | undefined;
-        let authTimeout: NodeJS.Timeout;
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            clearTimeout(authTimeout); 
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             
@@ -253,6 +251,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     unsubFromUser = onSnapshot(userDocRef, (userDocSnap) => {
                         if (!userDocSnap.exists()) {
                             console.warn(`No Firestore document found for user ${currentUser.uid}. Waiting...`);
+                             // If user doc doesn't exist, it might be a race condition on signup.
+                            // We don't want to get stuck loading forever.
+                            setLoading(false);
                             return;
                         }
                         
@@ -283,18 +284,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
-        authTimeout = setTimeout(() => {
-            if (loading) {
-                console.warn("Auth state change timed out. Forcing loading to false.");
-                setLoading(false);
-            }
-        }, 10000); 
-
         return () => {
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             unsubscribe();
-            clearTimeout(authTimeout);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
