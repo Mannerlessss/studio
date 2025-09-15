@@ -2,8 +2,8 @@
 /**
  * @fileOverview A server-side flow to securely redeem a referral code.
  *
- * This flow handles the complex logic of validating a referral code,
- * applying a bonus to the new user, and updating the referrer's records.
+ * This flow handles the complex logic of validating a referral code
+ * and linking the new user to their referrer.
  * This is a privileged operation that requires the Firebase Admin SDK.
  */
 import { z } from 'zod';
@@ -55,28 +55,13 @@ export async function redeemCode(input: RedeemCodeInput): Promise<RedeemCodeOutp
                 throw new Error('You cannot use your own referral code.');
             }
             
-            const welcomeBonus = 75;
-
-            // 1. Update the user who redeemed the code
+            // 1. Update the user who redeemed the code to link them to the referrer
             transaction.update(userRef, {
                 usedReferralCode: code.toUpperCase(),
                 referredBy: referrerDoc.id,
-                totalBalance: adminSDK.firestore.FieldValue.increment(welcomeBonus),
-                totalBonusEarnings: adminSDK.firestore.FieldValue.increment(welcomeBonus),
-                totalEarnings: adminSDK.firestore.FieldValue.increment(welcomeBonus),
             });
 
-            // 2. Create a transaction record for the bonus
-            const userTransactionRef = db.collection('users').doc(userId).collection('transactions').doc();
-            transaction.set(userTransactionRef, {
-                type: 'bonus',
-                amount: welcomeBonus,
-                description: `Referral code redeemed`,
-                status: 'Completed',
-                date: adminSDK.firestore.FieldValue.serverTimestamp(),
-            });
-
-            // 3. Add the new user to the referrer's `referrals` subcollection
+            // 2. Add the new user to the referrer's `referrals` subcollection
             const newReferralRef = db.collection('users').doc(referrerDoc.id).collection('referrals').doc();
             transaction.set(newReferralRef, {
                 userId: userId,
@@ -89,7 +74,7 @@ export async function redeemCode(input: RedeemCodeInput): Promise<RedeemCodeOutp
 
         return {
             success: true,
-            message: 'Code redeemed successfully! You received a 75 Rs. bonus.',
+            message: 'Code redeemed successfully! Your welcome bonus will be applied on your first investment.',
         };
     } catch (error: any) {
         console.error('Redeem code transaction failed: ', error);
