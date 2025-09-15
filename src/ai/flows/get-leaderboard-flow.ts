@@ -34,7 +34,13 @@ export const getLeaderboardFlow = ai.defineFlow(
     const querySnapshot = await getDocs(q);
     
     const topUsers: LeaderboardUser[] = querySnapshot.docs
-        .map(doc => doc.data() as LeaderboardUser)
+        .map(doc => {
+          const data = doc.data();
+          return {
+            name: data.name || 'Anonymous',
+            investedReferralCount: data.investedReferralCount || 0
+          }
+        })
         .filter(user => user.investedReferralCount > 0);
 
     return topUsers;
