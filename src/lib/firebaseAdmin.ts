@@ -4,19 +4,11 @@ import * as admin from 'firebase-admin';
 export function getFirebaseAdmin() {
   if (admin.apps.length === 0) {
     try {
-      // In a deployed environment (like Vercel/Netlify), we expect credentials
-      // to be in an environment variable.
-      if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
-      } else {
-        // In a local development environment (like Firebase Studio), we can
-        // fall back to the GOOGLE_APPLICATION_CREDENTIALS environment variable
-        // which points to the serviceAccountKey.json file.
-         admin.initializeApp();
-      }
+      // The SDK will automatically pick up credentials from the environment.
+      // In a deployed environment like Vercel, this is handled via env vars.
+      // In a local environment (like Firebase Studio), it will look for the
+      // GOOGLE_APPLICATION_CREDENTIALS environment variable pointing to the serviceAccountKey.json file.
+       admin.initializeApp();
     } catch (error: any) {
       console.error('Firebase admin initialization error', error.stack);
       // We re-throw the error to make it clear that initialization failed.

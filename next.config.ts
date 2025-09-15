@@ -1,4 +1,3 @@
-
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -26,7 +25,7 @@ const nextConfig: NextConfig = {
     ],
   },
    experimental: {
-    serverComponentsExternalPackages: ['@genkit-ai/googleai', 'firebase-admin'],
+    serverComponentsExternalPackages: ['firebase-admin'],
   },
 };
 
