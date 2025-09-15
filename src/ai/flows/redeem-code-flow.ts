@@ -7,7 +7,7 @@
  * This is a privileged operation that requires the Firebase Admin SDK.
  */
 import { z } from 'zod';
-import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
+import { db, adminSDK } from '@/lib/firebaseAdmin';
 
 const RedeemCodeInputSchema = z.object({
     userId: z.string().describe('The UID of the user redeeming the code.'),
@@ -26,8 +26,6 @@ export type RedeemCodeOutput = z.infer<typeof RedeemCodeOutputSchema>;
 
 export async function redeemCode(input: RedeemCodeInput): Promise<RedeemCodeOutput> {
     const { userId, userName, userEmail, code } = input;
-    const { db, admin } = getFirebaseAdmin();
-
     const userRef = db.collection('users').doc(userId);
 
     try {
@@ -63,9 +61,9 @@ export async function redeemCode(input: RedeemCodeInput): Promise<RedeemCodeOutp
             transaction.update(userRef, {
                 usedReferralCode: code.toUpperCase(),
                 referredBy: referrerDoc.id,
-                totalBalance: admin.firestore.FieldValue.increment(welcomeBonus),
-                totalBonusEarnings: admin.firestore.FieldValue.increment(welcomeBonus),
-                totalEarnings: admin.firestore.FieldValue.increment(welcomeBonus),
+                totalBalance: adminSDK.firestore.FieldValue.increment(welcomeBonus),
+                totalBonusEarnings: adminSDK.firestore.FieldValue.increment(welcomeBonus),
+                totalEarnings: adminSDK.firestore.FieldValue.increment(welcomeBonus),
             });
 
             // 2. Create a transaction record for the bonus
@@ -75,7 +73,7 @@ export async function redeemCode(input: RedeemCodeInput): Promise<RedeemCodeOutp
                 amount: welcomeBonus,
                 description: `Referral code redeemed`,
                 status: 'Completed',
-                date: admin.firestore.FieldValue.serverTimestamp(),
+                date: adminSDK.firestore.FieldValue.serverTimestamp(),
             });
 
             // 3. Add the new user to the referrer's `referrals` subcollection
@@ -85,7 +83,7 @@ export async function redeemCode(input: RedeemCodeInput): Promise<RedeemCodeOutp
                 name: userName,
                 email: userEmail,
                 hasInvested: false,
-                joinedAt: admin.firestore.FieldValue.serverTimestamp(),
+                joinedAt: adminSDK.firestore.FieldValue.serverTimestamp(),
             });
         });
 
