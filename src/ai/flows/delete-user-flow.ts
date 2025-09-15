@@ -7,9 +7,11 @@
  * privileged operation that requires the Firebase Admin SDK.
  */
 import { z } from 'zod';
-import { auth, db } from '@/lib/firebaseAdmin';
+import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
 
 export async function deleteUser(uid: string): Promise<{ success: boolean; message: string; }> {
+    const { auth, db } = getFirebaseAdmin();
+    
     if (!uid) {
         throw new Error('User UID is required.');
     }

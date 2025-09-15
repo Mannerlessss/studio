@@ -6,7 +6,7 @@
  * an operation that clients cannot do directly due to security rules.
  */
 import { z } from 'zod';
-import { db } from '@/lib/firebaseAdmin';
+import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 
@@ -29,6 +29,7 @@ export const getLeaderboardFlow = ai.defineFlow(
     outputSchema: GetLeaderboardOutputSchema,
   },
   async () => {
+    const { db } = getFirebaseAdmin();
     const usersRef = collection(db, 'users');
     const q = query(usersRef, orderBy('investedReferralCount', 'desc'), limit(5));
     const querySnapshot = await getDocs(q);
