@@ -4,7 +4,7 @@ import { WelcomeCard } from '@/components/vaultboost/welcome-card';
 import { InfoCard } from '@/components/vaultboost/info-card';
 import { DailyBonusCard } from '@/components/vaultboost/daily-bonus-card';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
-import { Wallet, TrendingUp, Users, PiggyBank, Gem } from 'lucide-react';
+import { Wallet, TrendingUp, Users, PiggyBank } from 'lucide-react';
 import { UpgradeCard } from '@/components/vaultboost/upgrade-card';
 import { WithdrawCard } from '@/components/vaultboost/withdraw-card';
 import { TransactionHistoryCard } from '@/components/vaultboost/transaction-history-card';
@@ -15,6 +15,7 @@ import { ProfileCompletionCard } from '@/components/vaultboost/profile-completio
 import { AnnouncementPopup } from '@/components/vaultboost/announcement-popup';
 import { ActiveInvestmentsCard } from '@/components/vaultboost/active-investments-card';
 import { CollectBonusCard } from '@/components/vaultboost/collect-bonus-card';
+import { DiamondLogo } from '@/components/vaultboost/diamond-logo';
 
 
 const Dashboard: NextPage = () => {
@@ -24,7 +25,7 @@ const Dashboard: NextPage = () => {
       return (
         <div className="flex items-center justify-center min-h-screen bg-background">
             <div className="text-center">
-                <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
+                <DiamondLogo className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
                 <p className="text-lg text-muted-foreground">Loading Dashboard...</p>
             </div>
         </div>

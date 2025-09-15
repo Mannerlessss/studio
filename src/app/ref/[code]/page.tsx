@@ -1,8 +1,7 @@
-
 'use client';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Gem } from 'lucide-react';
+import { DiamondLogo } from '@/components/vaultboost/diamond-logo';
 
 // This page will capture the referral code from the URL,
 // store it in localStorage, and redirect to the signup page.
@@ -25,7 +24,7 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="text-center">
-        <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
+        <DiamondLogo className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
         <p className="text-lg text-muted-foreground">Applying referral code...</p>
       </div>
     </div>
