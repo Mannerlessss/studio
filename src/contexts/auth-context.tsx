@@ -114,14 +114,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
         
         try {
-            // First, get all active investments outside of a transaction.
             const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
 
             if (activeInvestmentsSnapshot.empty) {
-                return; // No active investments to process
+                return;
             }
 
-            // Now, run a transaction to update user and investment docs together.
              await runTransaction(db, async (transaction) => {
                 const userDocRef = doc(db, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
@@ -134,7 +132,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 let totalEarningsToAdd = 0;
                 const currentData = userDoc.data() as UserData;
                 const now = new Date();
-                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                 
                 const commissionParentRef = currentData.commissionParent ? doc(db, 'users', currentData.commissionParent) : null;
                 let commissionParentDoc: any = null;
@@ -144,7 +141,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
                 for (const investmentDoc of activeInvestmentsSnapshot.docs) {
-                    // We must re-fetch inside the transaction to ensure we have the latest data
                     const currentInvestmentRef = doc(db, `users/${currentUserId}/investments`, investmentDoc.id);
                     const currentInvestmentDoc = await transaction.get(currentInvestmentRef);
 
@@ -152,16 +148,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                     const investment = currentInvestmentDoc.data() as Investment;
 
-                    const lastUpdateDate = investment.lastUpdate.toDate();
-                    const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
+                    const lastUpdateMillis = investment.lastUpdate.toMillis();
+                    const nowMillis = now.getTime();
                     
                     const msInDay = 24 * 60 * 60 * 1000;
-                    const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
+                    const daysPassed = Math.floor((nowMillis - lastUpdateMillis) / msInDay);
                     
                     if (daysPassed <= 0) continue;
                     
                     const dailyReturn = investment.dailyReturn || 0;
-                    if (dailyReturn <= 0) continue; // Skip if no daily return
+                    if (dailyReturn <= 0) continue;
 
                     const daysAlreadyProcessed = Math.round(investment.earnings / dailyReturn);
                     const remainingDaysInPlan = investment.durationDays - daysAlreadyProcessed;
@@ -174,15 +170,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         const newEarnings = investment.earnings + earningsForThisPlan;
                         const newStatus = (daysAlreadyProcessed + daysToCredit) >= investment.durationDays ? 'completed' : 'active';
                         
+                        // Set the new lastUpdate time to be exactly `daysToCredit` after the previous one.
+                        const newLastUpdateMillis = lastUpdateMillis + (daysToCredit * msInDay);
+                        const newLastUpdate = Timestamp.fromMillis(newLastUpdateMillis);
+
                         transaction.update(currentInvestmentRef, {
                             earnings: newEarnings,
-                            lastUpdate: serverTimestamp(),
+                            lastUpdate: newLastUpdate,
                             status: newStatus
                         });
 
                         for (let i = 0; i < daysToCredit; i++) {
                             const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                            const earningDay = new Date(startOfToday.getTime() - (daysPassed - i - 1) * msInDay);
+                            const earningDay = new Date(lastUpdateMillis + ((i + 1) * msInDay));
                             transaction.set(transactionRef, {
                                 type: 'earning',
                                 amount: dailyReturn,
@@ -197,9 +197,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             const commissionAmount = earningsForThisPlan * 0.03;
                             const parentData = commissionParentDoc.data();
                             transaction.update(commissionParentRef!, {
-                                totalBalance: (parentData.totalBalance || 0) + commissionAmount,
-                                totalReferralEarnings: (parentData.totalReferralEarnings || 0) + commissionAmount,
-                                totalEarnings: (parentData.totalEarnings || 0) + commissionAmount,
+                                totalBalance: increment(commissionAmount),
+                                totalReferralEarnings: increment(commissionAmount),
+                                totalEarnings: increment(commissionAmount),
                             });
                             
                             const commissionTransactionRef = doc(collection(db, `users/${commissionParentRef!.id}/transactions`));
@@ -216,9 +216,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                 if (totalEarningsToAdd > 0) {
                     transaction.update(userDocRef, {
-                        totalInvestmentEarnings: (currentData.totalInvestmentEarnings || 0) + totalEarningsToAdd,
-                        totalBalance: (currentData.totalBalance || 0) + totalEarningsToAdd,
-                        totalEarnings: (currentData.totalEarnings || 0) + totalEarningsToAdd,
+                        totalInvestmentEarnings: increment(totalEarningsToAdd),
+                        totalBalance: increment(totalEarningsToAdd),
+                        totalEarnings: increment(totalEarningsToAdd),
                     });
                 }
             });
@@ -243,7 +243,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (unsubFromInvestments) unsubFromInvestments();
             
             if (currentUser) {
-                const idTokenResult = await currentUser.getIdTokenResult(true); // Force refresh
+                const idTokenResult = await currentUser.getIdTokenResult(true);
                 const userIsAdmin = idTokenResult.claims.role === 'admin';
                 
                 setUser(currentUser);
@@ -253,7 +253,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                      setUserData(null);
                      setLoading(false);
                 } else {
-                    // Process earnings ONCE before setting up listeners
                     await processInvestmentEarnings(currentUser.uid); 
                     
                     const userDocRef = doc(db, 'users', currentUser.uid);
@@ -265,7 +264,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         
                         const baseUserData = { uid: userDocSnap.id, ...userDocSnap.data() } as UserData;
                         
-                        // Now listen to investments subcollection
                         const investmentsColRef = collection(db, `users/${currentUser.uid}/investments`);
                         unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
                             const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));
@@ -274,7 +272,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         }, (error) => {
                             console.error("Error fetching investments:", error);
                             toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load investments. Check Firestore rules." });
-                            setUserData(baseUserData); // Set base data even if investments fail
+                            setUserData(baseUserData);
                             setLoading(false);
                         });
 
@@ -332,11 +330,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signUpWithEmail = async ({ name, email, phone, password, referralCode: providedCode }: any) => {
         setLoading(true);
         try {
-            // Step 1: Create Auth User
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const newUser = userCredential.user;
 
-            // Step 2: Create User Doc
             const referralCode = `${name.split(' ')[0].toUpperCase().substring(0, 5)}${(Math.random() * 9000 + 1000).toFixed(0)}`;
             const userDocRef = doc(db, 'users', newUser.uid);
 
@@ -377,7 +373,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await setDoc(userDocRef, newUserDocData);
 
 
-            // Step 3: If referral code was used, add to referrer's subcollection
             if (newUserDocData.referredBy) {
                 const referrerId = newUserDocData.referredBy;
                  if (referrerId !== newUser.uid) {
@@ -462,26 +457,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         try {
-            const batch = writeBatch(db);
             const userDocRef = doc(db, 'users', user.uid);
             
-            batch.update(userDocRef, {
-                totalBalance: increment(amount),
-                totalBonusEarnings: increment(amount),
-                totalEarnings: increment(amount),
-                lastBonusClaim: now
-            });
-            
-            const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
-            batch.set(transactionRef, {
-                type: 'bonus',
-                amount: amount,
-                description: 'Daily Bonus Claim',
-                status: 'Completed',
-                date: now
+            await runTransaction(db, async (transaction) => {
+                const userDoc = await transaction.get(userDocRef);
+                if (!userDoc.exists()) {
+                    throw "User does not exist.";
+                }
+
+                transaction.update(userDocRef, {
+                    totalBalance: increment(amount),
+                    totalBonusEarnings: increment(amount),
+                    totalEarnings: increment(amount),
+                    lastBonusClaim: now
+                });
+                
+                const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+                transaction.set(transactionRef, {
+                    type: 'bonus',
+                    amount: amount,
+                    description: 'Daily Bonus Claim',
+                    status: 'Completed',
+                    date: now
+                });
             });
 
-            await batch.commit();
             toast({ title: 'Bonus Claimed!', description: `You received ${amount} Rs.` });
         } catch (error: any) {
             console.error("Error claiming daily bonus: ", error);
@@ -502,26 +502,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const signupBonusAmount = 200;
         
         try {
-            const batch = writeBatch(db);
             const userDocRef = doc(db, 'users', user.uid);
-            
-            batch.update(userDocRef, {
-                totalBalance: increment(signupBonusAmount),
-                totalBonusEarnings: increment(signupBonusAmount),
-                totalEarnings: increment(signupBonusAmount),
-                hasCollectedSignupBonus: true,
-            });
-            
-            const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
-            batch.set(transactionRef, {
-                type: 'bonus',
-                amount: signupBonusAmount,
-                description: 'Sign-up Bonus',
-                status: 'Completed',
-                date: serverTimestamp()
+
+            await runTransaction(db, async (transaction) => {
+                const userDoc = await transaction.get(userDocRef);
+                 if (!userDoc.exists()) {
+                    throw "User does not exist.";
+                }
+
+                transaction.update(userDocRef, {
+                    totalBalance: increment(signupBonusAmount),
+                    totalBonusEarnings: increment(signupBonusAmount),
+                    totalEarnings: increment(signupBonusAmount),
+                    hasCollectedSignupBonus: true,
+                });
+                
+                const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+                transaction.set(transactionRef, {
+                    type: 'bonus',
+                    amount: signupBonusAmount,
+                    description: 'Sign-up Bonus',
+                    status: 'Completed',
+                    date: serverTimestamp()
+                });
             });
 
-            await batch.commit();
             toast({ title: 'Bonus Collected!', description: `You received ${signupBonusAmount} Rs.` });
         } catch (error: any) {
             console.error("Error collecting signup bonus: ", error);
