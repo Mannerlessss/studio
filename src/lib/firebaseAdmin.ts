@@ -5,10 +5,9 @@ export function getFirebaseAdmin() {
   if (admin.apps.length === 0) {
     try {
       // The SDK will automatically pick up credentials from the environment.
-      // In a deployed environment (like Vercel, Firebase Hosting), this is handled by setting environment variables.
+      // In a deployed environment, this is handled automatically.
       // In a local environment, it will look for the GOOGLE_APPLICATION_CREDENTIALS
-      // environment variable, which can be pointed to the serviceAccountKey.json file.
-      // The .env file we created handles this for local development.
+      // environment variable pointing to the serviceAccountKey.json file.
       admin.initializeApp();
     } catch (error: any) {
       console.error('Firebase admin initialization error', error.stack);
