@@ -226,10 +226,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         let unsubFromUser: (() => void) | undefined;
         let unsubFromInvestments: (() => void) | undefined;
-        let authTimeout: NodeJS.Timeout;
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            clearTimeout(authTimeout); 
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             
@@ -249,7 +247,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const userDocRef = doc(db, 'users', currentUser.uid);
                     unsubFromUser = onSnapshot(userDocRef, (userDocSnap) => {
                         if (!userDocSnap.exists()) {
-                            console.warn(`No Firestore document found for user ${currentUser.uid}. Waiting...`);
+                            console.warn(`No Firestore document found for user ${currentUser.uid}. This can happen briefly during sign up.`);
                             return;
                         }
                         
@@ -280,18 +278,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
-        authTimeout = setTimeout(() => {
-            if (loading) {
-                console.warn("Auth state change timed out. Forcing loading to false.");
-                setLoading(false);
-            }
-        }, 10000); 
-
         return () => {
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             unsubscribe();
-            clearTimeout(authTimeout);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -312,6 +302,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             router.push('/admin');
         }
     }, [user, isAdmin, loading, pathname, router]);
+
+    useEffect(() => {
+        let timeout: NodeJS.Timeout;
+        if (loading) {
+            timeout = setTimeout(() => {
+                // Re-check loading state inside the timeout
+                // to avoid race conditions
+                if (loading && !user) {
+                     toast({
+                        variant: 'destructive',
+                        title: 'Loading Timeout',
+                        description: 'Could not connect to the server. Please try again.',
+                    });
+                    logOut();
+                }
+            }, 10000); // 10 seconds
+        }
+
+        return () => {
+            clearTimeout(timeout);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loading]);
 
     const signUpWithEmail = async ({ name, email, phone, password, referralCode: providedCode }: any) => {
         setLoading(true);
