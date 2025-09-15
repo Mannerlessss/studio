@@ -7,7 +7,7 @@
  * privileged operation that requires the Firebase Admin SDK.
  */
 import { z } from 'zod';
-import { auth, db } from '@/lib/firebaseAdmin';
+import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 
 export async function deleteUser(uid: string): Promise<{ success: boolean; message: string; }> {
     if (!uid) {
@@ -16,32 +16,25 @@ export async function deleteUser(uid: string): Promise<{ success: boolean; messa
     
     try {
         // Delete from Firebase Authentication
-        await auth.deleteUser(uid);
+        await adminAuth.deleteUser(uid);
 
         // Delete from Firestore database
-        const userDocRef = db.collection('users').doc(uid);
+        const userDocRef = adminDb.collection('users').doc(uid);
         
-        // Check if the document exists before trying to delete
         const docSnap = await userDocRef.get();
         if (docSnap.exists) {
             await userDocRef.delete();
         }
         
-        // Note: This doesn't delete subcollections like `investments`, `transactions`, etc.
-        // For a full cleanup, a more complex script would be needed to recursively delete
-        // subcollection documents, but for typical use cases, this is sufficient.
-
         return {
             success: true,
             message: `Successfully deleted user ${uid} from Authentication and Firestore.`,
         };
     } catch (error: any) {
         console.error(`Failed to delete user ${uid}:`, error);
-         // Provide a more user-friendly error message
         if (error.code === 'auth/user-not-found') {
-            // If user not in auth, still try to delete from firestore, then return success.
             try {
-                const userDocRef = db.collection('users').doc(uid);
+                const userDocRef = adminDb.collection('users').doc(uid);
                 const docSnap = await userDocRef.get();
                 if (docSnap.exists) {
                     await userDocRef.delete();

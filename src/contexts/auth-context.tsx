@@ -11,7 +11,7 @@ import {
 import { useRouter, usePathname } from 'next/navigation';
 import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { auth, db } from '@/lib/firebase';
+import { clientAuth, clientDb } from '@/lib/firebaseClient';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc, increment } from 'firebase/firestore';
 import { redeemCode } from '@/ai/flows/redeem-code-flow';
 
@@ -96,7 +96,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logOut = async () => {
         setLoading(true);
         try {
-            await signOut(auth);
+            await signOut(clientAuth);
             sessionStorage.removeItem('vaultboost-announcement-seen');
         } catch (error) {
             console.error("Error signing out: ", error);
@@ -111,15 +111,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Function to process earnings for all active investments for a user
     const processInvestmentEarnings = async (currentUserId: string) => {
-        const investmentsColRef = collection(db, `users/${currentUserId}/investments`);
+        const investmentsColRef = collection(clientDb, `users/${currentUserId}/investments`);
         const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
         
         try {
             const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
             if (activeInvestmentsSnapshot.empty) return;
 
-             await runTransaction(db, async (transaction) => {
-                const userDocRef = doc(db, 'users', currentUserId);
+             await runTransaction(clientDb, async (transaction) => {
+                const userDocRef = doc(clientDb, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
 
                 if (!userDoc.exists()) {
@@ -132,7 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const now = new Date();
                 const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                 
-                const commissionParentRef = currentData.commissionParent ? doc(db, 'users', currentData.commissionParent) : null;
+                const commissionParentRef = currentData.commissionParent ? doc(clientDb, 'users', currentData.commissionParent) : null;
                 let commissionParentDoc: any = null;
                 if(commissionParentRef){
                     commissionParentDoc = await transaction.get(commissionParentRef);
@@ -140,7 +140,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
                 for (const investmentDoc of activeInvestmentsSnapshot.docs) {
-                    const currentInvestmentRef = doc(db, `users/${currentUserId}/investments`, investmentDoc.id);
+                    const currentInvestmentRef = doc(clientDb, `users/${currentUserId}/investments`, investmentDoc.id);
                     const currentInvestmentDoc = await transaction.get(currentInvestmentRef);
 
                     if (!currentInvestmentDoc.exists()) continue;
@@ -172,7 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         });
 
                         for (let i = 0; i < daysToCredit; i++) {
-                            const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
+                            const transactionRef = doc(collection(clientDb, `users/${currentUserId}/transactions`));
                             const earningDay = new Date(startOfToday.getTime() - (daysPassed - i - 1) * msInDay);
                             transaction.set(transactionRef, {
                                 type: 'earning',
@@ -193,7 +193,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                                 totalEarnings: (parentData.totalEarnings || 0) + commissionAmount,
                             });
                             
-                            const commissionTransactionRef = doc(collection(db, `users/${commissionParentRef!.id}/transactions`));
+                            const commissionTransactionRef = doc(collection(clientDb, `users/${commissionParentRef!.id}/transactions`));
                             transaction.set(commissionTransactionRef, {
                                 type: 'referral',
                                 amount: commissionAmount,
@@ -227,7 +227,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let unsubFromUser: (() => void) | undefined;
         let unsubFromInvestments: (() => void) | undefined;
 
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        const unsubscribe = onAuthStateChanged(clientAuth, async (currentUser) => {
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             
@@ -244,7 +244,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 } else {
                     await processInvestmentEarnings(currentUser.uid); 
                     
-                    const userDocRef = doc(db, 'users', currentUser.uid);
+                    const userDocRef = doc(clientDb, 'users', currentUser.uid);
                     unsubFromUser = onSnapshot(userDocRef, (userDocSnap) => {
                         if (!userDocSnap.exists()) {
                             console.warn(`No Firestore document found for user ${currentUser.uid}. This can happen briefly during sign up.`);
@@ -253,7 +253,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         
                         const baseUserData = { uid: userDocSnap.id, ...userDocSnap.data() } as UserData;
                         
-                        const investmentsColRef = collection(db, `users/${currentUser.uid}/investments`);
+                        const investmentsColRef = collection(clientDb, `users/${currentUser.uid}/investments`);
                         unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
                             const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));
                             setUserData({ ...baseUserData, investments });
@@ -329,11 +329,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signUpWithEmail = async ({ name, email, phone, password, referralCode: providedCode }: any) => {
         setLoading(true);
         try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const userCredential = await createUserWithEmailAndPassword(clientAuth, email, password);
             const newUser = userCredential.user;
 
             const referralCode = `${name.split(' ')[0].toUpperCase().substring(0, 5)}${(Math.random() * 9000 + 1000).toFixed(0)}`;
-            const userDocRef = doc(db, 'users', newUser.uid);
+            const userDocRef = doc(clientDb, 'users', newUser.uid);
 
             await setDoc(userDocRef, {
                 uid: newUser.uid,
@@ -375,8 +375,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signInWithEmail = async ({ email, password }: any) => {
         setLoading(true);
         try {
-            const credential = await signInWithEmailAndPassword(auth, email, password);
-            const userDocRef = doc(db, 'users', credential.user.uid);
+            const credential = await signInWithEmailAndPassword(clientAuth, email, password);
+            const userDocRef = doc(clientDb, 'users', credential.user.uid);
             await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
         } catch (error: any) {
             toast({
@@ -390,7 +390,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const sendPasswordReset = async (email: string) => {
         try {
-            await sendPasswordResetEmail(auth, email);
+            await sendPasswordResetEmail(clientAuth, email);
             toast({
                 title: 'Password Reset Link Sent',
                 description: `If an account with ${email} exists, a reset link has been sent.`,
@@ -406,12 +406,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const updateUserName = async (name: string) => {
         if (!user) throw new Error("User not found");
-        await updateDoc(doc(db, 'users', user.uid), { name });
+        await updateDoc(doc(clientDb, 'users', user.uid), { name });
     };
 
     const updateUserPhone = async (phone: string) => {
         if (!user) throw new Error("User not found");
-        await updateDoc(doc(db, 'users', user.uid), { phone });
+        await updateDoc(doc(clientDb, 'users', user.uid), { phone });
     };
     
     const claimDailyBonus = async (amount: number) => {
@@ -426,8 +426,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
         
-        const batch = writeBatch(db);
-        const userDocRef = doc(db, 'users', user.uid);
+        const batch = writeBatch(clientDb);
+        const userDocRef = doc(clientDb, 'users', user.uid);
         
         batch.update(userDocRef, {
             totalBalance: increment(amount),
@@ -436,7 +436,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             lastBonusClaim: now
         });
         
-        const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+        const transactionRef = doc(collection(clientDb, `users/${user.uid}/transactions`));
         batch.set(transactionRef, {
             type: 'bonus',
             amount: amount,
@@ -455,8 +455,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const signupBonusAmount = 200;
         
-        const batch = writeBatch(db);
-        const userDocRef = doc(db, 'users', user.uid);
+        const batch = writeBatch(clientDb);
+        const userDocRef = doc(clientDb, 'users', user.uid);
         
         batch.update(userDocRef, {
             totalBalance: increment(signupBonusAmount),
@@ -465,7 +465,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             hasCollectedSignupBonus: true,
         });
         
-        const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+        const transactionRef = doc(collection(clientDb, `users/${user.uid}/transactions`));
         batch.set(transactionRef, {
             type: 'bonus',
             amount: signupBonusAmount,

@@ -1,14 +1,11 @@
 'use server';
 /**
  * @fileOverview A server-side flow to securely update the status of a withdrawal request.
- *
- * This flow uses the Admin SDK to ensure only authorized users (admins) can
- * approve or reject withdrawal requests.
  */
 import { z } from 'zod';
-import { db } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
-import { doc, writeBatch, getDoc, collection, query, where, getDocs, increment } from 'firebase/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 
 // Schema for updating a withdrawal status
 const UpdateWithdrawalStatusInputSchema = z.object({
@@ -31,33 +28,28 @@ export const updateWithdrawalStatusFlow = ai.defineFlow({
     outputSchema: UpdateWithdrawalStatusOutputSchema,
 }, async ({ userId, withdrawalId, newStatus, amount }) => {
 
-    const withdrawalDocRef = doc(db, `users/${userId}/withdrawals`, withdrawalId);
-    const batch = writeBatch(db);
+    const withdrawalDocRef = adminDb.doc(`users/${userId}/withdrawals/${withdrawalId}`);
+    const batch = adminDb.batch();
 
-    // 1. Update the withdrawal document itself
     batch.update(withdrawalDocRef, { status: newStatus });
     
-    // 2. Find and update the corresponding transaction document
-    const transactionQuery = query(
-        collection(db, `users/${userId}/transactions`), 
-        where('type', '==', 'withdrawal'),
-        where('amount', '==', amount),
-        where('status', '==', 'Pending')
-        // Ideally, we'd have a shared ID, but this is a pragmatic approach for now.
-        // It finds the oldest pending withdrawal transaction matching the amount.
-    );
-    const transactionSnapshot = await getDocs(transactionQuery);
+    // Find and update the corresponding transaction document
+    const transactionQuery = adminDb.collection(`users/${userId}/transactions`) 
+        .where('type', '==', 'withdrawal')
+        .where('amount', '==', amount)
+        .where('status', '==', 'Pending')
+        .limit(1); // Find the first match
+        
+    const transactionSnapshot = await transactionQuery.get();
     if (!transactionSnapshot.empty) {
         const transactionDocRef = transactionSnapshot.docs[0].ref;
         batch.update(transactionDocRef, { status: newStatus });
     }
 
-    // 3. If rejected, refund the balance to the user
     if (newStatus === 'Rejected') {
-         const userDocRef = doc(db, 'users', userId);
-         // We don't need to get the doc first when using `increment`
+         const userDocRef = adminDb.doc(`users/${userId}`);
          batch.update(userDocRef, {
-            totalBalance: increment(amount)
+            totalBalance: FieldValue.increment(amount)
         });
     }
 

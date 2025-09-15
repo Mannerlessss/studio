@@ -1,39 +1,53 @@
-import * as admin from 'firebase-admin';
-import serviceAccount from '../../serviceAccountKey.json';
+'use server';
+import admin from 'firebase-admin';
 
-// This function ensures that Firebase is initialized only once (singleton pattern).
-function getFirebaseAdmin() {
-  if (!admin.apps.length) {
-    try {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
-      });
-    } catch (error: any) {
-      console.error('Firebase admin initialization error', error.stack);
-      // We re-throw the error to make it clear that initialization failed.
-      throw new Error(`Failed to initialize Firebase Admin SDK. Check server logs for details. Error: ${error.message}`);
-    }
-  }
-  return admin;
+// This interface is not exhaustive, but covers the essentials for initialization.
+interface ServiceAccount {
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
 }
 
-const adminInstance = getFirebaseAdmin();
+let adminDb: admin.firestore.Firestore;
+let adminAuth: admin.auth.Auth;
 
 /**
- * The initialized Firebase Admin Firestore instance.
+ * Initializes the Firebase Admin SDK if not already initialized.
+ * This is a server-only module.
  */
-export const db = adminInstance.firestore();
+function initializeAdmin() {
+  if (admin.apps.length > 0) {
+    return;
+  }
 
-/**
- * The initialized Firebase Admin Auth instance.
- */
-export const auth = adminInstance.auth();
+  try {
+    // Vercel/Netlify/etc. will have this as a single-line JSON string.
+    // In local dev, it might be set in a .env.local file.
+    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
-/**
- * The raw Firebase Admin SDK instance.
- * Use this for types or functionalities not covered by the `db` and `auth` exports.
- * @example
- * import { adminSDK } from '@/lib/firebaseAdmin';
- * const serverTimestamp = adminSDK.firestore.FieldValue.serverTimestamp();
- */
-export const adminSDK = adminInstance;
+    if (!serviceAccountKey) {
+      throw new Error('Firebase Admin SDK: FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+    }
+
+    const serviceAccount: ServiceAccount = JSON.parse(serviceAccountKey);
+
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+
+    console.log('Firebase Admin SDK initialized successfully.');
+  } catch (error: any) {
+    console.error('Firebase Admin SDK initialization error:', error);
+    // Re-throw to make it clear that initialization failed.
+    throw new Error(`Failed to initialize Firebase Admin SDK. Check server logs. Error: ${error.message}`);
+  }
+}
+
+// Initialize the SDK.
+initializeAdmin();
+
+// Export the initialized services.
+adminDb = admin.firestore();
+adminAuth = admin.auth();
+
+export { adminDb, adminAuth };

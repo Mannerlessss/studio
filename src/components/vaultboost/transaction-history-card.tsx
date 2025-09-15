@@ -6,7 +6,7 @@ import { Clock, Gift, TrendingUp, Banknote, ArrowUpCircle, ArrowDownCircle, User
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { useAuth } from '@/contexts/auth-context';
-import { db } from '@/lib/firebase';
+import { clientDb } from '@/lib/firebaseClient';
 import { collection, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 
@@ -64,7 +64,7 @@ export function TransactionHistoryCard() {
       return;
     };
 
-    const transactionsColRef = collection(db, `users/${user.uid}/transactions`);
+    const transactionsColRef = collection(clientDb, `users/${user.uid}/transactions`);
     const q = query(transactionsColRef, orderBy('date', 'desc'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {

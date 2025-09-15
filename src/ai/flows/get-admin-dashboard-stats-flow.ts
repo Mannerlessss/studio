@@ -1,14 +1,11 @@
 'use server';
 /**
  * @fileOverview A server-side flow to securely fetch admin dashboard statistics.
- *
- * This flow queries various collections to compute stats, which clients cannot
- * do directly due to security rules.
  */
 import { z } from 'zod';
-import { db } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
-import { collection, collectionGroup, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 
 const GetAdminDashboardStatsOutputSchema = z.object({
     totalUsers: z.number(),
@@ -26,16 +23,15 @@ export const getAdminDashboardStatsFlow = ai.defineFlow(
   },
   async () => {
     // Total Users
-    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const usersSnapshot = await adminDb.collection('users').get();
     const totalUsers = usersSnapshot.size;
 
     // Pending Withdrawals
-    const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'), where('status', '==', 'Pending'));
-    const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
+    const withdrawalsSnapshot = await adminDb.collectionGroup('withdrawals').where('status', '==', 'Pending').get();
     const pendingWithdrawals = withdrawalsSnapshot.size;
 
     // Active Offer Codes
-    const offersSnapshot = await getDocs(collection(db, 'offers'));
+    const offersSnapshot = await adminDb.collection('offers').get();
     const activeOffers = offersSnapshot.docs.filter(doc => {
         const offer = doc.data();
         const now = new Date();

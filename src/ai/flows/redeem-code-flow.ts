@@ -1,14 +1,11 @@
 'use server';
 /**
  * @fileOverview A server-side flow to securely redeem a referral code.
- *
- * This flow handles the complex logic of validating a referral code
- * and linking the new user to their referrer.
- * This is a privileged operation that requires the Firebase Admin SDK.
  */
 import { z } from 'zod';
-import { db, adminSDK } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
+import { FieldValue } from 'firebase-admin/firestore';
 
 const RedeemCodeInputSchema = z.object({
     userId: z.string().describe('The UID of the user redeeming the code.'),
@@ -30,10 +27,10 @@ export const redeemCodeFlow = ai.defineFlow({
     inputSchema: RedeemCodeInputSchema,
     outputSchema: RedeemCodeOutputSchema,
 }, async ({ userId, userName, userEmail, code }) => {
-    const userRef = db.collection('users').doc(userId);
+    const userRef = adminDb.collection('users').doc(userId);
 
     try {
-        await db.runTransaction(async (transaction) => {
+        await adminDb.runTransaction(async (transaction) => {
             const userDoc = await transaction.get(userRef);
             if (!userDoc.exists) {
                 throw new Error('User does not exist.');
@@ -45,11 +42,10 @@ export const redeemCodeFlow = ai.defineFlow({
             }
 
             // Find the referrer by their code
-            const usersRef = db.collection('users');
+            const usersRef = adminDb.collection('users');
             const referrerQuery = usersRef.where('referralCode', '==', code.toUpperCase()).limit(1);
             const referrerSnapshot = await transaction.get(referrerQuery);
             
-
             if (referrerSnapshot.empty) {
                 throw new Error('Invalid referral code.');
             }
@@ -66,13 +62,13 @@ export const redeemCodeFlow = ai.defineFlow({
             });
 
             // 2. Add the new user to the referrer's `referrals` subcollection
-            const newReferralRef = db.collection('users').doc(referrerDoc.id).collection('referrals').doc();
+            const newReferralRef = adminDb.collection('users').doc(referrerDoc.id).collection('referrals').doc();
             transaction.set(newReferralRef, {
                 userId: userId,
                 name: userName,
                 email: userEmail,
                 hasInvested: false,
-                joinedAt: adminSDK.firestore.FieldValue.serverTimestamp(),
+                joinedAt: FieldValue.serverTimestamp(),
             });
         });
 

@@ -3,9 +3,9 @@
  * @fileOverview A server-side flow to securely fetch all withdrawal requests for the admin panel.
  */
 import { z } from 'zod';
-import { db } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
-import { collectionGroup, getDocs, query, Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 
 const WithdrawalDetailsSchema = z.object({
   upiId: z.string().optional(),
@@ -21,14 +21,13 @@ const WithdrawalRequestSchema = z.object({
   amount: z.number(),
   method: z.enum(['UPI', 'Bank Transfer']),
   details: WithdrawalDetailsSchema,
-  date: z.any(), // Send as serialized timestamp
+  date: z.string(), // Send as ISO string
   status: z.enum(['Pending', 'Approved', 'Rejected']),
 });
 
 export type WithdrawalRequest = z.infer<typeof WithdrawalRequestSchema>;
 
 const GetAllWithdrawalsOutputSchema = z.array(WithdrawalRequestSchema);
-export type GetAllWithdrawalsOutput = z.infer<typeof GetAllWithdrawalsOutputSchema>;
 
 export const getAllWithdrawalsFlow = ai.defineFlow(
   {
@@ -37,12 +36,13 @@ export const getAllWithdrawalsFlow = ai.defineFlow(
     outputSchema: GetAllWithdrawalsOutputSchema,
   },
   async () => {
-    const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'));
-    const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
+    const withdrawalsSnapshot = await adminDb.collectionGroup('withdrawals').get();
     
     const requests: WithdrawalRequest[] = [];
     withdrawalsSnapshot.forEach(docSnap => {
         const data = docSnap.data();
+        const date = data.date instanceof Timestamp ? data.date.toDate().toISOString() : new Date().toISOString();
+
         requests.push({ 
             id: docSnap.id,
             userId: docSnap.ref.parent.parent!.id,
@@ -50,7 +50,7 @@ export const getAllWithdrawalsFlow = ai.defineFlow(
             amount: data.amount || 0,
             method: data.method || 'UPI',
             details: data.details || {},
-            date: data.date,
+            date: date,
             status: data.status || 'Pending',
         });
     });
@@ -59,6 +59,6 @@ export const getAllWithdrawalsFlow = ai.defineFlow(
   }
 );
 
-export async function getAllWithdrawals(): Promise<GetAllWithdrawalsOutput> {
+export async function getAllWithdrawals(): Promise<WithdrawalRequest[]> {
     return getAllWithdrawalsFlow();
 }

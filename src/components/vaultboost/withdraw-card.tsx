@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import Link from 'next/link';
 import { addDoc, collection, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { clientDb } from '@/lib/firebaseClient';
 
 export function WithdrawCard() {
   const [showWithdrawForm, setShowWithdrawForm] = useState(false);
@@ -97,8 +97,8 @@ export function WithdrawCard() {
     
     setIsLoading(true);
     try {
-      await runTransaction(db, async (transaction) => {
-        const userDocRef = doc(db, 'users', user.uid);
+      await runTransaction(clientDb, async (transaction) => {
+        const userDocRef = doc(clientDb, 'users', user.uid);
         const userDoc = await transaction.get(userDocRef);
 
         if (!userDoc.exists()) {
@@ -116,7 +116,7 @@ export function WithdrawCard() {
         });
 
         // 2. Create withdrawal request
-        const withdrawalRef = doc(collection(db, `users/${user.uid}/withdrawals`));
+        const withdrawalRef = doc(collection(clientDb, `users/${user.uid}/withdrawals`));
         transaction.set(withdrawalRef, {
           amount: withdrawAmount,
           method: method === 'upi' ? 'UPI' : 'Bank Transfer',
@@ -127,7 +127,7 @@ export function WithdrawCard() {
         });
 
          // 3. Create a transaction record
-        const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+        const transactionRef = doc(collection(clientDb, `users/${user.uid}/transactions`));
         transaction.set(transactionRef, {
             type: 'withdrawal',
             amount: withdrawAmount,

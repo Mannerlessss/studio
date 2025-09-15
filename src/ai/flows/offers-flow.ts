@@ -1,14 +1,11 @@
 'use server';
 /**
  * @fileOverview Server-side flows for managing offer codes.
- *
- * This includes creating, deleting, and fetching offer codes using the Admin SDK
- * to ensure proper permissions.
  */
 import { z } from 'zod';
-import { db, adminSDK } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
-import { collection, addDoc, deleteDoc, doc, getDocs, Timestamp } from 'firebase/firestore';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 
 // Schema for creating an offer
 const CreateOfferInputSchema = z.object({
@@ -47,15 +44,18 @@ export const getAllOffersFlow = ai.defineFlow({
     inputSchema: z.void(),
     outputSchema: GetAllOffersOutputSchema,
 }, async () => {
-    const offersSnapshot = await getDocs(collection(db, 'offers'));
+    const offersSnapshot = await adminDb.collection('offers').get();
     const offersData: Offer[] = offersSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
             id: doc.id,
-            ...data,
+            code: data.code,
+            rewardAmount: data.rewardAmount,
+            maxUsers: data.maxUsers || null,
             expiresAt: (data.expiresAt as Timestamp)?.toDate().toISOString() || null,
+            usageCount: data.usageCount,
             createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || null,
-        } as Offer;
+        };
     });
     return offersData;
 });
@@ -66,22 +66,17 @@ export const createOfferFlow = ai.defineFlow({
     inputSchema: CreateOfferInputSchema,
     outputSchema: OfferOutputSchema,
 }, async (input) => {
-
     const newOfferData: any = {
         code: input.code.toUpperCase(),
         rewardAmount: input.rewardAmount,
         usageCount: 0,
-        createdAt: adminSDK.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
     };
 
-    if (input.maxUsers) {
-        newOfferData.maxUsers = input.maxUsers;
-    }
-    if (input.expiresAt) {
-        newOfferData.expiresAt = Timestamp.fromDate(new Date(input.expiresAt));
-    }
+    if (input.maxUsers) newOfferData.maxUsers = input.maxUsers;
+    if (input.expiresAt) newOfferData.expiresAt = Timestamp.fromDate(new Date(input.expiresAt));
 
-    const docRef = await addDoc(collection(db, 'offers'), newOfferData);
+    const docRef = await adminDb.collection('offers').add(newOfferData);
     
     return {
         success: true,
@@ -96,14 +91,9 @@ export const deleteOfferFlow = ai.defineFlow({
     inputSchema: z.string(), // Expects offer ID
     outputSchema: OfferOutputSchema,
 }, async (offerId) => {
-    if (!offerId) {
-        throw new Error('Offer ID is required.');
-    }
-    await deleteDoc(doc(db, 'offers', offerId));
-    return {
-        success: true,
-        message: 'Offer code deleted successfully.',
-    };
+    if (!offerId) throw new Error('Offer ID is required.');
+    await adminDb.collection('offers').doc(offerId).delete();
+    return { success: true, message: 'Offer code deleted successfully.' };
 });
 
 

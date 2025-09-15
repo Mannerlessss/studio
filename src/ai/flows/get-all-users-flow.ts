@@ -3,9 +3,9 @@
  * @fileOverview A server-side flow to securely fetch all user data for the admin panel.
  */
 import { z } from 'zod';
-import { db } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
-import { collection, getDocs, Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 
 const UserForAdminSchema = z.object({
     id: z.string(),
@@ -27,7 +27,6 @@ const UserForAdminSchema = z.object({
 export type UserForAdmin = z.infer<typeof UserForAdminSchema>;
 
 const GetAllUsersOutputSchema = z.array(UserForAdminSchema);
-export type GetAllUsersOutput = z.infer<typeof GetAllUsersOutputSchema>;
 
 export const getAllUsersFlow = ai.defineFlow(
   {
@@ -36,9 +35,12 @@ export const getAllUsersFlow = ai.defineFlow(
     outputSchema: GetAllUsersOutputSchema,
   },
   async () => {
-    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const usersSnapshot = await adminDb.collection('users').get();
     const usersData: UserForAdmin[] = usersSnapshot.docs.map(doc => {
         const data = doc.data();
+        // Convert Firestore Timestamps to serializable format (ISO string)
+        const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : null;
+
         return {
             id: doc.id,
             name: data.name || 'N/A',
@@ -53,13 +55,15 @@ export const getAllUsersFlow = ai.defineFlow(
             investedReferralCount: data.investedReferralCount || 0,
             referredBy: data.referredBy,
             claimedMilestones: data.claimedMilestones,
-            createdAt: data.createdAt, // Keep as is, will be serialized
+            createdAt: createdAt,
         };
     });
     return usersData;
   }
 );
 
-export async function getAllUsers(): Promise<GetAllUsersOutput> {
-    return getAllUsersFlow();
+export async function getAllUsers(): Promise<UserForAdmin[]> {
+    const result = await getAllUsersFlow();
+    // The flow now returns serializable data, so we can just return it.
+    return result;
 }

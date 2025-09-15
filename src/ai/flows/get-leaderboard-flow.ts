@@ -1,15 +1,10 @@
 'use server';
 /**
  * @fileOverview A server-side flow to securely fetch the referral leaderboard.
- *
- * This flow queries the entire users collection to find the top referrers,
- * an operation that clients cannot do directly due to security rules.
  */
 import { z } from 'zod';
-import { db } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
-
 
 const LeaderboardUserSchema = z.object({
     name: z.string(),
@@ -29,9 +24,9 @@ export const getLeaderboardFlow = ai.defineFlow(
     outputSchema: GetLeaderboardOutputSchema,
   },
   async () => {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, orderBy('investedReferralCount', 'desc'), limit(5));
-    const querySnapshot = await getDocs(q);
+    const usersRef = adminDb.collection('users');
+    const q = usersRef.orderBy('investedReferralCount', 'desc').limit(5);
+    const querySnapshot = await q.get();
     
     const topUsers: LeaderboardUser[] = querySnapshot.docs
         .map(doc => {
@@ -49,6 +44,6 @@ export const getLeaderboardFlow = ai.defineFlow(
 
 
 // Exported wrapper function
-export async function getLeaderboard(): Promise<GetLeaderboardOutput> {
+export async function getLeaderboard(): Promise<LeaderboardUser[]> {
     return getLeaderboardFlow();
 }
