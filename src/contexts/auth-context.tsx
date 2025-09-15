@@ -44,7 +44,7 @@ interface UserData {
     totalEarnings: number; // Sum of all earnings types
     totalReferralEarnings: number;
     totalBonusEarnings: number;
-    totalInvestmentEarnings: number; // Sum of earnings from all investment plans
+    totalInvestmentEarnings: number;
 
     hasInvested: boolean;
     hasCollectedSignupBonus: boolean;
