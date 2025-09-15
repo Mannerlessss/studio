@@ -1,7 +1,7 @@
 'use client';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { CircleUser, Gem, Search, HandCoins, Users, Gift, Home, Shapes } from 'lucide-react';
+import { CircleUser, Gem, HandCoins, Users, Gift, Home, Shapes } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,7 +11,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { AdminBottomNav } from '@/components/vaultboost/admin-bottom-nav';
 import { useAuth } from '@/contexts/auth-context';
 import { usePathname } from 'next/navigation';

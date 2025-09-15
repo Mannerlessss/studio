@@ -10,12 +10,14 @@ import { Button } from '../ui/button';
 
 const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
     
-    const dailyReturn = investment.dailyReturn || 0;
-    const durationDays = investment.durationDays || 30;
-    
-    const daysProcessed = dailyReturn > 0 ? Math.round(investment.earnings / dailyReturn) : 0;
-    const progress = durationDays > 0 ? (daysProcessed / durationDays) * 100 : 0;
-    const dailyReturnRate = investment.planAmount > 0 ? (dailyReturn / investment.planAmount) * 100 : 0;
+    // Fallback to 0 if values are undefined/null
+    const perMinuteReturn = (investment as any).dailyReturn || 0;
+    const durationMinutes = (investment as any).durationMinutes || 30;
+
+    const minutesProcessed = perMinuteReturn > 0 ? Math.round(investment.earnings / perMinuteReturn) : 0;
+    const progress = durationMinutes > 0 ? (minutesProcessed / durationMinutes) * 100 : 0;
+    const dailyReturnEquivalent = perMinuteReturn * 60 * 24;
+    const dailyReturnRate = investment.planAmount > 0 ? (dailyReturnEquivalent / investment.planAmount) * 100 : 0;
 
     return (
         <div className="p-4 rounded-lg bg-muted/50 border relative">
@@ -41,8 +43,8 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
                 </div>
                 <Progress value={progress} />
                 <div className="flex justify-between items-center text-xs text-muted-foreground">
-                    <p>Day {daysProcessed} of {durationDays}</p>
-                    <p>Daily: {dailyReturn.toFixed(2)} Rs.</p>
+                    <p>Minute {minutesProcessed} of {durationMinutes}</p>
+                    <p>Per Min: {perMinuteReturn.toFixed(4)} Rs.</p>
                 </div>
             </div>
         </div>
