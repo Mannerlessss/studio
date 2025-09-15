@@ -235,10 +235,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         let unsubFromUser: (() => void) | undefined;
         let unsubFromInvestments: (() => void) | undefined;
-        let authTimeout: NodeJS.Timeout;
 
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            clearTimeout(authTimeout); 
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             
@@ -258,7 +256,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const userDocRef = doc(db, 'users', currentUser.uid);
                     unsubFromUser = onSnapshot(userDocRef, (userDocSnap) => {
                         if (!userDocSnap.exists()) {
-                            console.warn(`No Firestore document found for user ${currentUser.uid}. Waiting...`);
+                            console.warn(`No Firestore document found for user ${currentUser.uid}. This can happen briefly during signup.`);
+                            // Don't set loading to false here, wait for doc creation
                             return;
                         }
                         
@@ -290,7 +289,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
-        authTimeout = setTimeout(() => {
+        const authTimeout = setTimeout(() => {
             if (loading) {
                 console.warn("Auth state change timed out. Forcing loading to false.");
                 setLoading(false);
@@ -333,9 +332,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const newUser = userCredential.user;
 
+            const batch = writeBatch(db);
+
+            // Create User Doc
             const referralCode = `${name.split(' ')[0].toUpperCase().substring(0, 5)}${(Math.random() * 9000 + 1000).toFixed(0)}`;
             const userDocRef = doc(db, 'users', newUser.uid);
-
+            
             const newUserDocData: any = {
                 uid: newUser.uid,
                 name,
@@ -359,42 +361,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 redeemedOfferCodes: [],
             };
 
-            const usedCode = localStorage.getItem('referralCode') || providedCode;
+            const usedCode = (localStorage.getItem('referralCode') || providedCode || '').toUpperCase();
             if (usedCode) {
-                const q = query(collection(db, 'users'), where('referralCode', '==', usedCode.toUpperCase()));
-                const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
-                    const referrerDoc = querySnapshot.docs[0];
-                    newUserDocData.usedReferralCode = usedCode.toUpperCase();
-                    newUserDocData.referredBy = referrerDoc.id;
+                 // Securely look up the referral code
+                const referralCodeRef = doc(db, 'referralCodes', usedCode);
+                const referralCodeSnap = await getDoc(referralCodeRef);
+                
+                if (referralCodeSnap.exists()) {
+                    const referrerUid = referralCodeSnap.data().userId;
+                    newUserDocData.usedReferralCode = usedCode;
+                    newUserDocData.referredBy = referrerUid;
+
+                     // Add to referrer's subcollection
+                    if (referrerUid !== newUser.uid) {
+                        const referrerSubCollectionRef = doc(collection(db, `users/${referrerUid}/referrals`));
+                        batch.set(referrerSubCollectionRef, {
+                            userId: newUser.uid,
+                            name: name,
+                            email: email,
+                            hasInvested: false,
+                            joinedAt: Timestamp.now(),
+                        });
+                        localStorage.removeItem('referralCode');
+                    }
                 }
             }
-             
-            await setDoc(userDocRef, newUserDocData);
+            
+            batch.set(userDocRef, newUserDocData);
+            
+            // Create a document in the `referralCodes` collection
+            const newReferralCodeRef = doc(db, 'referralCodes', referralCode);
+            batch.set(newReferralCodeRef, { userId: newUser.uid });
 
-
-            if (newUserDocData.referredBy) {
-                const referrerId = newUserDocData.referredBy;
-                 if (referrerId !== newUser.uid) {
-                    const referrerSubCollectionRef = collection(db, `users/${referrerId}/referrals`);
-                    await addDoc(referrerSubCollectionRef, {
-                        userId: newUser.uid,
-                        name: name,
-                        email: email,
-                        hasInvested: false,
-                        joinedAt: Timestamp.now(),
-                    });
-                    localStorage.removeItem('referralCode');
-                }
-            }
+            await batch.commit();
 
         } catch (error: any) {
+            console.error("Sign up error:", error);
             toast({
                 variant: 'destructive',
                 title: 'Sign Up Failed',
-                description: error.message,
+                description: error.code === 'auth/email-already-in-use' ? 'This email is already registered.' : error.message,
             });
-            setLoading(false);
+        } finally {
+            // Let the onAuthStateChanged listener handle setting loading to false
         }
     };
 
