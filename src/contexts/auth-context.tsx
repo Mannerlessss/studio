@@ -134,7 +134,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 let totalEarningsToAdd = 0;
                 const currentData = userDoc.data() as UserData;
                 const now = new Date();
-                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                 
                 const commissionParentRef = currentData.commissionParent ? doc(db, 'users', currentData.commissionParent) : null;
                 let commissionParentDoc: any = null;
@@ -142,9 +141,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     commissionParentDoc = await transaction.get(commissionParentRef);
                 }
 
-
                 for (const investmentDoc of activeInvestmentsSnapshot.docs) {
-                    // We must re-fetch inside the transaction to ensure we have the latest data
                     const currentInvestmentRef = doc(db, `users/${currentUserId}/investments`, investmentDoc.id);
                     const currentInvestmentDoc = await transaction.get(currentInvestmentRef);
 
@@ -153,11 +150,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const investment = currentInvestmentDoc.data() as Investment;
 
                     const lastUpdateDate = investment.lastUpdate.toDate();
-                    const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
-                    
+                    const msPassed = now.getTime() - lastUpdateDate.getTime();
+
                     const msInDay = 24 * 60 * 60 * 1000;
-                    const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
-                    
+                    const daysPassed = Math.floor(msPassed / msInDay);
+
                     if (daysPassed <= 0) continue;
 
                     const daysAlreadyProcessed = Math.round(investment.earnings / investment.dailyReturn);
@@ -179,7 +176,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                         for (let i = 0; i < daysToCredit; i++) {
                             const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                            const earningDay = new Date(startOfToday.getTime() - (daysPassed - i - 1) * msInDay);
+                            const earningDay = new Date(lastUpdateDate.getTime() + (i + 1) * msInDay);
                             transaction.set(transactionRef, {
                                 type: 'earning',
                                 amount: investment.dailyReturn,
@@ -232,8 +229,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         let unsubFromUser: (() => void) | undefined;
         let unsubFromInvestments: (() => void) | undefined;
-        
+        let authTimeout: NodeJS.Timeout;
+
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            clearTimeout(authTimeout); 
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             
@@ -248,7 +247,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                      setUserData(null);
                      setLoading(false);
                 } else {
-                    // Process earnings ONCE before setting up listeners
                     await processInvestmentEarnings(currentUser.uid); 
                     
                     const userDocRef = doc(db, 'users', currentUser.uid);
@@ -260,7 +258,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         
                         const baseUserData = { uid: userDocSnap.id, ...userDocSnap.data() } as UserData;
                         
-                        // Now listen to investments subcollection
                         const investmentsColRef = collection(db, `users/${currentUser.uid}/investments`);
                         unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
                             const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));
@@ -268,7 +265,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             setLoading(false);
                         }, (error) => {
                             console.error("Error fetching investments:", error);
-                            setUserData(baseUserData); // Set base data even if investments fail
+                            setUserData(baseUserData); 
                             setLoading(false);
                         });
 
@@ -286,7 +283,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
-        const authTimeout = setTimeout(() => {
+        authTimeout = setTimeout(() => {
             if (loading) {
                 console.warn("Auth state change timed out. Forcing loading to false.");
                 setLoading(false);
@@ -326,66 +323,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signUpWithEmail = async ({ name, email, phone, password, referralCode: providedCode }: any) => {
         setLoading(true);
         try {
-            // Step 1: Create Auth User
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const newUser = userCredential.user;
-
-            // Step 2: Create User Doc
             const referralCode = `${name.split(' ')[0].toUpperCase().substring(0, 5)}${(Math.random() * 9000 + 1000).toFixed(0)}`;
             const userDocRef = doc(db, 'users', newUser.uid);
 
             const newUserDocData: any = {
-                uid: newUser.uid,
-                name,
-                email,
-                phone,
-                membership: 'Basic',
-                rank: 'Bronze',
-                totalBalance: 0,
-                totalInvested: 0,
-                totalEarnings: 0,
-                totalReferralEarnings: 0,
-                totalBonusEarnings: 0,
-                totalInvestmentEarnings: 0,
-                hasInvested: false,
-                hasCollectedSignupBonus: false,
-                investedReferralCount: 0,
-                referralCode: referralCode,
-                createdAt: serverTimestamp(),
-                lastLogin: serverTimestamp(),
-                claimedMilestones: [],
-                redeemedOfferCodes: [],
+                uid: newUser.uid, name, email, phone, membership: 'Basic', rank: 'Bronze',
+                totalBalance: 0, totalInvested: 0, totalEarnings: 0,
+                totalReferralEarnings: 0, totalBonusEarnings: 0, totalInvestmentEarnings: 0,
+                hasInvested: false, hasCollectedSignupBonus: false, investedReferralCount: 0,
+                referralCode: referralCode, createdAt: serverTimestamp(), lastLogin: serverTimestamp(),
+                claimedMilestones: [], redeemedOfferCodes: [],
             };
 
             const usedCode = localStorage.getItem('referralCode') || providedCode;
             if (usedCode) {
-                const q = query(collection(db, 'users'), where('referralCode', '==', usedCode.toUpperCase()));
-                const querySnapshot = await getDocs(q);
-                if (!querySnapshot.empty) {
-                    const referrerDoc = querySnapshot.docs[0];
+                 const referralCodeDocRef = doc(db, "referralCodes", usedCode.toUpperCase());
+                 const referralCodeDoc = await getDoc(referralCodeDocRef);
+                if (referralCodeDoc.exists()) {
+                    const referrerUid = referralCodeDoc.data().uid;
                     newUserDocData.usedReferralCode = usedCode.toUpperCase();
-                    newUserDocData.referredBy = referrerDoc.id;
+                    newUserDocData.referredBy = referrerUid;
                 }
             }
              
-            await setDoc(userDocRef, newUserDocData);
+            const batch = writeBatch(db);
+            batch.set(userDocRef, newUserDocData);
+            
+            const newReferralCodeRef = doc(db, "referralCodes", referralCode);
+            batch.set(newReferralCodeRef, { uid: newUser.uid });
 
-
-            // Step 3: If referral code was used, add to referrer's subcollection
-            if (newUserDocData.referredBy) {
-                const referrerId = newUserDocData.referredBy;
-                 if (referrerId !== newUser.uid) {
-                    const referrerSubCollectionRef = collection(db, `users/${referrerId}/referrals`);
-                    await addDoc(referrerSubCollectionRef, {
-                        userId: newUser.uid,
-                        name: name,
-                        email: email,
-                        hasInvested: false,
-                        joinedAt: Timestamp.now(),
-                    });
-                    localStorage.removeItem('referralCode');
-                }
+            if (newUserDocData.referredBy && newUserDocData.referredBy !== newUser.uid) {
+                const referrerSubCollectionRef = collection(db, `users/${newUserDocData.referredBy}/referrals`);
+                const newReferralDoc = doc(referrerSubCollectionRef);
+                batch.set(newReferralDoc, {
+                    userId: newUser.uid, name: name, email: email,
+                    hasInvested: false, joinedAt: Timestamp.now(),
+                });
+                localStorage.removeItem('referralCode');
             }
+
+            await batch.commit();
 
         } catch (error: any) {
             toast({
@@ -455,9 +434,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, 'users', user.uid);
         
         batch.update(userDocRef, {
-            totalBalance: userData.totalBalance + amount,
-            totalBonusEarnings: userData.totalBonusEarnings + amount,
-            totalEarnings: userData.totalEarnings + amount,
+            totalBalance: increment(amount),
+            totalBonusEarnings: increment(amount),
+            totalEarnings: increment(amount),
             lastBonusClaim: now
         });
         
@@ -484,9 +463,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, 'users', user.uid);
         
         batch.update(userDocRef, {
-            totalBalance: userData.totalBalance + signupBonusAmount,
-            totalBonusEarnings: userData.totalBonusEarnings + signupBonusAmount,
-            totalEarnings: userData.totalEarnings + signupBonusAmount,
+            totalBalance: increment(signupBonusAmount),
+            totalBonusEarnings: increment(signupBonusAmount),
+            totalEarnings: increment(signupBonusAmount),
             hasCollectedSignupBonus: true,
         });
         
@@ -520,14 +499,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    return <AuthContext.Provider value={value}>{!loading ? children : (
-        <div className="flex items-center justify-center min-h-screen bg-background">
-            <div className="text-center">
-                <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
-                <p className="text-lg text-muted-foreground">Loading...</p>
+    if (loading) {
+         return (
+            <div className="flex items-center justify-center min-h-screen bg-background">
+                <div className="text-center">
+                    <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
+                    <p className="text-lg text-muted-foreground">Loading...</p>
+                </div>
             </div>
-        </div>
-    )}</AuthContext.Provider>;
+        );
+    }
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {
