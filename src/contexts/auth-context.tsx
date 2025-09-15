@@ -13,6 +13,7 @@ import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc, increment } from 'firebase/firestore';
+import { redeemCode } from '@/ai/flows/redeem-code-flow';
 
 export interface Investment {
     id: string;
@@ -351,15 +352,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     newUserDocData.totalBalance += welcomeBonus;
                     newUserDocData.totalBonusEarnings += welcomeBonus;
                     newUserDocData.totalEarnings += welcomeBonus;
-
-                    const transactionRef = doc(collection(db, `users/${newUser.uid}/transactions`));
-                    await setDoc(transactionRef, {
-                        type: 'bonus', amount: welcomeBonus, description: `Welcome bonus for using referral code!`, status: 'Completed', date: serverTimestamp()
-                    });
                 }
             }
              
             await setDoc(userDocRef, newUserDocData);
+
+            // Create welcome bonus transaction if applicable
+            if (newUserDocData.usedReferralCode) {
+                const transactionRef = doc(collection(db, `users/${newUser.uid}/transactions`));
+                 await setDoc(transactionRef, {
+                    type: 'bonus', amount: 75, description: `Welcome bonus for using referral code!`, status: 'Completed', date: serverTimestamp()
+                });
+            }
 
             if (newUserDocData.referredBy) {
                 const referrerId = newUserDocData.referredBy;
@@ -493,57 +497,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const redeemReferralCode = async (code: string) => {
-        if (!user || !userData) throw new Error("User not found");
-        if (userData.usedReferralCode) throw new Error("You have already used a referral code.");
-
-        const codeUpper = code.toUpperCase();
-        
-        // Find the referrer
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("referralCode", "==", codeUpper));
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-            throw new Error("Invalid referral code.");
+        if (!user || !userData) {
+            throw new Error("You must be logged in to redeem a code.");
         }
         
-        const referrerDoc = querySnapshot.docs[0];
-        if (referrerDoc.id === user.uid) {
-            throw new Error("You cannot use your own referral code.");
-        }
-        
-        await runTransaction(db, async (transaction) => {
-            const userDocRef = doc(db, 'users', user.uid);
-            
-            // Give welcome bonus
-            const welcomeBonus = 75;
-            transaction.update(userDocRef, {
-                usedReferralCode: codeUpper,
-                referredBy: referrerDoc.id,
-                totalBalance: increment(welcomeBonus),
-                totalBonusEarnings: increment(welcomeBonus),
-                totalEarnings: increment(welcomeBonus),
-            });
-            
-            // Create transaction record for the bonus
-            const userTransactionRef = doc(collection(db, `users/${user.uid}/transactions`));
-            transaction.set(userTransactionRef, {
-                type: 'bonus', amount: welcomeBonus, description: `Referral code redeemed`, status: 'Completed', date: serverTimestamp()
-            });
-
-            // Add the current user to the referrer's subcollection
-            const referrerSubCollectionRef = collection(db, `users/${referrerDoc.id}/referrals`);
-            const newReferralDocRef = doc(referrerSubCollectionRef);
-            transaction.set(newReferralDocRef, {
+        try {
+            const result = await redeemCode({
                 userId: user.uid,
-                name: userData.name,
-                email: userData.email,
-                hasInvested: false,
-                joinedAt: Timestamp.now(),
+                userName: userData.name,
+                userEmail: userData.email,
+                code: code,
             });
-        });
-        
-        toast({ title: 'Code Redeemed!', description: 'You have received a 75 Rs. bonus!' });
+            toast({
+                title: 'Code Redeemed!',
+                description: result.message,
+            });
+        } catch (e: any) {
+            // The flow will throw an error with a user-friendly message
+            throw new Error(e.message || 'An unknown error occurred.');
+        }
     };
 
     const value: AuthContextType = {
