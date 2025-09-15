@@ -7,22 +7,23 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Gift, Shield, LogOut, Loader2, Ticket, Gem } from 'lucide-react';
+import { User, Shield, LogOut, Loader2, Ticket } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const SettingsPage: NextPage = () => {
-    const { userData, loading: authLoading, logOut, updateUserPhone, updateUserName } = useAuth();
+    const { userData, loading: authLoading, logOut, updateUserPhone, updateUserName, redeemReferralCode } = useAuth();
     const { toast } = useToast();
     
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
+    const [referralCode, setReferralCode] = useState('');
 
     const [isUpdatingName, setIsUpdatingName] = useState(false);
     const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
+    const [isRedeeming, setIsRedeeming] = useState(false);
 
     useEffect(() => {
       if (userData) {
@@ -68,6 +69,22 @@ const SettingsPage: NextPage = () => {
             setIsUpdatingPhone(false);
         }
     };
+
+    const handleRedeemCode = async () => {
+        if (!referralCode) {
+            toast({ variant: 'destructive', title: 'Missing Code', description: 'Please enter a referral code.' });
+            return;
+        }
+        setIsRedeeming(true);
+        try {
+            await redeemReferralCode(referralCode);
+            setReferralCode('');
+        } catch (error: any) {
+             toast({ variant: 'destructive', title: 'Redemption Failed', description: error.message });
+        } finally {
+            setIsRedeeming(false);
+        }
+    }
 
   if (authLoading || !userData) {
       return (
@@ -148,6 +165,35 @@ const SettingsPage: NextPage = () => {
             </div>
           </CardContent>
         </Card>
+
+        {!userData.usedReferralCode && (
+           <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <Ticket className="w-6 h-6 text-primary" />
+                        <CardTitle>Redeem a Code</CardTitle>
+                    </div>
+                    <CardDescription>Enter a referral code you missed during sign up.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                    <Label htmlFor="referral-code">Referral Code</Label>
+                    <div className="flex gap-2">
+                        <Input 
+                            id="referral-code" 
+                            placeholder="e.g., FRIEND123" 
+                            value={referralCode} 
+                            onChange={(e) => setReferralCode(e.target.value.toUpperCase())} 
+                            disabled={isRedeeming}
+                        />
+                        <Button onClick={handleRedeemCode} disabled={isRedeeming || !referralCode}>
+                        {isRedeeming ? <Loader2 className="animate-spin"/> : 'Redeem'}
+                        </Button>
+                    </div>
+                    </div>
+                </CardContent>
+            </Card>
+        )}
 
         <Card>
           <CardHeader>
