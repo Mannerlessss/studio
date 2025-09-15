@@ -20,7 +20,7 @@ export interface Investment {
     dailyReturn: number;
     startDate: Timestamp;
     lastUpdate: Timestamp;
-    durationDays: number;
+    durationMinutes: number;
     earnings: number;
     status: 'active' | 'completed';
 }
@@ -146,32 +146,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                     if (!currentInvestmentDoc.exists()) continue;
 
-                    const investment = currentInvestmentDoc.data() as Investment;
+                    const investment = currentInvestmentDoc.data() as any;
 
                     const lastUpdateMillis = investment.lastUpdate.toMillis();
                     const nowMillis = now.getTime();
                     
-                    const msInDay = 24 * 60 * 60 * 1000;
-                    const daysPassed = Math.floor((nowMillis - lastUpdateMillis) / msInDay);
+                    const msInMinute = 60 * 1000;
+                    const minutesPassed = Math.floor((nowMillis - lastUpdateMillis) / msInMinute);
                     
-                    if (daysPassed <= 0) continue;
+                    if (minutesPassed <= 0) continue;
                     
-                    const dailyReturn = investment.dailyReturn || 0;
-                    if (dailyReturn <= 0) continue;
+                    const perMinuteReturn = investment.dailyReturn || 0; // It's now per-minute
+                    if (perMinuteReturn <= 0) continue;
 
-                    const daysAlreadyProcessed = Math.round(investment.earnings / dailyReturn);
-                    const remainingDaysInPlan = investment.durationDays - daysAlreadyProcessed;
-                    const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
+                    const minutesAlreadyProcessed = Math.round(investment.earnings / perMinuteReturn);
+                    const remainingMinutesInPlan = investment.durationMinutes - minutesAlreadyProcessed;
+                    const minutesToCredit = Math.min(minutesPassed, remainingMinutesInPlan);
 
-                    if (daysToCredit > 0) {
-                        const earningsForThisPlan = dailyReturn * daysToCredit;
+                    if (minutesToCredit > 0) {
+                        const earningsForThisPlan = perMinuteReturn * minutesToCredit;
                         totalEarningsToAdd += earningsForThisPlan;
 
                         const newEarnings = investment.earnings + earningsForThisPlan;
-                        const newStatus = (daysAlreadyProcessed + daysToCredit) >= investment.durationDays ? 'completed' : 'active';
+                        const newStatus = (minutesAlreadyProcessed + minutesToCredit) >= investment.durationMinutes ? 'completed' : 'active';
                         
-                        // Set the new lastUpdate time to be exactly `daysToCredit` after the previous one.
-                        const newLastUpdateMillis = lastUpdateMillis + (daysToCredit * msInDay);
+                        // Set the new lastUpdate time to be exactly `minutesToCredit` after the previous one.
+                        const newLastUpdateMillis = lastUpdateMillis + (minutesToCredit * msInMinute);
                         const newLastUpdate = Timestamp.fromMillis(newLastUpdateMillis);
 
                         transaction.update(currentInvestmentRef, {
@@ -180,15 +180,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             status: newStatus
                         });
 
-                        for (let i = 0; i < daysToCredit; i++) {
+                        for (let i = 0; i < minutesToCredit; i++) {
                             const transactionRef = doc(collection(db, `users/${currentUserId}/transactions`));
-                            const earningDay = new Date(lastUpdateMillis + ((i + 1) * msInDay));
+                            const earningMinute = new Date(lastUpdateMillis + ((i + 1) * msInMinute));
                             transaction.set(transactionRef, {
                                 type: 'earning',
-                                amount: dailyReturn,
+                                amount: perMinuteReturn,
                                 description: `Earning from Plan ${investment.planAmount}`,
                                 status: 'Completed',
-                                date: Timestamp.fromDate(earningDay),
+                                date: Timestamp.fromDate(earningMinute),
                             });
                         }
 

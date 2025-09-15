@@ -24,7 +24,7 @@ const InvestmentPage: NextPage = () => {
       <div className="p-4 space-y-6">
         <h2 className="text-2xl font-bold text-center">Investment Plans</h2>
         {plans.map((plan, index) => (
-          <InvestmentPlanCard key={index} {...plan} userName={userName} />
+          <InvestmentPlanCard key={index} {...plan} userName={userName} isTest={true} />
         ))}
 
         <Card className="bg-muted/50 border-dashed">
@@ -35,8 +35,8 @@ const InvestmentPage: NextPage = () => {
                 </div>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
-                <p>• All investment plans will automatically expire after 30 days from the date of purchase.</p>
-                <p>• Daily earnings are credited to your account every 24 hours.</p>
+                <p>• All investment plans will automatically expire after 30 minutes from the date of purchase.</p>
+                <p>• Earnings are credited to your account every minute.</p>
             </CardContent>
         </Card>
 

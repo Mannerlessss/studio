@@ -13,6 +13,7 @@ interface InvestmentPlanCardProps {
   mostPurchased?: boolean;
   badgeText?: string;
   userName?: string;
+  isTest?: boolean;
 }
 
 export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
@@ -22,6 +23,7 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
   mostPurchased = false,
   badgeText = 'Most Purchased',
   userName = 'User',
+  isTest = false,
 }) => {
   const totalProfit = dailyReturn * duration;
   const message = `Hi, I'm ${userName} and I want to buy the plan for ${amount} Rs.`;
@@ -45,8 +47,8 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
           <span className="font-semibold">{dailyReturn} Rs.</span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-muted-foreground">Contract Days</span>
-          <span className="font-semibold">{duration} Days</span>
+          <span className="text-muted-foreground">Contract Duration</span>
+          <span className="font-semibold">{isTest ? '30 Minutes' : `${duration} Days`}</span>
         </div>
         <div className="flex justify-between items-center text-lg">
           <span className="text-muted-foreground font-semibold">Total Profit</span>
