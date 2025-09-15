@@ -1,6 +1,5 @@
-
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Gem, Lock, Mail, Phone, User, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,7 +28,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 export default function LoginPage() {
-    const { signInWithGoogle, signUpWithEmail, signInWithEmail, loading, sendPasswordReset } = useAuth();
+    const { signUpWithEmail, signInWithEmail, loading, sendPasswordReset } = useAuth();
     const { toast } = useToast();
 
     // Signup state
@@ -45,6 +44,13 @@ export default function LoginPage() {
     
     // Forgot Password State
     const [resetEmail, setResetEmail] = useState('');
+
+    useEffect(() => {
+        const storedReferralCode = localStorage.getItem('referralCode');
+        if (storedReferralCode) {
+            setReferralCode(storedReferralCode);
+        }
+    }, []);
 
 
     const handleSignUp = async () => {
@@ -221,3 +227,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    

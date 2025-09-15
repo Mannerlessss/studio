@@ -12,11 +12,11 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const SettingsPage: NextPage = () => {
-    const { userData, loading, logOut, updateUserPhone, updateUserName } = useAuth();
+    const { userData, loading: authLoading, logOut, updateUserPhone, updateUserName } = useAuth();
     const { toast } = useToast();
-    const router = useRouter();
     
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
@@ -44,56 +44,71 @@ const SettingsPage: NextPage = () => {
     }
 
     const handleUpdateName = async () => {
-        if (!name || name === userData?.name) {
-            return;
-        }
+        if (!name || name === userData?.name) return;
         setIsUpdatingName(true);
         try {
             await updateUserName(name);
-             toast({
-                title: 'Success!',
-                description: 'Your name has been updated.',
-            });
+             toast({ title: 'Success!', description: 'Your name has been updated.' });
         } catch (error: any) {
-             toast({
-                variant: 'destructive',
-                title: 'Update Failed',
-                description: error.message,
-            });
+             toast({ variant: 'destructive', title: 'Update Failed', description: error.message });
         } finally {
             setIsUpdatingName(false);
         }
     };
 
     const handleUpdatePhone = async () => {
-        if (!phone || phone === userData?.phone) {
-            return;
-        }
+        if (!phone || phone === userData?.phone) return;
         setIsUpdatingPhone(true);
         try {
             await updateUserPhone(phone);
-             toast({
-                title: 'Success!',
-                description: 'Your phone number has been updated.',
-            });
+             toast({ title: 'Success!', description: 'Your phone number has been updated.' });
         } catch (error: any) {
-             toast({
-                variant: 'destructive',
-                title: 'Update Failed',
-                description: error.message,
-            });
+             toast({ variant: 'destructive', title: 'Update Failed', description: error.message });
         } finally {
             setIsUpdatingPhone(false);
         }
     };
 
-  if (loading || !userData) {
+  if (authLoading || !userData) {
       return (
-        <div className="flex items-center justify-center min-h-screen bg-background">
-            <div className="text-center">
-                <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
-                <p className="text-lg text-muted-foreground">Loading Settings...</p>
+        <div className="bg-background min-h-full">
+            <Header />
+            <div className="p-4 space-y-6">
+                <h2 className="text-2xl font-bold text-center">My Account</h2>
+                <Card>
+                    <CardHeader>
+                        <Skeleton className="h-6 w-48" />
+                        <Skeleton className="h-4 w-64" />
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                       <div className="space-y-2">
+                           <Skeleton className="h-4 w-20" />
+                           <Skeleton className="h-10 w-full" />
+                       </div>
+                       <div className="space-y-2">
+                           <Skeleton className="h-4 w-28" />
+                           <Skeleton className="h-10 w-full" />
+                       </div>
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader>
+                        <Skeleton className="h-6 w-40" />
+                        <Skeleton className="h-4 w-56" />
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                       <div className="space-y-2">
+                           <Skeleton className="h-4 w-24" />
+                           <Skeleton className="h-5 w-48" />
+                       </div>
+                       <div className="space-y-2">
+                           <Skeleton className="h-4 w-32" />
+                           <Skeleton className="h-5 w-24" />
+                       </div>
+                    </CardContent>
+                </Card>
             </div>
+            <BottomNav activePage="settings" />
         </div>
       );
   }

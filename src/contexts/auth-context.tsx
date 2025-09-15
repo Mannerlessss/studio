@@ -61,7 +61,6 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   totalROI: number;
-  signInWithGoogle: () => Promise<void>;
   signUpWithEmail: (details: any) => Promise<void>;
   signInWithEmail: (details: any) => Promise<void>;
   logOut: () => Promise<void>;
@@ -510,7 +509,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loading,
         isAdmin,
         totalROI,
-        signInWithGoogle,
         signUpWithEmail,
         signInWithEmail,
         logOut,
@@ -521,7 +519,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sendPasswordReset,
     };
     
-    if (loading) {
+    if (loading && !userData && !pathname.startsWith('/admin')) {
          return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <div className="text-center">
@@ -542,3 +540,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
