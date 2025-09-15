@@ -115,14 +115,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
         
         try {
-            // First, get all active investments outside of a transaction.
             const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
+            if (activeInvestmentsSnapshot.empty) return;
 
-            if (activeInvestmentsSnapshot.empty) {
-                return; // No active investments to process
-            }
-
-            // Now, run a transaction to update user and investment docs together.
              await runTransaction(db, async (transaction) => {
                 const userDocRef = doc(db, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
@@ -145,14 +140,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
                 for (const investmentDoc of activeInvestmentsSnapshot.docs) {
-                    // We must re-fetch inside the transaction to ensure we have the latest data
                     const currentInvestmentRef = doc(db, `users/${currentUserId}/investments`, investmentDoc.id);
                     const currentInvestmentDoc = await transaction.get(currentInvestmentRef);
 
                     if (!currentInvestmentDoc.exists()) continue;
 
                     const investment = currentInvestmentDoc.data() as Investment;
-
                     const lastUpdateDate = investment.lastUpdate.toDate();
                     const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
                     
@@ -251,7 +244,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                      setUserData(null);
                      setLoading(false);
                 } else {
-                    // Process earnings ONCE before setting up listeners
                     await processInvestmentEarnings(currentUser.uid); 
                     
                     const userDocRef = doc(db, 'users', currentUser.uid);
@@ -263,7 +255,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         
                         const baseUserData = { uid: userDocSnap.id, ...userDocSnap.data() } as UserData;
                         
-                        // Now listen to investments subcollection
                         const investmentsColRef = collection(db, `users/${currentUser.uid}/investments`);
                         unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
                             const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));
@@ -271,7 +262,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             setLoading(false);
                         }, (error) => {
                             console.error("Error fetching investments:", error);
-                            setUserData(baseUserData); // Set base data even if investments fail
+                            setUserData(baseUserData);
                             setLoading(false);
                         });
 
@@ -331,7 +322,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const referralCode = `${name.split(' ')[0].toUpperCase().substring(0, 5)}${(Math.random() * 9000 + 1000).toFixed(0)}`;
             const userDocRef = doc(db, 'users', newUser.uid);
 
-            const newUserDocData: any = {
+            await setDoc(userDocRef, {
                 uid: newUser.uid,
                 name,
                 email,
@@ -351,39 +342,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 lastLogin: serverTimestamp(),
                 claimedMilestones: [],
                 redeemedOfferCodes: [],
-            };
-
+            });
+            
             const usedCode = localStorage.getItem('referralCode') || providedCode;
             if (usedCode) {
-                // We cannot validate the code here on the client-side securely.
-                // We will just store it, and let the backend handle validation if needed.
-                // For now, we will trust it for the bonus.
-                const q = query(collection(db, 'users'), where('referralCode', '==', usedCode.toUpperCase()));
-                const querySnapshot = await getDocs(q); // This query may fail with security rules
-                if (!querySnapshot.empty) {
-                    const referrerDoc = querySnapshot.docs[0];
-                    if (referrerDoc.id !== newUser.uid) {
-                        newUserDocData.usedReferralCode = usedCode.toUpperCase();
-                        newUserDocData.referredBy = referrerDoc.id;
-                    }
-                }
+                 await redeemReferralCode(usedCode, newUser, name, email);
+                 localStorage.removeItem('referralCode');
             }
-             
-            await setDoc(userDocRef, newUserDocData);
-            
-            if (newUserDocData.referredBy) {
-                const referrerId = newUserDocData.referredBy;
-                const referrerSubCollectionRef = collection(db, `users/${referrerId}/referrals`);
-                await addDoc(referrerSubCollectionRef, {
-                    userId: newUser.uid,
-                    name: name,
-                    email: email,
-                    hasInvested: false,
-                    joinedAt: Timestamp.now(),
-                });
-                localStorage.removeItem('referralCode');
-            }
-
         } catch (error: any) {
             toast({
                 variant: 'destructive',
@@ -452,9 +417,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, 'users', user.uid);
         
         batch.update(userDocRef, {
-            totalBalance: userData.totalBalance + amount,
-            totalBonusEarnings: userData.totalBonusEarnings + amount,
-            totalEarnings: userData.totalEarnings + amount,
+            totalBalance: increment(amount),
+            totalBonusEarnings: increment(amount),
+            totalEarnings: increment(amount),
             lastBonusClaim: now
         });
         
@@ -481,9 +446,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, 'users', user.uid);
         
         batch.update(userDocRef, {
-            totalBalance: userData.totalBalance + signupBonusAmount,
-            totalBonusEarnings: userData.totalBonusEarnings + signupBonusAmount,
-            totalEarnings: userData.totalEarnings + signupBonusAmount,
+            totalBalance: increment(signupBonusAmount),
+            totalBonusEarnings: increment(signupBonusAmount),
+            totalEarnings: increment(signupBonusAmount),
             hasCollectedSignupBonus: true,
         });
         
@@ -500,19 +465,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: 'Bonus Collected!', description: `You received ${signupBonusAmount} Rs.` });
     }
 
-    const redeemReferralCode = async (code: string) => {
-        if (!user || !userData) {
-            throw new Error("You must be logged in to redeem a code.");
+    const redeemReferralCode = async (code: string, newUser?: User, newUserName?: string, newUserEmail?: string) => {
+        const currentUser = newUser || user;
+        const currentData = userData;
+        const currentUserName = newUserName || currentData?.name;
+        const currentUserEmail = newUserEmail || currentData?.email;
+
+        if (!currentUser || !currentUserName || !currentUserEmail) {
+            throw new Error("User data is not available.");
         }
-        if (userData.usedReferralCode) {
+        if (currentData && currentData.usedReferralCode) {
             throw new Error("A referral code has already been used for this account.");
         }
 
         try {
             const result = await redeemCode({
-                userId: user.uid,
-                userName: userData.name,
-                userEmail: userData.email,
+                userId: currentUser.uid,
+                userName: currentUserName,
+                userEmail: currentUserEmail,
                 code: code,
             });
 
@@ -543,7 +513,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         redeemReferralCode,
     };
     
-    if (loading && !userData && !pathname.startsWith('/admin')) {
+    if (loading && !pathname.startsWith('/admin')) {
          return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <div className="text-center">

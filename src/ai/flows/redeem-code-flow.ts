@@ -45,7 +45,7 @@ export async function redeemCode(input: RedeemCodeInput): Promise<RedeemCodeOutp
             // Find the referrer by their code
             const usersRef = db.collection('users');
             const referrerQuery = usersRef.where('referralCode', '==', code.toUpperCase()).limit(1);
-            const referrerSnapshot = await referrerQuery.get();
+            const referrerSnapshot = await transaction.get(referrerQuery);
             
 
             if (referrerSnapshot.empty) {
