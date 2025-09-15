@@ -10,6 +10,8 @@ import { WithdrawCard } from '@/components/vaultboost/withdraw-card';
 import { TransactionHistoryCard } from '@/components/vaultboost/transaction-history-card';
 import { Header } from '@/components/vaultboost/header';
 import { useAuth } from '@/contexts/auth-context';
+import { GuidedTour } from '@/components/vaultboost/guided-tour';
+import { ProfileCompletionCard } from '@/components/vaultboost/profile-completion-card';
 import { AnnouncementPopup } from '@/components/vaultboost/announcement-popup';
 import { ActiveInvestmentsCard } from '@/components/vaultboost/active-investments-card';
 import { CollectBonusCard } from '@/components/vaultboost/collect-bonus-card';
@@ -37,11 +39,13 @@ const Dashboard: NextPage = () => {
     <div className="bg-background min-h-full">
       <Header />
       <AnnouncementPopup />
+      <GuidedTour />
       <div className="p-4 space-y-6">
         <div id="welcome-card">
           <WelcomeCard name={userData.name} membership={`${userData.membership} Member`} />
         </div>
         <CollectBonusCard />
+        <ProfileCompletionCard />
         <div className="grid grid-cols-2 gap-4" id="info-cards">
           <InfoCard
             title="Invested"

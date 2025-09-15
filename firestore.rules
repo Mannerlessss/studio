@@ -2,9 +2,45 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Deny all reads and writes to all collections.
-    match /{document=**} {
-      allow read, write: if false;
+
+    // Helper function to check if a user is an admin
+    function isAdmin(request) {
+      return request.auth.token.admin == true;
+    }
+
+    // Rules for the 'users' collection
+    match /users/{userId} {
+      // Admins can read any user document
+      allow get: if isAdmin(request);
+      allow list: if isAdmin(request);
+
+      // A user can read, update their own document.
+      // They can only create it if the userId matches their auth uid.
+      allow read, update: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
+      
+      // Admins can write to any user document (e.g., for upgrades)
+      allow write: if isAdmin(request);
+
+      // Rules for subcollections within a user document
+      match /{subcollection}/{docId} {
+        // A user can do anything with documents in their own subcollections
+        allow read, write: if request.auth.uid == userId;
+        // Admins can also read/write to any user's subcollections
+        allow read, write: if isAdmin(request);
+      }
+    }
+
+    // Rules for the 'offers' collection
+    match /offers/{offerId} {
+      // Any authenticated user can read the list of offers.
+      allow get, list: if request.auth != null;
+      // Only admins can create, update, or delete offers.
+      allow write: if isAdmin(request);
+    }
+    
+    match /withdrawals/{withdrawalId} {
+        allow read, list, write: if isAdmin(request);
     }
   }
 }

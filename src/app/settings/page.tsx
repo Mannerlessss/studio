@@ -7,14 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Shield, LogOut, Loader2 } from 'lucide-react';
+import { User, Gift, Shield, LogOut, Loader2, Ticket } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 const SettingsPage: NextPage = () => {
     const { userData, logOut, updateUserPhone, updateUserName } = useAuth();
     const { toast } = useToast();
+    const router = useRouter();
     
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
@@ -42,15 +44,47 @@ const SettingsPage: NextPage = () => {
     }
 
     const handleUpdateName = async () => {
+        if (!name || name === userData?.name) {
+            return;
+        }
         setIsUpdatingName(true);
-        await updateUserName(name);
-        setIsUpdatingName(false);
+        try {
+            await updateUserName(name);
+             toast({
+                title: 'Success!',
+                description: 'Your name has been updated.',
+            });
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: 'Update Failed',
+                description: error.message,
+            });
+        } finally {
+            setIsUpdatingName(false);
+        }
     };
 
     const handleUpdatePhone = async () => {
+        if (!phone || phone === userData?.phone) {
+            return;
+        }
         setIsUpdatingPhone(true);
-        await updateUserPhone(phone);
-        setIsUpdatingPhone(false);
+        try {
+            await updateUserPhone(phone);
+             toast({
+                title: 'Success!',
+                description: 'Your phone number has been updated.',
+            });
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: 'Update Failed',
+                description: error.message,
+            });
+        } finally {
+            setIsUpdatingPhone(false);
+        }
     };
 
   return (

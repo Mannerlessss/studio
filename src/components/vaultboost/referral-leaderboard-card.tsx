@@ -7,7 +7,7 @@ import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Trophy, Medal, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '../ui/avatar';
 
 interface LeaderboardUser {
     name: string;

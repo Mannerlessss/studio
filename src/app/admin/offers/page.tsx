@@ -40,6 +40,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { db } from '@/lib/firebase';
+import { addDoc, collection, deleteDoc, doc, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type OfferSortableKeys = 'code' | 'rewardAmount' | 'usageCount' | 'createdAt';
@@ -49,18 +51,10 @@ interface Offer {
     code: string;
     rewardAmount: number;
     maxUsers?: number | null;
-    expiresAt?: Date | null;
+    expiresAt?: Timestamp | null;
     usageCount: number;
-    createdAt: Date;
+    createdAt: Timestamp;
 }
-
-const MOCK_OFFERS: Offer[] = [
-    { id: '1', code: 'WELCOME100', rewardAmount: 100, maxUsers: 100, usageCount: 45, createdAt: new Date(Date.now() - 86400000 * 2), expiresAt: new Date(Date.now() + 86400000 * 28)},
-    { id: '2', code: 'FREEMONEY', rewardAmount: 50, usageCount: 88, createdAt: new Date(Date.now() - 86400000 * 5), expiresAt: null, maxUsers: null },
-    { id: '3', code: 'EXPIRED20', rewardAmount: 20, maxUsers: 50, usageCount: 50, createdAt: new Date(Date.now() - 86400000 * 10), expiresAt: new Date(Date.now() - 86400000) },
-    { id: '4', code: 'SPECIAL', rewardAmount: 250, maxUsers: 10, usageCount: 3, createdAt: new Date(Date.now() - 86400000 * 1), expiresAt: new Date(Date.now() + 86400000 * 6) }
-];
-
 
 export default function OffersPage() {
     const { toast } = useToast();
@@ -78,12 +72,21 @@ export default function OffersPage() {
     const [expiresIn, setExpiresIn] = useState<string>('never');
 
      useEffect(() => {
-        setLoading(true);
-        setTimeout(() => {
-            setOffers(MOCK_OFFERS);
-            setLoading(false);
-        }, 500);
-    }, []);
+        const fetchOffers = async () => {
+            setLoading(true);
+            try {
+                const offersSnapshot = await getDocs(collection(db, 'offers'));
+                const offersData: Offer[] = offersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Offer));
+                setOffers(offersData);
+            } catch (error: any) {
+                console.error("Error fetching offers: ", error);
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch offer codes. Check permissions.' });
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchOffers();
+    }, [toast]);
     
     const handleSort = (key: OfferSortableKeys) => {
         if (sortKey === key) {
@@ -98,8 +101,14 @@ export default function OffersPage() {
         return offers
             .filter(offer => offer.code.toLowerCase().includes(searchTerm.toLowerCase()))
             .sort((a, b) => {
-                const aValue = a[sortKey] || 0;
-                const bValue = b[sortKey] || 0;
+                let aValue, bValue;
+                 if (sortKey === 'createdAt') {
+                    aValue = a.createdAt?.toMillis() || 0;
+                    bValue = b.createdAt?.toMillis() || 0;
+                } else {
+                    aValue = a[sortKey] || 0;
+                    bValue = b[sortKey] || 0;
+                }
 
                 if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
                 if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
@@ -110,11 +119,6 @@ export default function OffersPage() {
 
     const handleCreateCode = async () => {
         setIsSubmitting(true);
-        toast({
-            title: 'Prototype Mode',
-            description: 'This action is for demonstration only.',
-        });
-
         if (!newCode || !rewardAmount) {
             toast({
                 variant: 'destructive',
@@ -124,31 +128,65 @@ export default function OffersPage() {
             setIsSubmitting(false);
             return;
         }
-        
-        let expiresAtDate: Date | null = null;
+
+        let expiresAtTimestamp: Timestamp | null = null;
         if (expiresIn && expiresIn !== 'never') {
-            expiresAtDate = new Date();
+            const expiresAtDate = new Date();
             if (expiresIn === '1-day') expiresAtDate.setDate(expiresAtDate.getDate() + 1);
             else if (expiresIn === '7-days') expiresAtDate.setDate(expiresAtDate.getDate() + 7);
             else if (expiresIn === '30-days') expiresAtDate.setDate(expiresAtDate.getDate() + 30);
+            expiresAtTimestamp = Timestamp.fromDate(expiresAtDate);
         }
 
-        const newOfferForState: Offer = {
-            id: String(Date.now()),
+        const newOfferData: any = {
             code: newCode.toUpperCase(),
             rewardAmount: Number(rewardAmount),
-            maxUsers: maxUsers ? Number(maxUsers) : null,
-            expiresAt: expiresAtDate,
             usageCount: 0,
-            createdAt: new Date()
+            createdAt: serverTimestamp(),
         };
 
-        setOffers(prev => [newOfferForState, ...prev]);
-        setNewCode('');
-        setRewardAmount('');
-        setMaxUsers('');
-        setExpiresIn('never');
-        setIsSubmitting(false);
+        if (maxUsers) {
+            newOfferData.maxUsers = Number(maxUsers);
+        }
+
+        if (expiresAtTimestamp) {
+            newOfferData.expiresAt = expiresAtTimestamp;
+        }
+
+
+        try {
+            const docRef = await addDoc(collection(db, 'offers'), newOfferData);
+             toast({
+                title: 'Code Created!',
+                description: `New offer code "${newCode.toUpperCase()}" has been created.`,
+            });
+            
+             const newOfferForState: Offer = {
+                id: docRef.id,
+                code: newOfferData.code,
+                rewardAmount: newOfferData.rewardAmount,
+                maxUsers: newOfferData.maxUsers || null,
+                expiresAt: newOfferData.expiresAt || null,
+                usageCount: 0,
+                createdAt: Timestamp.now() // Use client-side timestamp for immediate UI update
+            };
+
+            setOffers(prev => [newOfferForState, ...prev]);
+
+            // Reset form
+            setNewCode('');
+            setRewardAmount('');
+            setMaxUsers('');
+            setExpiresIn('never');
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: 'Creation Failed',
+                description: error.message,
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const copyCode = (code: string) => {
@@ -160,18 +198,27 @@ export default function OffersPage() {
     }
 
     const deleteCode = async (id: string) => {
-        toast({
-            title: 'Code Deleted (Prototype)',
-            description: `The offer code has been removed from the view.`,
-        });
-        setOffers(prev => prev.filter(offer => offer.id !== id));
+        try {
+            await deleteDoc(doc(db, 'offers', id));
+            toast({
+                title: 'Code Deleted!',
+                description: `The offer code has been deleted.`,
+            });
+            setOffers(prev => prev.filter(offer => offer.id !== id));
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: 'Deletion Failed',
+                description: error.message,
+            });
+        }
     }
     
     const getStatus = (offer: Offer): { text: 'Active' | 'Expired'; variant: 'default' | 'outline' } => {
         if (offer.maxUsers && offer.usageCount >= offer.maxUsers) {
             return { text: 'Expired', variant: 'outline' };
         }
-        if (offer.expiresAt && offer.expiresAt.getTime() < Date.now()) {
+        if (offer.expiresAt && offer.expiresAt.toMillis() < Date.now()) {
              return { text: 'Expired', variant: 'outline' };
         }
         return { text: 'Active', variant: 'default' };

@@ -19,12 +19,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import Link from 'next/link';
+import { addDoc, collection, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export function WithdrawCard() {
   const [showWithdrawForm, setShowWithdrawForm] = useState(false);
   const [method, setMethod] = useState<'upi' | 'bank'>('upi');
   const [showInvestmentNeededDialog, setShowInvestmentNeededDialog] = useState(false);
-  const { userData, loading } = useAuth();
+  const { user, userData } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   
@@ -36,23 +38,124 @@ export function WithdrawCard() {
   
 
   const handleRequestWithdrawal = () => {
-    // In prototype mode, just show the form
+    // This check is a bit redundant now but good for UX
+    if (!userData?.hasInvested) {
+        setShowInvestmentNeededDialog(true);
+        return;
+    }
     setShowWithdrawForm(true);
   };
 
   const hasInvested = userData?.hasInvested || false;
+  const canWithdraw = (userData?.totalBalance || 0) >= 100;
   const balance = userData?.totalBalance || 0;
 
   const handleSubmit = async () => {
+     if (!user || !userData) {
+      toast({ variant: 'destructive', title: 'Error', description: 'User not found.' });
+      return;
+    }
+    if (!hasInvested) {
+      setShowInvestmentNeededDialog(true);
+      return;
+    }
+    if (!canWithdraw) {
+      toast({
+        variant: 'destructive',
+        title: 'Insufficient Balance',
+        description: 'You need at least 100 Rs. in your balance to make a withdrawal.',
+      });
+      return;
+    }
+
+    const withdrawAmount = Number(amount);
+    if (isNaN(withdrawAmount) || withdrawAmount < 100) {
+        toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Minimum withdrawal amount is 100 Rs.' });
+        return;
+    }
+     if (withdrawAmount > balance) {
+        toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Withdrawal amount cannot exceed your available balance.' });
+        return;
+    }
+
+    let details: any = {};
+    if (method === 'upi') {
+        if (!upiId) {
+            toast({ variant: 'destructive', title: 'Missing Field', description: 'Please enter your UPI ID.' });
+            return;
+        }
+        details.upiId = upiId;
+    } else { // bank
+         if (!accountNumber || !ifsc) {
+            toast({ variant: 'destructive', title: 'Missing Fields', description: 'Please enter all bank details.' });
+            return;
+        }
+        details.accountHolder = userData.name;
+        details.accountNumber = accountNumber;
+        details.ifsc = ifsc;
+    }
+    
     setIsLoading(true);
-    toast({
-        title: 'Prototype Mode',
-        description: 'Withdrawal requests are not functional without a backend.',
-    });
-    setTimeout(() => {
-        setIsLoading(false);
-        setShowWithdrawForm(false);
-    }, 1000);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await transaction.get(userDocRef);
+
+        if (!userDoc.exists()) {
+          throw new Error("User document does not exist.");
+        }
+
+        const currentBalance = userDoc.data().totalBalance || 0;
+        if (currentBalance < withdrawAmount) {
+          throw new Error("Insufficient funds.");
+        }
+
+        // 1. Deduct from user's balance
+        transaction.update(userDocRef, {
+          totalBalance: currentBalance - withdrawAmount,
+        });
+
+        // 2. Create withdrawal request
+        const withdrawalRef = doc(collection(db, `users/${user.uid}/withdrawals`));
+        transaction.set(withdrawalRef, {
+          amount: withdrawAmount,
+          method: method === 'upi' ? 'UPI' : 'Bank Transfer',
+          details,
+          status: 'Pending',
+          date: serverTimestamp(),
+          userName: userData.name,
+        });
+
+         // 3. Create a transaction record
+        const transactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+        transaction.set(transactionRef, {
+            type: 'withdrawal',
+            amount: withdrawAmount,
+            description: `Withdrawal request`,
+            status: 'Pending',
+            date: serverTimestamp(),
+        });
+      });
+
+      toast({
+        title: 'Request Submitted',
+        description: 'Your withdrawal request has been submitted for processing.',
+      });
+      // Reset form
+      setShowWithdrawForm(false);
+      setAmount('');
+      setUpiId('');
+      setAccountNumber('');
+      setIfsc('');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Withdrawal Failed',
+        description: error.message,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
 
@@ -61,7 +164,7 @@ export function WithdrawCard() {
       <Card>
         <CardHeader>
           <CardTitle>Withdraw Earnings</CardTitle>
-          <CardDescription>Available Balance: {balance.toFixed(2)} Rs.</CardDescription>
+          <CardDescription>Available Balance: {userData?.totalBalance.toFixed(2) || '0.00'} Rs.</CardDescription>
         </CardHeader>
         <CardContent>
           {!showWithdrawForm ? (
@@ -75,7 +178,7 @@ export function WithdrawCard() {
                <Alert>
                   <Info className="h-4 w-4" />
                   <AlertDescription>
-                      Minimum withdrawal is 100 Rs. This is a prototype and no real transaction will be made.
+                      Minimum withdrawal is 100 Rs. Your request will be processed within 24-48 hours.
                   </AlertDescription>
               </Alert>
                {userData?.name && (
@@ -133,6 +236,31 @@ export function WithdrawCard() {
           )}
         </CardContent>
       </Card>
+      <AlertDialog open={showInvestmentNeededDialog} onOpenChange={setShowInvestmentNeededDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+             <div className="flex justify-center mb-4">
+               <div className="p-3 bg-primary/10 rounded-full">
+                  <DollarSign className="w-8 h-8 text-primary" />
+              </div>
+            </div>
+            <AlertDialogTitle className="text-center">Investment Required</AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              To ensure the security and sustainability of our platform, withdrawals are enabled only after you make your first investment.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-col sm:space-x-0 gap-2">
+            <Link href="/investment" className='w-full'>
+                <Button className='w-full'>
+                    Make an Investment
+                </Button>
+            </Link>
+            <AlertDialogAction onClick={() => setShowInvestmentNeededDialog(false)} variant="outline">
+              Got it
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

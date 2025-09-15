@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, HandCoins, Gift, TrendingUp } from "lucide-react";
+import { db } from '@/lib/firebase';
+import { collection, collectionGroup, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Stats {
@@ -16,17 +18,47 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        setLoading(true);
-        // Simulate fetching data
-        setTimeout(() => {
-            setStats({
-                totalUsers: 125,
-                pendingWithdrawals: 8,
-                activeOffers: 3,
-                totalInvestments: 25000
-            });
-            setLoading(false);
-        }, 500);
+        const fetchStats = async () => {
+            try {
+                // Total Users
+                const usersSnapshot = await getDocs(collection(db, 'users'));
+                const totalUsers = usersSnapshot.size;
+
+                // Pending Withdrawals
+                const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'), where('status', '==', 'Pending'));
+                const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
+                const pendingWithdrawals = withdrawalsSnapshot.size;
+
+                // Active Offer Codes
+                const offersSnapshot = await getDocs(collection(db, 'offers'));
+                const activeOffers = offersSnapshot.docs.filter(doc => {
+                    const offer = doc.data();
+                    const now = new Date();
+                    const isExpiredByDate = offer.expiresAt && (offer.expiresAt as Timestamp).toDate() < now;
+                    const isExpiredByUsage = offer.maxUsers && offer.usageCount >= offer.maxUsers;
+                    return !isExpiredByDate && !isExpiredByUsage;
+                }).length;
+
+                // Total Investments - Sum of 'totalInvested' field from all users
+                let totalInvestments = 0;
+                usersSnapshot.forEach(doc => {
+                    totalInvestments += doc.data().totalInvested || 0;
+                });
+
+                setStats({
+                    totalUsers,
+                    pendingWithdrawals,
+                    activeOffers,
+                    totalInvestments
+                });
+            } catch (error) {
+                console.error("Error fetching admin stats:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStats();
     }, []);
 
   return (
@@ -94,13 +126,14 @@ export default function AdminDashboard() {
       </div>
       <div
         className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm"
+        x-chunk="dashboard-02-chunk-1"
       >
         <div className="flex flex-col items-center gap-1 text-center py-20">
           <h3 className="text-2xl font-bold tracking-tight">
             Welcome to the Admin Panel
           </h3>
           <p className="text-sm text-muted-foreground">
-            Use the navigation to manage your app.
+            Use the bottom navigation to manage your app.
           </p>
         </div>
       </div>

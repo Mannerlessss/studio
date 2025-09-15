@@ -19,13 +19,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Loader2, Search, ArrowUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase';
+import { collection, doc, getDocs, updateDoc, writeBatch, getDoc, collectionGroup, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 
 type WithdrawalSortableKeys = 'userName' | 'amount' | 'method' | 'date' | 'status';
 
 interface WithdrawalRequest {
-  id: string;
+  id: string; // Document ID of the withdrawal request
   userId: string;
   userName: string;
   amount: number;
@@ -36,34 +38,47 @@ interface WithdrawalRequest {
     accountNumber?: string;
     ifsc?: string;
   };
-  date: Date;
+  date: any; // Firestore timestamp
   status: 'Pending' | 'Approved' | 'Rejected';
 }
 
-const MOCK_WITHDRAWALS: WithdrawalRequest[] = [
-    { id: 'w1', userId: '3', userName: 'Priya Singh', amount: 500, method: 'UPI', details: { upiId: 'priya@okhdfc' }, date: new Date(Date.now() - 3600000), status: 'Pending' },
-    { id: 'w2', userId: '1', userName: 'Anjali Sharma', amount: 200, method: 'Bank Transfer', details: { accountHolder: 'Anjali S', accountNumber: '...1234', ifsc: 'HDFC000123' }, date: new Date(Date.now() - 86400000), status: 'Pending' },
-    { id: 'w3', userId: '2', userName: 'Rohan Verma', amount: 100, method: 'UPI', details: { upiId: 'rohan.v@okicici' }, date: new Date(Date.now() - 86400000 * 2), status: 'Approved' },
-    { id: 'w4', userId: '4', userName: 'Amit Patel', amount: 150, method: 'UPI', details: { upiId: 'patelamit@oksbi' }, date: new Date(Date.now() - 86400000 * 3), status: 'Rejected' },
-];
 
 export default function WithdrawalsPage() {
     const { toast } = useToast();
     const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState<string | null>(null); // Store ID of item being submitted
     const [searchTerm, setSearchTerm] = useState('');
     const [sortKey, setSortKey] = useState<WithdrawalSortableKeys>('date');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
 
     useEffect(() => {
-        setLoading(true);
-        setTimeout(() => {
-            setWithdrawals(MOCK_WITHDRAWALS);
-            setLoading(false);
-        }, 500);
-    }, []);
+        const fetchWithdrawals = async () => {
+            setLoading(true);
+            try {
+                const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'));
+                const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
+                const requests: WithdrawalRequest[] = [];
+                 withdrawalsSnapshot.forEach(doc => {
+                    requests.push({ 
+                        id: doc.id,
+                        userId: doc.ref.parent.parent!.id,
+                        ...doc.data()
+                    } as WithdrawalRequest);
+                });
+                
+                setWithdrawals(requests);
+            } catch (error: any) {
+                console.error("Error fetching withdrawals: ", error);
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch withdrawal requests. Check permissions.' });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchWithdrawals();
+    }, [toast]);
 
     const handleSort = (key: WithdrawalSortableKeys) => {
         if (sortKey === key) {
@@ -78,15 +93,17 @@ export default function WithdrawalsPage() {
         return withdrawals
             .filter(w => w.userName.toLowerCase().includes(searchTerm.toLowerCase()))
             .sort((a, b) => {
-                let aValue: any, bValue: any;
+                let aValue, bValue;
                 if (sortKey === 'date') {
-                    aValue = a.date.getTime();
-                    bValue = b.date.getTime();
+                    aValue = a.date?.toMillis() || 0;
+                    bValue = b.date?.toMillis() || 0;
                 } else if (sortKey === 'status') {
+                     // Custom sort for status: Pending > Approved > Rejected
                     const statusOrder = { 'Pending': 0, 'Approved': 1, 'Rejected': 2 };
                     aValue = statusOrder[a.status];
                     bValue = statusOrder[b.status];
-                } else {
+                } 
+                else {
                     aValue = a[sortKey];
                     bValue = b[sortKey];
                 }
@@ -99,16 +116,58 @@ export default function WithdrawalsPage() {
 
     const handleStatusChange = async (req: WithdrawalRequest, newStatus: 'Approved' | 'Rejected') => {
         setIsSubmitting(req.id);
-        toast({
-            title: `Request ${newStatus}`,
-            description: `Withdrawal request for ${req.userName} has been ${newStatus.toLowerCase()} (simulation).`,
-        });
+        const withdrawalDocRef = doc(db, `users/${req.userId}/withdrawals`, req.id);
         
-        // Simulate update
-        setTimeout(() => {
+        try {
+            const batch = writeBatch(db);
+
+            batch.update(withdrawalDocRef, { status: newStatus });
+            
+            // Also update the corresponding transaction document
+            const transactionQuery = query(
+                collection(db, `users/${req.userId}/transactions`), 
+                where('type', '==', 'withdrawal'),
+                where('amount', '==', req.amount),
+                where('status', '==', 'Pending')
+            );
+            const transactionSnapshot = await getDocs(transactionQuery);
+            // This assumes the latest pending withdrawal transaction matches. A more robust system might use a shared ID.
+             if (!transactionSnapshot.empty) {
+                const transactionDocRef = transactionSnapshot.docs[0].ref;
+                batch.update(transactionDocRef, { status: newStatus });
+            }
+
+
+            if (newStatus === 'Rejected') {
+                 const userDocRef = doc(db, 'users', req.userId);
+                 const userDoc = await getDoc(userDocRef);
+                 if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    batch.update(userDocRef, {
+                        totalBalance: (userData.totalBalance || 0) + req.amount
+                    });
+                 }
+            }
+
+            await batch.commit();
+
+            toast({
+                title: `Request ${newStatus}`,
+                description: `Withdrawal request for ${req.userName} has been ${newStatus.toLowerCase()}.`,
+            });
+            
+            // Update local state
             setWithdrawals(prev => prev.map(w => w.id === req.id ? {...w, status: newStatus} : w));
+
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Update Failed',
+                description: error.message,
+            });
+        } finally {
             setIsSubmitting(null);
-        }, 500);
+        }
     }
 
 
@@ -191,7 +250,7 @@ export default function WithdrawalsPage() {
                         </div>
                     )}
                 </TableCell>
-                <TableCell>{withdrawal.date?.toLocaleDateString()}</TableCell>
+                <TableCell>{withdrawal.date?.toDate().toLocaleDateString()}</TableCell>
                 <TableCell>
                   <Badge
                     variant={

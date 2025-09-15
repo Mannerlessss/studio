@@ -37,9 +37,12 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2, ArrowUpDown, Search } from 'lucide-react';
+import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2, ArrowUpDown, Search, UserPlus } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { db } from '@/lib/firebase';
+import { collection, doc, getDoc, getDocs, updateDoc, writeBatch, serverTimestamp, query, where, addDoc, increment, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     Select,
@@ -48,7 +51,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
+import { deleteUser } from '@/ai/flows/delete-user-flow';
+
 
 type UserSortableKeys = 'name' | 'email' | 'membership';
 
@@ -57,28 +61,29 @@ interface User {
     name: string;
     email: string;
     membership: 'Basic' | 'Pro';
+    hasInvested?: boolean;
     totalBalance: number;
     totalInvestmentEarnings: number;
     totalBonusEarnings: number;
     totalReferralEarnings: number;
+    totalInvested: number;
+    claimedMilestones?: number[];
+    investedReferralCount: number;
+    referredBy?: string;
+    createdAt?: Timestamp;
 }
 
-const MOCK_USERS: User[] = [
-    { id: '1', name: 'Anjali Sharma', email: 'anjali@example.com', membership: 'Pro', totalBalance: 1250, totalInvestmentEarnings: 800, totalBonusEarnings: 150, totalReferralEarnings: 300 },
-    { id: '2', name: 'Rohan Verma', email: 'rohan@example.com', membership: 'Basic', totalBalance: 300, totalInvestmentEarnings: 200, totalBonusEarnings: 50, totalReferralEarnings: 50 },
-    { id: '3', name: 'Priya Singh', email: 'priya@example.com', membership: 'Pro', totalBalance: 5000, totalInvestmentEarnings: 4000, totalBonusEarnings: 200, totalReferralEarnings: 800 },
-    { id: '4', name: 'Amit Patel', email: 'amit@example.com', membership: 'Basic', totalBalance: 150, totalInvestmentEarnings: 100, totalBonusEarnings: 25, totalReferralEarnings: 25 },
-    { id: '5', name: 'Sunita Devi', email: 'sunita@example.com', membership: 'Basic', totalBalance: 50, totalInvestmentEarnings: 0, totalBonusEarnings: 50, totalReferralEarnings: 0 },
-];
-
 const investmentPlans = [100, 300, 500, 1000, 2000];
+const milestones: { [key: number]: number } = {
+  5: 250, 10: 500, 20: 1000, 30: 1500, 40: 2000, 50: 2500,
+};
 
 export default function UsersPage() {
     const { toast } = useToast();
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
-    const [creditAmount, setCreditAmount] = useState('100');
+    const [creditAmount, setCreditAmount] = useState('100'); // Default to the smallest plan
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortKey, setSortKey] = useState<UserSortableKeys>('name');
@@ -86,18 +91,28 @@ export default function UsersPage() {
 
 
     useEffect(() => {
-        setLoading(true);
-        setTimeout(() => {
-            setUsers(MOCK_USERS);
-            setLoading(false);
-        }, 500);
-    }, []);
+        const fetchUsers = async () => {
+            setLoading(true);
+            try {
+                const usersSnapshot = await getDocs(collection(db, 'users'));
+                const usersData: User[] = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+                setUsers(usersData);
+            } catch (error: any) {
+                console.error("Error fetching users: ", error);
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch users. Check permissions.' });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchUsers();
+    }, [toast]);
     
     const filteredAndSortedUsers = useMemo(() => {
         return users
             .filter(user =>
-                user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                user.email.toLowerCase().includes(searchTerm.toLowerCase())
+                (user?.name ?? '').toLowerCase().includes((searchTerm ?? '').toLowerCase()) ||
+                (user?.email ?? '').toLowerCase().includes((searchTerm ?? '').toLowerCase())
             )
             .sort((a, b) => {
                 const aValue = a[sortKey] || '';
@@ -116,38 +131,196 @@ export default function UsersPage() {
             setSortDirection('asc');
         }
     };
-    
-    const showPrototypeToast = () => {
-        toast({ title: 'Prototype Mode', description: 'This action is for demonstration only.' });
-    }
 
     const handleDeleteUser = async (userId: string) => {
         setIsSubmitting(userId);
-        showPrototypeToast();
-        setUsers(prevUsers => prevUsers.filter(u => u.id !== userId));
-        setIsSubmitting(null);
+        try {
+            const result = await deleteUser(userId);
+            toast({
+                title: 'User Deleted',
+                description: result.message,
+            });
+            setUsers(prevUsers => prevUsers.filter(u => u.id !== userId));
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Deletion Failed',
+                description: error.message,
+            });
+        } finally {
+            setIsSubmitting(null);
+        }
     };
 
     const handleCredit = async (user: User) => {
         setIsSubmitting(user.id);
-        showPrototypeToast();
         const amount = Number(creditAmount);
-        toast({
-            title: `Investment Credited`,
-            description: `${amount} Rs. has been invested for user ${user.name} (simulation).`,
-        });
-        setIsSubmitting(null);
+        if (isNaN(amount) || !investmentPlans.includes(amount)) {
+            toast({
+                variant: 'destructive',
+                title: 'Invalid Amount',
+                description: 'Please select a valid investment plan amount.',
+            });
+            setIsSubmitting(null);
+            return;
+        }
+
+        try {
+            const userDocRef = doc(db, 'users', user.id);
+            const batch = writeBatch(db);
+            const now = serverTimestamp();
+
+            // 1. Create a new document in the `investments` subcollection
+            const newInvestmentRef = doc(collection(db, `users/${user.id}/investments`));
+            const dailyReturnRate = user.membership === 'Pro' ? 0.13 : 0.10;
+            batch.set(newInvestmentRef, {
+                planAmount: amount,
+                dailyReturn: amount * dailyReturnRate,
+                startDate: now,
+                lastUpdate: now,
+                durationDays: 30,
+                earnings: 0,
+                status: 'active',
+            });
+
+            // 2. Create a transaction record
+            const transactionRef = doc(collection(db, `users/${user.id}/transactions`));
+            batch.set(transactionRef, {
+                type: 'investment',
+                amount,
+                description: `Invested in Plan ${amount}`,
+                status: 'Completed',
+                date: now,
+            });
+            
+            // 3. Update the user's main document
+            const userUpdates: any = {
+                totalInvested: (user.totalInvested || 0) + amount,
+            };
+            if (!user.hasInvested) {
+                userUpdates.hasInvested = true;
+                userUpdates.commissionParent = user.referredBy; // Set commission parent on first investment
+            }
+            batch.update(userDocRef, userUpdates);
+
+            // 4. Handle Referral Logic (if it's the user's first investment >= 100)
+            if (!user.hasInvested && user.referredBy && amount >= 100) {
+                const referrerDocRef = doc(db, 'users', user.referredBy);
+                const referrerDoc = await getDoc(referrerDocRef);
+
+                if (referrerDoc.exists()) {
+                    const referrerData = referrerDoc.data() as User;
+                    const bonusAmount = 75; // Standard referral bonus
+
+                    // Give welcome bonus to the new investor
+                    batch.update(userDocRef, {
+                        totalBalance: (user.totalBalance || 0) + bonusAmount,
+                        totalBonusEarnings: (user.totalBonusEarnings || 0) + bonusAmount,
+                        totalEarnings: ((user as any).totalEarnings || 0) + bonusAmount,
+                    });
+                    const userBonusTransactionRef = doc(collection(db, `users/${user.id}/transactions`));
+                    batch.set(userBonusTransactionRef, {
+                        type: 'bonus', amount: bonusAmount, description: `Welcome referral bonus!`, status: 'Completed', date: now,
+                    });
+
+                    // Give standard referral bonus to the referrer & increment their count
+                    const newReferralCount = (referrerData.investedReferralCount || 0) + 1;
+                    batch.update(referrerDocRef, {
+                        totalBalance: (referrerData.totalBalance || 0) + bonusAmount,
+                        totalReferralEarnings: (referrerData.totalReferralEarnings || 0) + bonusAmount,
+                        totalEarnings: ((referrerData as any).totalEarnings || 0) + bonusAmount,
+                        investedReferralCount: newReferralCount,
+                    });
+                    const referrerBonusTransactionRef = doc(collection(db, `users/${user.referredBy}/transactions`));
+                     batch.set(referrerBonusTransactionRef, {
+                        type: 'referral', amount: bonusAmount, description: `Referral bonus from ${user.name}`, status: 'Completed', date: now,
+                    });
+                    
+                    // CHECK FOR MILESTONES
+                    const claimedMilestones = referrerData.claimedMilestones || [];
+                    for (const milestone in milestones) {
+                        const milestoneNum = Number(milestone);
+                        if (newReferralCount >= milestoneNum && !claimedMilestones.includes(milestoneNum)) {
+                            const rewardAmount = milestones[milestoneNum];
+                             batch.update(referrerDocRef, {
+                                totalBalance: increment(rewardAmount),
+                                totalReferralEarnings: increment(rewardAmount),
+                                totalEarnings: increment(rewardAmount),
+                                claimedMilestones: [...claimedMilestones, milestoneNum]
+                            });
+
+                             const milestoneTransactionRef = doc(collection(db, `users/${user.referredBy}/transactions`));
+                             batch.set(milestoneTransactionRef, {
+                                type: 'bonus', amount: rewardAmount, description: `Milestone Bonus: ${milestone} referrals`, status: 'Completed', date: now,
+                            });
+                        }
+                    }
+                    
+                    // Upsert the referred user in the referrer's subcollection
+                    const referrerReferralsRef = collection(db, 'users', user.referredBy, 'referrals');
+                    const q = query(referrerReferralsRef, where("userId", "==", user.id));
+                    const referredUserDocs = await getDocs(q);
+                    
+                    if (referredUserDocs.empty) {
+                         // Add them if they don't exist
+                        const newReferralSubDocRef = doc(referrerReferralsRef);
+                        batch.set(newReferralSubDocRef, {
+                            userId: user.id,
+                            name: user.name,
+                            email: user.email,
+                            hasInvested: true,
+                            joinedAt: user.createdAt || serverTimestamp() 
+                        });
+                    } else {
+                        // User already exists, just update their investment status
+                        const referredUserDocRef = referredUserDocs.docs[0].ref;
+                        batch.update(referredUserDocRef, { hasInvested: true });
+                    }
+                }
+            }
+            
+            await batch.commit();
+
+            toast({
+                title: `Investment Credited`,
+                description: `${amount} Rs. has been invested for user ${user.name}.`,
+            });
+            setUsers(prevUsers => prevUsers.map(u => u.id === user.id ? { 
+                ...u, 
+                hasInvested: true, 
+                totalInvested: (u.totalInvested || 0) + amount,
+            } : u));
+            setCreditAmount('100');
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: `Credit Failed`,
+                description: error.message,
+            });
+        } finally {
+            setIsSubmitting(null);
+        }
     }
 
     const handleUpgrade = async (userId: string) => {
         setIsSubmitting(userId);
-        showPrototypeToast();
-        setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, membership: 'Pro' } : u));
-        toast({
-            title: `Upgraded to Pro`,
-            description: `User has been upgraded to the Pro plan (simulation).`,
-        });
-        setIsSubmitting(null);
+        try {
+            const userDocRef = doc(db, 'users', userId);
+            await updateDoc(userDocRef, { membership: 'Pro' });
+            toast({
+                title: `Upgraded to Pro`,
+                description: `User has been upgraded to the Pro plan.`,
+            });
+            setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, membership: 'Pro' } : u));
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: `Upgrade Failed`,
+                description: error.message,
+            });
+        } finally {
+            setIsSubmitting(null);
+        }
     }
 
   return (
@@ -222,7 +395,7 @@ export default function UsersPage() {
                                 </Button>
                             </DialogTrigger>
                         </Dialog>
-                       <AlertDialog>
+                       <AlertDialog onOpenChange={(open) => !open && setCreditAmount('100')}>
                           <AlertDialogTrigger asChild>
                              <Button variant="outline" size="sm" disabled={!!isSubmitting}>
                                 <DollarSign className='w-4 h-4 mr-1' /> Credit
@@ -232,7 +405,7 @@ export default function UsersPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Credit Investment for {user.name}</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Select the investment plan to credit. This is a prototype action.
+                                Select the investment plan to credit. This will create a new active investment plan for the user.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <div className="space-y-2">
@@ -273,7 +446,7 @@ export default function UsersPage() {
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Delete User: {user.name}?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        This is a prototype. The user will only be removed from this view.
+                                        This action cannot be undone. This will permanently delete the user's authentication account and all their associated data in Firestore. Are you sure?
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>

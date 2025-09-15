@@ -10,14 +10,9 @@ import { Button } from '../ui/button';
 
 const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
     
-    // Fallback to 0 if values are undefined/null
-    const perMinuteReturn = (investment as any).dailyReturn || 0;
-    const durationMinutes = (investment as any).durationMinutes || 30;
-
-    const minutesProcessed = perMinuteReturn > 0 ? Math.round(investment.earnings / perMinuteReturn) : 0;
-    const progress = durationMinutes > 0 ? (minutesProcessed / durationMinutes) * 100 : 0;
-    const dailyReturnEquivalent = perMinuteReturn * 60 * 24;
-    const dailyReturnRate = investment.planAmount > 0 ? (dailyReturnEquivalent / investment.planAmount) * 100 : 0;
+    const daysProcessed = Math.round(investment.earnings / investment.dailyReturn);
+    const progress = (daysProcessed / investment.durationDays) * 100;
+    const dailyReturnRate = (investment.dailyReturn / investment.planAmount) * 100;
 
     return (
         <div className="p-4 rounded-lg bg-muted/50 border relative">
@@ -27,13 +22,13 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
                     <p className="text-sm text-muted-foreground">Plan Active</p>
                 </div>
                 <div className='text-right'>
-                    <p className="text-2xl font-bold text-green-500">{investment.earnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Rs.</p>
+                    <p className="text-2xl font-bold text-green-500">{investment.earnings.toLocaleString()} Rs.</p>
                     <p className="text-sm text-muted-foreground">Total Earned</p>
                 </div>
             </div>
 
             <div className="absolute top-4 left-1/2 -translate-x-1/2">
-                 <Badge className="bg-blue-500 text-white shadow-lg">{!isNaN(dailyReturnRate) ? dailyReturnRate.toFixed(0) : 0}% Daily</Badge>
+                <Badge className="bg-blue-500 text-white shadow-lg">{dailyReturnRate.toFixed(0)}% Daily</Badge>
             </div>
 
             <div className="mt-4 col-span-2 space-y-2">
@@ -43,8 +38,8 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
                 </div>
                 <Progress value={progress} />
                 <div className="flex justify-between items-center text-xs text-muted-foreground">
-                    <p>Minute {minutesProcessed} of {durationMinutes}</p>
-                    <p>Per Min: {perMinuteReturn.toFixed(4)} Rs.</p>
+                    <p>Day {daysProcessed} of {investment.durationDays}</p>
+                    <p>Daily: {investment.dailyReturn.toLocaleString()} Rs.</p>
                 </div>
             </div>
         </div>
