@@ -21,7 +21,7 @@ const WithdrawalRequestSchema = z.object({
   amount: z.number(),
   method: z.enum(['UPI', 'Bank Transfer']),
   details: WithdrawalDetailsSchema,
-  date: z.string(), // Send as ISO string
+  date: z.any(), // Send as serialized timestamp
   status: z.enum(['Pending', 'Approved', 'Rejected']),
 });
 
@@ -43,8 +43,6 @@ export const getAllWithdrawalsFlow = ai.defineFlow(
     const requests: WithdrawalRequest[] = [];
     withdrawalsSnapshot.forEach(docSnap => {
         const data = docSnap.data();
-        const date = (data.date as Timestamp)?.toDate();
-
         requests.push({ 
             id: docSnap.id,
             userId: docSnap.ref.parent.parent!.id,
@@ -52,7 +50,7 @@ export const getAllWithdrawalsFlow = ai.defineFlow(
             amount: data.amount || 0,
             method: data.method || 'UPI',
             details: data.details || {},
-            date: date ? date.toLocaleDateString() : 'N/A',
+            date: data.date,
             status: data.status || 'Pending',
         });
     });

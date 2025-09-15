@@ -19,12 +19,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Loader2, Search, ArrowUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, updateDoc, writeBatch, getDoc, collectionGroup, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { getAllWithdrawals } from '@/ai/flows/get-all-withdrawals-flow';
-import type { WithdrawalRequest } from '@/ai/flows/get-all-withdrawals-flow';
+import { getAllWithdrawals, WithdrawalRequest } from '@/ai/flows/get-all-withdrawals-flow';
+import { updateWithdrawalStatus } from '@/ai/flows/update-withdrawal-status-flow';
 
 type WithdrawalSortableKeys = 'userName' | 'amount' | 'method' | 'date' | 'status';
 
@@ -70,9 +68,8 @@ export default function WithdrawalsPage() {
             .sort((a, b) => {
                 let aValue, bValue;
                 if (sortKey === 'date') {
-                    // Dates are strings now, so we can compare them directly
-                    aValue = a.date || '';
-                    bValue = b.date || '';
+                    aValue = new Date(a.date).getTime() || 0;
+                    bValue = new Date(b.date).getTime() || 0;
                 } else if (sortKey === 'status') {
                      // Custom sort for status: Pending > Approved > Rejected
                     const statusOrder = { 'Pending': 0, 'Approved': 1, 'Rejected': 2 };
@@ -80,8 +77,8 @@ export default function WithdrawalsPage() {
                     bValue = statusOrder[b.status];
                 } 
                 else {
-                    aValue = a[sortKey];
-                    bValue = b[sortKey];
+                    aValue = a[sortKey as keyof WithdrawalRequest];
+                    bValue = b[sortKey as keyof WithdrawalRequest];
                 }
 
                 if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
@@ -92,40 +89,13 @@ export default function WithdrawalsPage() {
 
     const handleStatusChange = async (req: WithdrawalRequest, newStatus: 'Approved' | 'Rejected') => {
         setIsSubmitting(req.id);
-        const withdrawalDocRef = doc(db, `users/${req.userId}/withdrawals`, req.id);
-        
         try {
-            const batch = writeBatch(db);
-
-            batch.update(withdrawalDocRef, { status: newStatus });
-            
-            // Also update the corresponding transaction document
-            const transactionQuery = query(
-                collection(db, `users/${req.userId}/transactions`), 
-                where('type', '==', 'withdrawal'),
-                where('amount', '==', req.amount),
-                where('status', '==', 'Pending')
-            );
-            const transactionSnapshot = await getDocs(transactionQuery);
-            // This assumes the latest pending withdrawal transaction matches. A more robust system might use a shared ID.
-             if (!transactionSnapshot.empty) {
-                const transactionDocRef = transactionSnapshot.docs[0].ref;
-                batch.update(transactionDocRef, { status: newStatus });
-            }
-
-
-            if (newStatus === 'Rejected') {
-                 const userDocRef = doc(db, 'users', req.userId);
-                 const userDoc = await getDoc(userDocRef);
-                 if (userDoc.exists()) {
-                    const userData = userDoc.data();
-                    batch.update(userDocRef, {
-                        totalBalance: (userData.totalBalance || 0) + req.amount
-                    });
-                 }
-            }
-
-            await batch.commit();
+            await updateWithdrawalStatus({
+                userId: req.userId,
+                withdrawalId: req.id,
+                newStatus,
+                amount: req.amount,
+            });
 
             toast({
                 title: `Request ${newStatus}`,
@@ -226,7 +196,7 @@ export default function WithdrawalsPage() {
                         </div>
                     )}
                 </TableCell>
-                <TableCell>{withdrawal.date}</TableCell>
+                <TableCell>{new Date(withdrawal.date).toLocaleDateString()}</TableCell>
                 <TableCell>
                   <Badge
                     variant={

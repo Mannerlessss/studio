@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import { db, adminSDK } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
-import { doc, getDoc, collection, writeBatch, serverTimestamp, query, where, getDocs, increment } from 'firebase/firestore';
+import { doc, getDoc, collection, writeBatch, serverTimestamp, query, where, getDocs, increment, Timestamp } from 'firebase/firestore';
 
 const CreditInvestmentInputSchema = z.object({
   userId: z.string(),
@@ -34,7 +34,7 @@ export const creditInvestmentFlow = ai.defineFlow(
   async ({ userId, amount }) => {
     const userDocRef = doc(db, 'users', userId);
     const batch = writeBatch(db);
-    const now = serverTimestamp();
+    const now = adminSDK.firestore.FieldValue.serverTimestamp();
 
     try {
         const userDoc = await getDoc(userDocRef);
@@ -72,8 +72,6 @@ export const creditInvestmentFlow = ai.defineFlow(
         };
         if (!user.hasInvested) {
             userUpdates.hasInvested = true;
-            // Set commission parent on first investment
-            // Note: `referredBy` should have been set during signup/code redemption
             if (user.referredBy) {
                 userUpdates.commissionParent = user.referredBy;
             }
@@ -89,7 +87,6 @@ export const creditInvestmentFlow = ai.defineFlow(
                 const referrerData = referrerDoc.data();
                 const bonusAmount = 75; // Standard referral bonus
 
-                // Give welcome bonus to the new investor
                 batch.update(userDocRef, {
                     totalBalance: increment(bonusAmount),
                     totalBonusEarnings: increment(bonusAmount),
@@ -100,7 +97,6 @@ export const creditInvestmentFlow = ai.defineFlow(
                     type: 'bonus', amount: bonusAmount, description: `Welcome referral bonus!`, status: 'Completed', date: now,
                 });
 
-                // Give standard referral bonus to the referrer & increment their count
                 const newReferralCount = (referrerData.investedReferralCount || 0) + 1;
                 batch.update(referrerDocRef, {
                     totalBalance: increment(bonusAmount),
@@ -113,7 +109,6 @@ export const creditInvestmentFlow = ai.defineFlow(
                     type: 'referral', amount: bonusAmount, description: `Referral bonus from ${user.name}`, status: 'Completed', date: now,
                 });
                 
-                // CHECK FOR MILESTONES
                 const claimedMilestones = referrerData.claimedMilestones || [];
                 for (const milestone in milestones) {
                     const milestoneNum = Number(milestone);
@@ -133,7 +128,6 @@ export const creditInvestmentFlow = ai.defineFlow(
                     }
                 }
                 
-                // Upsert the referred user in the referrer's subcollection
                 const referrerReferralsRef = collection(db, 'users', user.referredBy, 'referrals');
                 const q = query(referrerReferralsRef, where("userId", "==", userId));
                 const referredUserDocs = await getDocs(q);
@@ -145,7 +139,7 @@ export const creditInvestmentFlow = ai.defineFlow(
                         name: user.name,
                         email: user.email,
                         hasInvested: true,
-                        joinedAt: user.createdAt || serverTimestamp() 
+                        joinedAt: user.createdAt || now
                     });
                 } else {
                     const referredUserDocRef = referredUserDocs.docs[0].ref;
@@ -168,6 +162,6 @@ export const creditInvestmentFlow = ai.defineFlow(
 );
 
 
-export async function creditInvestment(input: CreditInvestmentInput): Promise<CreditInvestmentOutput> {
+export async function creditInvestment(input: CreditInvestmentInput): Promise<{success: boolean, message: string}> {
     return await creditInvestmentFlow(input);
 }

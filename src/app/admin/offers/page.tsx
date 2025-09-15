@@ -40,21 +40,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { db } from '@/lib/firebase';
-import { addDoc, collection, deleteDoc, doc, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getAllOffers, createOffer, deleteOffer, Offer } from '@/ai/flows/offers-flow';
 
 type OfferSortableKeys = 'code' | 'rewardAmount' | 'usageCount' | 'createdAt';
-
-interface Offer {
-    id: string;
-    code: string;
-    rewardAmount: number;
-    maxUsers?: number | null;
-    expiresAt?: Timestamp | null;
-    usageCount: number;
-    createdAt: Timestamp;
-}
 
 export default function OffersPage() {
     const { toast } = useToast();
@@ -75,8 +64,7 @@ export default function OffersPage() {
         const fetchOffers = async () => {
             setLoading(true);
             try {
-                const offersSnapshot = await getDocs(collection(db, 'offers'));
-                const offersData: Offer[] = offersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Offer));
+                const offersData = await getAllOffers();
                 setOffers(offersData);
             } catch (error: any) {
                 console.error("Error fetching offers: ", error);
@@ -101,14 +89,8 @@ export default function OffersPage() {
         return offers
             .filter(offer => offer.code.toLowerCase().includes(searchTerm.toLowerCase()))
             .sort((a, b) => {
-                let aValue, bValue;
-                 if (sortKey === 'createdAt') {
-                    aValue = a.createdAt?.toMillis() || 0;
-                    bValue = b.createdAt?.toMillis() || 0;
-                } else {
-                    aValue = a[sortKey] || 0;
-                    bValue = b[sortKey] || 0;
-                }
+                const aValue = a[sortKey as keyof Offer] || 0;
+                const bValue = b[sortKey as keyof Offer] || 0;
 
                 if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
                 if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
@@ -119,71 +101,53 @@ export default function OffersPage() {
 
     const handleCreateCode = async () => {
         setIsSubmitting(true);
-        if (!newCode || !rewardAmount) {
+        const rewardNum = Number(rewardAmount);
+        if (!newCode || isNaN(rewardNum) || rewardNum <= 0) {
             toast({
                 variant: 'destructive',
-                title: 'Missing Information',
-                description: 'Please provide a code and a reward amount.',
+                title: 'Invalid Information',
+                description: 'Please provide a valid code and a positive reward amount.',
             });
             setIsSubmitting(false);
             return;
         }
 
-        let expiresAtTimestamp: Timestamp | null = null;
+        let expiresAtISO: string | undefined = undefined;
         if (expiresIn && expiresIn !== 'never') {
             const expiresAtDate = new Date();
             if (expiresIn === '1-day') expiresAtDate.setDate(expiresAtDate.getDate() + 1);
             else if (expiresIn === '7-days') expiresAtDate.setDate(expiresAtDate.getDate() + 7);
             else if (expiresIn === '30-days') expiresAtDate.setDate(expiresAtDate.getDate() + 30);
-            expiresAtTimestamp = Timestamp.fromDate(expiresAtDate);
+            expiresAtISO = expiresAtDate.toISOString();
         }
-
-        const newOfferData: any = {
-            code: newCode.toUpperCase(),
-            rewardAmount: Number(rewardAmount),
-            usageCount: 0,
-            createdAt: serverTimestamp(),
-        };
-
-        if (maxUsers) {
-            newOfferData.maxUsers = Number(maxUsers);
-        }
-
-        if (expiresAtTimestamp) {
-            newOfferData.expiresAt = expiresAtTimestamp;
-        }
-
-
+        
         try {
-            const docRef = await addDoc(collection(db, 'offers'), newOfferData);
-             toast({
-                title: 'Code Created!',
-                description: `New offer code "${newCode.toUpperCase()}" has been created.`,
+            const result = await createOffer({
+                code: newCode,
+                rewardAmount: rewardNum,
+                maxUsers: maxUsers ? Number(maxUsers) : undefined,
+                expiresAt: expiresAtISO,
             });
-            
-             const newOfferForState: Offer = {
-                id: docRef.id,
-                code: newOfferData.code,
-                rewardAmount: newOfferData.rewardAmount,
-                maxUsers: newOfferData.maxUsers || null,
-                expiresAt: newOfferData.expiresAt || null,
-                usageCount: 0,
-                createdAt: Timestamp.now() // Use client-side timestamp for immediate UI update
-            };
 
+            toast({ title: 'Code Created!', description: result.message });
+            
+            const newOfferForState: Offer = {
+                id: result.id!,
+                code: newCode.toUpperCase(),
+                rewardAmount: rewardNum,
+                maxUsers: maxUsers ? Number(maxUsers) : null,
+                expiresAt: expiresAtISO,
+                usageCount: 0,
+                createdAt: new Date().toISOString(), // Immediate UI update
+            };
             setOffers(prev => [newOfferForState, ...prev]);
 
-            // Reset form
             setNewCode('');
             setRewardAmount('');
             setMaxUsers('');
             setExpiresIn('never');
         } catch (error: any) {
-             toast({
-                variant: 'destructive',
-                title: 'Creation Failed',
-                description: error.message,
-            });
+             toast({ variant: 'destructive', title: 'Creation Failed', description: error.message });
         } finally {
             setIsSubmitting(false);
         }
@@ -191,26 +155,16 @@ export default function OffersPage() {
 
     const copyCode = (code: string) => {
         navigator.clipboard.writeText(code);
-        toast({
-            title: 'Copied!',
-            description: `Code "${code}" copied to clipboard.`,
-        });
+        toast({ title: 'Copied!', description: `Code "${code}" copied to clipboard.` });
     }
 
-    const deleteCode = async (id: string) => {
+    const handleDeleteCode = async (id: string) => {
         try {
-            await deleteDoc(doc(db, 'offers', id));
-            toast({
-                title: 'Code Deleted!',
-                description: `The offer code has been deleted.`,
-            });
+            await deleteOffer(id);
+            toast({ title: 'Code Deleted!', description: `The offer code has been deleted.` });
             setOffers(prev => prev.filter(offer => offer.id !== id));
         } catch (error: any) {
-             toast({
-                variant: 'destructive',
-                title: 'Deletion Failed',
-                description: error.message,
-            });
+             toast({ variant: 'destructive', title: 'Deletion Failed', description: error.message });
         }
     }
     
@@ -218,7 +172,7 @@ export default function OffersPage() {
         if (offer.maxUsers && offer.usageCount >= offer.maxUsers) {
             return { text: 'Expired', variant: 'outline' };
         }
-        if (offer.expiresAt && offer.expiresAt.toMillis() < Date.now()) {
+        if (offer.expiresAt && new Date(offer.expiresAt).getTime() < Date.now()) {
              return { text: 'Expired', variant: 'outline' };
         }
         return { text: 'Active', variant: 'default' };
@@ -358,7 +312,7 @@ export default function OffersPage() {
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteCode(offer.id)}>
+                              <AlertDialogAction onClick={() => handleDeleteCode(offer.id)}>
                                 Yes, delete it
                               </AlertDialogAction>
                             </AlertDialogFooter>

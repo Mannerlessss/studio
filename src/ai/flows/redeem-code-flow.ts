@@ -8,6 +8,7 @@
  */
 import { z } from 'zod';
 import { db, adminSDK } from '@/lib/firebaseAdmin';
+import { ai } from '@/ai/genkit';
 
 const RedeemCodeInputSchema = z.object({
     userId: z.string().describe('The UID of the user redeeming the code.'),
@@ -24,8 +25,11 @@ const RedeemCodeOutputSchema = z.object({
 export type RedeemCodeOutput = z.infer<typeof RedeemCodeOutputSchema>;
 
 
-export async function redeemCode(input: RedeemCodeInput): Promise<RedeemCodeOutput> {
-    const { userId, userName, userEmail, code } = input;
+export const redeemCodeFlow = ai.defineFlow({
+    name: 'redeemCodeFlow',
+    inputSchema: RedeemCodeInputSchema,
+    outputSchema: RedeemCodeOutputSchema,
+}, async ({ userId, userName, userEmail, code }) => {
     const userRef = db.collection('users').doc(userId);
 
     try {
@@ -80,4 +84,8 @@ export async function redeemCode(input: RedeemCodeInput): Promise<RedeemCodeOutp
         console.error('Redeem code transaction failed: ', error);
         throw new Error(error.message || 'An unknown error occurred during redemption.');
     }
+});
+
+export async function redeemCode(input: RedeemCodeInput): Promise<RedeemCodeOutput> {
+    return redeemCodeFlow(input);
 }
