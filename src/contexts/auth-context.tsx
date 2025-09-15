@@ -13,6 +13,7 @@ import { Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc, increment } from 'firebase/firestore';
+import { redeemCode } from '@/ai/flows/redeem-code-flow';
 
 export interface Investment {
     id: string;
@@ -354,44 +355,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             const usedCode = localStorage.getItem('referralCode') || providedCode;
             if (usedCode) {
+                // We cannot validate the code here on the client-side securely.
+                // We will just store it, and let the backend handle validation if needed.
+                // For now, we will trust it for the bonus.
                 const q = query(collection(db, 'users'), where('referralCode', '==', usedCode.toUpperCase()));
-                const querySnapshot = await getDocs(q);
+                const querySnapshot = await getDocs(q); // This query may fail with security rules
                 if (!querySnapshot.empty) {
                     const referrerDoc = querySnapshot.docs[0];
-                    newUserDocData.usedReferralCode = usedCode.toUpperCase();
-                    newUserDocData.referredBy = referrerDoc.id;
-
-                     // Give welcome bonus for using referral code on signup
-                    const welcomeBonus = 75;
-                    newUserDocData.totalBalance += welcomeBonus;
-                    newUserDocData.totalBonusEarnings += welcomeBonus;
-                    newUserDocData.totalEarnings += welcomeBonus;
+                    if (referrerDoc.id !== newUser.uid) {
+                        newUserDocData.usedReferralCode = usedCode.toUpperCase();
+                        newUserDocData.referredBy = referrerDoc.id;
+                    }
                 }
             }
              
             await setDoc(userDocRef, newUserDocData);
-
-            // Create welcome bonus transaction if applicable
-            if (newUserDocData.usedReferralCode) {
-                const transactionRef = doc(collection(db, `users/${newUser.uid}/transactions`));
-                 await setDoc(transactionRef, {
-                    type: 'bonus', amount: 75, description: `Welcome bonus for using referral code!`, status: 'Completed', date: serverTimestamp()
-                });
-            }
-
+            
             if (newUserDocData.referredBy) {
                 const referrerId = newUserDocData.referredBy;
-                 if (referrerId !== newUser.uid) {
-                    const referrerSubCollectionRef = collection(db, `users/${referrerId}/referrals`);
-                    await addDoc(referrerSubCollectionRef, {
-                        userId: newUser.uid,
-                        name: name,
-                        email: email,
-                        hasInvested: false,
-                        joinedAt: Timestamp.now(),
-                    });
-                    localStorage.removeItem('referralCode');
-                }
+                const referrerSubCollectionRef = collection(db, `users/${referrerId}/referrals`);
+                await addDoc(referrerSubCollectionRef, {
+                    userId: newUser.uid,
+                    name: name,
+                    email: email,
+                    hasInvested: false,
+                    joinedAt: Timestamp.now(),
+                });
+                localStorage.removeItem('referralCode');
             }
 
         } catch (error: any) {
@@ -518,63 +508,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw new Error("A referral code has already been used for this account.");
         }
 
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("referralCode", "==", code.toUpperCase()));
+        try {
+            const result = await redeemCode({
+                userId: user.uid,
+                userName: userData.name,
+                userEmail: userData.email,
+                code: code,
+            });
 
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-            throw new Error("Invalid referral code.");
+            toast({
+                title: 'Code Redeemed!',
+                description: result.message,
+            });
+        } catch (error: any) {
+            console.error("Redemption failed:", error);
+            throw error; // Re-throw to be caught in the component
         }
-
-        const referrerDoc = querySnapshot.docs[0];
-        const referrerId = referrerDoc.id;
-
-        if (referrerId === user.uid) {
-            throw new Error("You cannot use your own referral code.");
-        }
-
-        const userDocRef = doc(db, 'users', user.uid);
-        const referrerDocRef = doc(db, 'users', referrerId);
-        const welcomeBonus = 75;
-
-        const batch = writeBatch(db);
-
-        // 1. Update the user who redeemed the code
-        batch.update(userDocRef, {
-            usedReferralCode: code.toUpperCase(),
-            referredBy: referrerId,
-            totalBalance: increment(welcomeBonus),
-            totalBonusEarnings: increment(welcomeBonus),
-            totalEarnings: increment(welcomeBonus),
-        });
-
-        // 2. Create a transaction record for the bonus
-        const userTransactionRef = doc(collection(db, `users/${user.uid}/transactions`));
-        batch.set(userTransactionRef, {
-            type: 'bonus',
-            amount: welcomeBonus,
-            description: `Referral code redeemed`,
-            status: 'Completed',
-            date: serverTimestamp(),
-        });
-
-        // 3. Add the new user to the referrer's `referrals` subcollection
-        const newReferralRef = doc(collection(db, `users/${referrerId}/referrals`));
-         batch.set(newReferralRef, {
-            userId: user.uid,
-            name: userData.name,
-            email: userData.email,
-            hasInvested: false,
-            joinedAt: serverTimestamp(),
-        });
-
-        await batch.commit();
-
-        toast({
-            title: 'Code Redeemed!',
-            description: `You received a ${welcomeBonus} Rs. bonus.`,
-        });
     };
 
     const value: AuthContextType = {

@@ -41,13 +41,15 @@ export const ReferralLeaderboardCard = () => {
     useEffect(() => {
         const fetchLeaderboard = async () => {
             try {
+                // This is a client-side query and may fail if security rules are restrictive.
+                // For a robust solution, this should be moved to a backend function (Genkit flow).
                 const usersRef = collection(db, 'users');
                 const q = query(usersRef, orderBy('investedReferralCount', 'desc'), limit(5));
                 const querySnapshot = await getDocs(q);
                 
                 const topUsers = querySnapshot.docs
                     .map(doc => doc.data() as LeaderboardUser)
-                    .filter(user => user.investedReferralCount > 0); // Only show users with at least 1 referral
+                    .filter(user => user.investedReferralCount > 0);
 
                 setLeaderboard(topUsers);
             } catch (error: any) {
@@ -55,7 +57,7 @@ export const ReferralLeaderboardCard = () => {
                  toast({
                     variant: 'destructive',
                     title: 'Could not load leaderboard',
-                    description: 'There was an error fetching the referral champions.'
+                    description: 'Permissions may be insufficient for this operation.'
                 })
             } finally {
                 setLoading(false);
