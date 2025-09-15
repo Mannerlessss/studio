@@ -320,10 +320,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [user, isAdmin, loading, pathname, router]);
 
-    const signInWithGoogle = async () => {
-        // To be implemented if needed
-    };
-
     const signUpWithEmail = async ({ name, email, phone, password, referralCode: providedCode }: any) => {
         setLoading(true);
         try {
@@ -540,5 +536,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
