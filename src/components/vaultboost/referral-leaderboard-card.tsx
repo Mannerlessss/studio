@@ -2,17 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { db } from '@/lib/firebase';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Trophy, Medal, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '../ui/avatar';
-
-interface LeaderboardUser {
-    name: string;
-    investedReferralCount: number;
-}
+import { getLeaderboard, type LeaderboardUser } from '@/ai/flows/get-leaderboard-flow';
+import { useToast } from '@/hooks/use-toast';
 
 const getRankIcon = (rank: number) => {
     switch (rank) {
@@ -35,28 +30,28 @@ const getRankColor = (rank: number) => {
 export const ReferralLeaderboardCard = () => {
     const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
     const [loading, setLoading] = useState(true);
+    const { toast } = useToast();
 
     useEffect(() => {
         const fetchLeaderboard = async () => {
+            setLoading(true);
             try {
-                const usersRef = collection(db, 'users');
-                const q = query(usersRef, orderBy('investedReferralCount', 'desc'), limit(5));
-                const querySnapshot = await getDocs(q);
-                
-                const topUsers = querySnapshot.docs
-                    .map(doc => doc.data() as LeaderboardUser)
-                    .filter(user => user.investedReferralCount > 0); // Only show users with at least 1 referral
-
+                const topUsers = await getLeaderboard();
                 setLeaderboard(topUsers);
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Error fetching leaderboard: ", error);
+                toast({
+                    variant: 'destructive',
+                    title: 'Could not load leaderboard',
+                    description: 'There was an error fetching the referral champions.'
+                })
             } finally {
                 setLoading(false);
             }
         };
 
         fetchLeaderboard();
-    }, []);
+    }, [toast]);
 
     return (
         <Card className="text-left">
