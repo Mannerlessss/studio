@@ -23,25 +23,10 @@ import { db } from '@/lib/firebase';
 import { collection, doc, getDocs, updateDoc, writeBatch, getDoc, collectionGroup, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { getAllWithdrawals } from '@/ai/flows/get-all-withdrawals-flow';
+import type { WithdrawalRequest } from '@/ai/flows/get-all-withdrawals-flow';
 
 type WithdrawalSortableKeys = 'userName' | 'amount' | 'method' | 'date' | 'status';
-
-interface WithdrawalRequest {
-  id: string; // Document ID of the withdrawal request
-  userId: string;
-  userName: string;
-  amount: number;
-  method: 'UPI' | 'Bank Transfer';
-  details: { 
-    upiId?: string;
-    accountHolder?: string;
-    accountNumber?: string;
-    ifsc?: string;
-  };
-  date: any; // Firestore timestamp
-  status: 'Pending' | 'Approved' | 'Rejected';
-}
-
 
 export default function WithdrawalsPage() {
     const { toast } = useToast();
@@ -57,17 +42,7 @@ export default function WithdrawalsPage() {
         const fetchWithdrawals = async () => {
             setLoading(true);
             try {
-                const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'));
-                const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
-                const requests: WithdrawalRequest[] = [];
-                 withdrawalsSnapshot.forEach(doc => {
-                    requests.push({ 
-                        id: doc.id,
-                        userId: doc.ref.parent.parent!.id,
-                        ...doc.data()
-                    } as WithdrawalRequest);
-                });
-                
+                const requests = await getAllWithdrawals();
                 setWithdrawals(requests);
             } catch (error: any) {
                 console.error("Error fetching withdrawals: ", error);
@@ -95,8 +70,9 @@ export default function WithdrawalsPage() {
             .sort((a, b) => {
                 let aValue, bValue;
                 if (sortKey === 'date') {
-                    aValue = a.date?.toMillis() || 0;
-                    bValue = b.date?.toMillis() || 0;
+                    // Dates are strings now, so we can compare them directly
+                    aValue = a.date || '';
+                    bValue = b.date || '';
                 } else if (sortKey === 'status') {
                      // Custom sort for status: Pending > Approved > Rejected
                     const statusOrder = { 'Pending': 0, 'Approved': 1, 'Rejected': 2 };
@@ -250,7 +226,7 @@ export default function WithdrawalsPage() {
                         </div>
                     )}
                 </TableCell>
-                <TableCell>{withdrawal.date?.toDate().toLocaleDateString()}</TableCell>
+                <TableCell>{withdrawal.date}</TableCell>
                 <TableCell>
                   <Badge
                     variant={

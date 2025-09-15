@@ -2,55 +2,19 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, HandCoins, Gift, TrendingUp } from "lucide-react";
-import { db } from '@/lib/firebase';
-import { collection, collectionGroup, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-
-interface Stats {
-    totalUsers: number;
-    pendingWithdrawals: number;
-    activeOffers: number;
-    totalInvestments: number;
-}
+import { getAdminDashboardStats } from '@/ai/flows/get-admin-dashboard-stats-flow';
+import type { GetAdminDashboardStatsOutput } from '@/ai/flows/get-admin-dashboard-stats-flow';
 
 export default function AdminDashboard() {
-    const [stats, setStats] = useState<Stats | null>(null);
+    const [stats, setStats] = useState<GetAdminDashboardStatsOutput | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                // Total Users
-                const usersSnapshot = await getDocs(collection(db, 'users'));
-                const totalUsers = usersSnapshot.size;
-
-                // Pending Withdrawals
-                const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'), where('status', '==', 'Pending'));
-                const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
-                const pendingWithdrawals = withdrawalsSnapshot.size;
-
-                // Active Offer Codes
-                const offersSnapshot = await getDocs(collection(db, 'offers'));
-                const activeOffers = offersSnapshot.docs.filter(doc => {
-                    const offer = doc.data();
-                    const now = new Date();
-                    const isExpiredByDate = offer.expiresAt && (offer.expiresAt as Timestamp).toDate() < now;
-                    const isExpiredByUsage = offer.maxUsers && offer.usageCount >= offer.maxUsers;
-                    return !isExpiredByDate && !isExpiredByUsage;
-                }).length;
-
-                // Total Investments - Sum of 'totalInvested' field from all users
-                let totalInvestments = 0;
-                usersSnapshot.forEach(doc => {
-                    totalInvestments += doc.data().totalInvested || 0;
-                });
-
-                setStats({
-                    totalUsers,
-                    pendingWithdrawals,
-                    activeOffers,
-                    totalInvestments
-                });
+                const adminStats = await getAdminDashboardStats();
+                setStats(adminStats);
             } catch (error) {
                 console.error("Error fetching admin stats:", error);
             } finally {

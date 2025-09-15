@@ -52,26 +52,11 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { deleteUser } from '@/ai/flows/delete-user-flow';
+import { getAllUsers } from '@/ai/flows/get-all-users-flow';
+import type { UserForAdmin } from '@/ai/flows/get-all-users-flow';
 
 
 type UserSortableKeys = 'name' | 'email' | 'membership';
-
-interface User {
-    id: string;
-    name: string;
-    email: string;
-    membership: 'Basic' | 'Pro';
-    hasInvested?: boolean;
-    totalBalance: number;
-    totalInvestmentEarnings: number;
-    totalBonusEarnings: number;
-    totalReferralEarnings: number;
-    totalInvested: number;
-    claimedMilestones?: number[];
-    investedReferralCount: number;
-    referredBy?: string;
-    createdAt?: Timestamp;
-}
 
 const investmentPlans = [100, 300, 500, 1000, 2000];
 const milestones: { [key: number]: number } = {
@@ -80,9 +65,9 @@ const milestones: { [key: number]: number } = {
 
 export default function UsersPage() {
     const { toast } = useToast();
-    const [users, setUsers] = useState<User[]>([]);
+    const [users, setUsers] = useState<UserForAdmin[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [selectedUser, setSelectedUser] = useState<UserForAdmin | null>(null);
     const [creditAmount, setCreditAmount] = useState('100'); // Default to the smallest plan
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -94,8 +79,7 @@ export default function UsersPage() {
         const fetchUsers = async () => {
             setLoading(true);
             try {
-                const usersSnapshot = await getDocs(collection(db, 'users'));
-                const usersData: User[] = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+                const usersData = await getAllUsers();
                 setUsers(usersData);
             } catch (error: any) {
                 console.error("Error fetching users: ", error);
@@ -152,7 +136,7 @@ export default function UsersPage() {
         }
     };
 
-    const handleCredit = async (user: User) => {
+    const handleCredit = async (user: UserForAdmin) => {
         setIsSubmitting(user.id);
         const amount = Number(creditAmount);
         if (isNaN(amount) || !investmentPlans.includes(amount)) {
@@ -209,7 +193,7 @@ export default function UsersPage() {
                 const referrerDoc = await getDoc(referrerDocRef);
 
                 if (referrerDoc.exists()) {
-                    const referrerData = referrerDoc.data() as User;
+                    const referrerData = referrerDoc.data() as UserForAdmin;
                     const bonusAmount = 75; // Standard referral bonus
 
                     // Give welcome bonus to the new investor
