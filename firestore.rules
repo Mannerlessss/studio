@@ -5,41 +5,46 @@ service cloud.firestore {
 
     // Helper function to check for admin role
     function isAdmin() {
-      return request.auth.token.role == 'admin';
+      return request.auth.token.admin == true;
     }
 
     // Rules for the 'users' collection
     match /users/{userId} {
-      // Admins can read/write any user document.
-      // Regular users can only read/write their own document.
-      allow read, write: if request.auth.uid == userId || isAdmin();
+      // Admins can read any user document
+      allow get, list: if isAdmin();
       
-      // Rules for all subcollections under a user document
+      // Users can only create their own document, and read/update their own document.
+      allow create: if request.auth.uid != null;
+      allow get, update: if request.auth.uid == userId;
+
+      // Rules for subcollections within a user document
       match /{subcollection}/{docId} {
-        allow read, write: if request.auth.uid == userId || isAdmin();
+        // Admins can read any document in any subcollection
+        allow get, list: if isAdmin();
+        // Users can perform any action on their own subcollections
+        allow read, write: if request.auth.uid == userId;
       }
     }
 
-    // Rules for the global 'offers' collection
+    // Rules for the 'offers' collection
     match /offers/{offerId} {
-      // Admins can read and write.
-      allow read, write: if isAdmin();
-      // All authenticated users can read.
-      allow get: if request.auth != null;
+        // Admins can perform any action on offers
+        allow read, write: if isAdmin();
+        // Regular users can only read offers
+        allow get, list: if request.auth.uid != null;
     }
     
-    // Rules for the global 'plans' collection
+    // Rules for the 'plans' collection
     match /plans/{planId} {
-        // Admins can read and write
+        // Admins can manage plans
         allow read, write: if isAdmin();
-        // All authenticated users can read
-        allow get: if request.auth != null;
+        // Users can read plans
+        allow get, list: if request.auth.uid != null;
     }
 
-    // This rule allows admins to perform a collectionGroup query on 'withdrawals'
-    // This is required for the admin panel to fetch all pending withdrawals.
+    // Collection group query for withdrawals - for Admin Panel
     match /{path=**}/withdrawals/{withdrawalId} {
-      allow read: if isAdmin();
+      allow get, list: if isAdmin();
     }
   }
 }
