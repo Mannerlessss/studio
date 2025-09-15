@@ -1,24 +1,29 @@
+
 import * as admin from 'firebase-admin';
+import * as fs from 'fs';
+import * as path from 'path';
 
-// This function ensures that Firebase is initialized only once.
-export function getFirebaseAdmin() {
-  if (admin.apps.length === 0) {
-    try {
-      // The SDK will automatically pick up credentials from the environment.
-      // In a deployed environment like Vercel, this is handled via env vars.
-      // In a local environment (like Firebase Studio), it will look for the
-      // GOOGLE_APPLICATION_CREDENTIALS environment variable pointing to the serviceAccountKey.json file.
-       admin.initializeApp();
-    } catch (error: any) {
-      console.error('Firebase admin initialization error', error.stack);
-      // We re-throw the error to make it clear that initialization failed.
-      throw new Error('Failed to initialize Firebase Admin SDK. Check server logs for details.');
+// This is a singleton pattern to ensure Firebase Admin is initialized only once.
+if (!admin.apps.length) {
+  try {
+    const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
+    
+    if (!fs.existsSync(serviceAccountPath)) {
+        throw new Error("serviceAccountKey.json not found at project root. Please ensure the file exists.");
     }
-  }
+    
+    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
 
-  return {
-    db: admin.firestore(),
-    auth: admin.auth(),
-    admin,
-  };
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+  } catch (error: any) {
+    console.error('Firebase admin initialization error', error);
+    // We re-throw the error to make it clear that initialization failed.
+    throw new Error(`Failed to initialize Firebase Admin SDK. Check server logs for details. Error: ${error.message}`);
+  }
 }
+
+export const db = admin.firestore();
+export const auth = admin.auth();
+export { admin };

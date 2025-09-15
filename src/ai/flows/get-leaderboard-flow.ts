@@ -6,8 +6,10 @@
  * an operation that clients cannot do directly due to security rules.
  */
 import { z } from 'zod';
-import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
+import { db } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+
 
 const LeaderboardUserSchema = z.object({
     name: z.string(),
@@ -27,12 +29,11 @@ export const getLeaderboardFlow = ai.defineFlow(
     outputSchema: GetLeaderboardOutputSchema,
   },
   async () => {
-    const { db } = getFirebaseAdmin();
-    const usersRef = db.collection('users');
+    const usersRef = collection(db, 'users');
     const q = query(usersRef, orderBy('investedReferralCount', 'desc'), limit(5));
     const querySnapshot = await getDocs(q);
     
-    const topUsers = querySnapshot.docs
+    const topUsers: LeaderboardUser[] = querySnapshot.docs
         .map(doc => doc.data() as LeaderboardUser)
         .filter(user => user.investedReferralCount > 0);
 
@@ -44,25 +45,4 @@ export const getLeaderboardFlow = ai.defineFlow(
 // Exported wrapper function
 export async function getLeaderboard(): Promise<GetLeaderboardOutput> {
     return getLeaderboardFlow();
-}
-
-// Helper functions from firestore, manually added as they are not available in this context
-function query(collectionRef: any, ...constraints: any[]) {
-    let q = collectionRef;
-    constraints.forEach(c => {
-        q = q[c.type](...c.args);
-    });
-    return q;
-}
-
-function orderBy(fieldPath: string, directionStr: 'asc' | 'desc' = 'asc') {
-    return { type: 'orderBy', args: [fieldPath, directionStr] };
-}
-
-function limit(num: number) {
-    return { type: 'limit', args: [num] };
-}
-
-async function getDocs(query: any) {
-    return await query.get();
 }

@@ -7,7 +7,7 @@
  * This is a privileged operation that requires the Firebase Admin SDK.
  */
 import { z } from 'zod';
-import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
+import { db, admin } from '@/lib/firebaseAdmin';
 
 const RedeemCodeInputSchema = z.object({
     userId: z.string().describe('The UID of the user redeeming the code.'),
@@ -25,7 +25,6 @@ export type RedeemCodeOutput = z.infer<typeof RedeemCodeOutputSchema>;
 
 
 export async function redeemCode(input: RedeemCodeInput): Promise<RedeemCodeOutput> {
-    const { db, admin } = getFirebaseAdmin();
     const { userId, userName, userEmail, code } = input;
 
     const userRef = db.collection('users').doc(userId);
