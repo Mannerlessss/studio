@@ -59,7 +59,7 @@ const CountdownTimer = () => {
     }
 
     return (
-        <div className="mt-2 p-2 rounded-lg bg-gradient-to-r from-red-500 to-orange-500 text-white animate-pulse">
+        <div className="mt-2 p-2 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground animate-pulse">
             <div className="flex items-center justify-center gap-1.5 text-center">
                 <Clock className="w-4 h-4" />
                 <p className="text-xs font-semibold uppercase tracking-wider">Offer Ends In:</p>
@@ -95,7 +95,7 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
       )}
       <CardHeader>
         <div className="flex items-baseline justify-center text-center gap-2">
-            <CardTitle className={cn('text-2xl font-bold', originalAmount ? 'text-primary' : '')}>{amount} Rs.</CardTitle>
+            <CardTitle className={cn('text-2xl font-bold', originalAmount ? 'text-primary' : 'text-foreground')}>{amount} Rs.</CardTitle>
             {originalAmount && (
                 <p className="text-lg font-semibold text-muted-foreground line-through">{originalAmount} Rs.</p>
             )}
