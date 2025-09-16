@@ -24,11 +24,7 @@ export function SpecialOfferPopup() {
     if (!loading) {
       const hasSeenPopup = sessionStorage.getItem(POPUP_STORAGE_KEY);
       if (!hasSeenPopup) {
-        const timer = setTimeout(() => {
-          setIsOpen(true);
-        }, 25000); // 25 seconds
-
-        return () => clearTimeout(timer);
+        setIsOpen(true);
       }
     }
   }, [loading]); // Add loading as a dependency
