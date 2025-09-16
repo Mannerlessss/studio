@@ -41,6 +41,7 @@ const CountdownTimer = () => {
         };
 
         const timer = setInterval(calculateTimeLeft, 1000);
+        calculateTimeLeft();
         return () => clearInterval(timer);
     }, []);
 
@@ -65,7 +66,6 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
   const totalProfit = dailyReturn * duration;
   const message = `Hi, I'm ${userName} and I want to buy the plan for ${amount} Rs.`;
   const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
-  const displayAmount = originalAmount || amount;
 
   return (
     <Card className={cn('shadow-lg relative overflow-hidden', mostPurchased ? 'border-primary border-2' : '')}>
@@ -76,14 +76,14 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
         </Badge>
       )}
       <CardHeader>
-        <div className="flex items-baseline gap-2">
-            <CardTitle className={cn('text-2xl font-bold', mostPurchased ? 'text-primary' : '')}>Plan {displayAmount} Rs.</CardTitle>
+        <div className="flex items-baseline justify-center text-center gap-2">
+            <CardTitle className={cn('text-2xl font-bold', mostPurchased ? 'text-primary' : '')}>{amount} Rs.</CardTitle>
             {originalAmount && (
                 <p className="text-lg font-semibold text-muted-foreground line-through">{originalAmount} Rs.</p>
             )}
         </div>
-        <CardDescription>Invest and get 10% daily return on the original plan amount.</CardDescription>
-        <CountdownTimer />
+        <CardDescription className="text-center">Invest {originalAmount || amount} Rs. and get 10% daily return.</CardDescription>
+        {originalAmount && <CountdownTimer />}
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex justify-between items-center">
