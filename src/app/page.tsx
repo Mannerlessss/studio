@@ -15,7 +15,7 @@ import { ProfileCompletionCard } from '@/components/vaultboost/profile-completio
 import { AnnouncementPopup } from '@/components/vaultboost/announcement-popup';
 import { ActiveInvestmentsCard } from '@/components/vaultboost/active-investments-card';
 import { CollectBonusCard } from '@/components/vaultboost/collect-bonus-card';
-import { cn } from '@/lib/utils';
+import { SpecialOfferPopup } from '@/components/vaultboost/special-offer-popup';
 
 
 const Dashboard: NextPage = () => {
@@ -40,6 +40,7 @@ const Dashboard: NextPage = () => {
     <div className="bg-background min-h-full">
       <Header />
       <AnnouncementPopup />
+      <SpecialOfferPopup />
       <GuidedTour />
       <div className="p-4 space-y-4">
         <div id="welcome-card">
