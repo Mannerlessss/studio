@@ -13,7 +13,6 @@ import { useToast } from '@/hooks/use-toast';
 import { clientAuth, clientDb } from '@/lib/firebaseClient';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc, increment } from 'firebase/firestore';
 import { redeemCode } from '@/ai/flows/redeem-code-flow';
-import { cn } from '@/lib/utils';
 import { DiamondLogo } from '@/components/vaultboost/diamond-logo';
 
 
