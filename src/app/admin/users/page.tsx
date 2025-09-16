@@ -56,7 +56,7 @@ import { clientDb } from '@/lib/firebaseClient';
 
 type UserSortableKeys = 'name' | 'email' | 'membership';
 
-const investmentPlans = [300, 400, 1000, 1600, 4000];
+const investmentPlans = [300, 500, 1000, 2000, 5000];
 
 export default function UsersPage() {
     const { toast } = useToast();
