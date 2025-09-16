@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/auth-context';
 
 const InvestmentPage: NextPage = () => {
   const plans = [
+    { amount: 100, dailyReturn: 10, duration: 30, mostPurchased: true, badgeText: 'Everyone Buys' },
     { amount: 300, dailyReturn: 30, duration: 30 },
     { amount: 400, originalAmount: 500, dailyReturn: 50, duration: 30, mostPurchased: true, badgeText: 'Hot Offer!' },
     { amount: 1000, dailyReturn: 100, duration: 30 },

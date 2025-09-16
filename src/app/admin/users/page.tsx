@@ -36,10 +36,9 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2, ArrowUpDown, Search, UserPlus } from 'lucide-react';
+import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2, ArrowUpDown, Search } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     Select,
@@ -53,17 +52,18 @@ import { getAllUsers, UserForAdmin } from '@/ai/flows/get-all-users-flow';
 import { creditInvestment } from '@/ai/flows/credit-investment-flow';
 import { updateDoc, doc } from 'firebase/firestore';
 import { clientDb } from '@/lib/firebaseClient';
+import { Input } from '@/components/ui/input';
 
 type UserSortableKeys = 'name' | 'email' | 'membership';
 
-const investmentPlans = [300, 500, 1000, 2000, 5000];
+const investmentPlans = [100, 300, 500, 1000, 2000, 5000];
 
 export default function UsersPage() {
     const { toast } = useToast();
     const [users, setUsers] = useState<UserForAdmin[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedUser, setSelectedUser] = useState<UserForAdmin | null>(null);
-    const [creditAmount, setCreditAmount] = useState('300');
+    const [creditAmount, setCreditAmount] = useState('100');
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortKey, setSortKey] = useState<UserSortableKeys>('name');
@@ -138,7 +138,7 @@ export default function UsersPage() {
             // Re-fetch users to get the latest data after a server-side change
             const usersData = await getAllUsers();
             setUsers(usersData);
-            setCreditAmount('300');
+            setCreditAmount('100');
         } catch (error: any) {
              toast({ variant: 'destructive', title: `Credit Failed`, description: error.message });
         } finally {
@@ -209,7 +209,7 @@ export default function UsersPage() {
                 <TableCell className="text-right">
                     <div className='flex gap-2 justify-end'>
                         <Dialog onOpenChange={(isOpen) => !isOpen && setSelectedUser(null)}>
-                            <DialogTrigger asChild>
+                             <DialogTrigger asChild>
                                 <Button variant="ghost" size="icon" onClick={() => setSelectedUser(user)}><Eye className='w-4 h-4' /><span className="sr-only">View Details</span></Button>
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-md">
@@ -230,7 +230,7 @@ export default function UsersPage() {
                                 </div>
                             </DialogContent>
                         </Dialog>
-                       <AlertDialog onOpenChange={(open) => !open && setCreditAmount('300')}>
+                       <AlertDialog onOpenChange={(open) => !open && setCreditAmount('100')}>
                           <AlertDialogTrigger asChild><Button variant="outline" size="sm" disabled={!!isSubmitting}><DollarSign className='w-4 h-4 mr-1' /> Credit</Button></AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
