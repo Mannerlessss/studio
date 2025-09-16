@@ -9,12 +9,11 @@ import { useAuth } from '@/contexts/auth-context';
 
 const InvestmentPage: NextPage = () => {
   const plans = [
-    { amount: 150, dailyReturn: 15, duration: 30, mostPurchased: true, badgeText: 'New Plan' },
-    { amount: 300, dailyReturn: 30, duration: 30 },
-    { amount: 500, dailyReturn: 50, duration: 30, mostPurchased: true, badgeText: 'Hot' },
+    { amount: 300, originalAmount: 400, dailyReturn: 40, duration: 30, mostPurchased: true, badgeText: 'Limited Offer' },
+    { amount: 400, originalAmount: 500, dailyReturn: 50, duration: 30, mostPurchased: true, badgeText: 'Hot' },
     { amount: 1000, dailyReturn: 100, duration: 30 },
-    { amount: 2000, dailyReturn: 200, duration: 30 },
-    { amount: 5000, dailyReturn: 500, duration: 30 },
+    { amount: 1600, originalAmount: 2000, dailyReturn: 200, duration: 30, mostPurchased: true, badgeText: 'Best Value' },
+    { amount: 4000, originalAmount: 5000, dailyReturn: 500, duration: 30 },
   ];
   const { userData } = useAuth();
   const userName = userData?.name || 'User';
