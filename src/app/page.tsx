@@ -54,7 +54,7 @@ const Dashboard: NextPage = () => {
       <Header />
       <AnnouncementPopup />
       <GuidedTour />
-      <div className="p-4 space-y-6">
+      <div className="p-4 space-y-4">
         <div id="welcome-card">
           <WelcomeCard name={userData.name} membership={`${userData.membership} Member`} />
         </div>
@@ -64,22 +64,22 @@ const Dashboard: NextPage = () => {
           <InfoCard
             title="Invested"
             value={`${userData.totalInvested || 0} Rs.`}
-            icon={<Wallet className="h-6 w-6 text-primary" />}
+            icon={<Wallet className="h-5 w-5 md:h-6 md:w-6 text-primary" />}
           />
           <InfoCard
             title="Earnings"
             value={`${userData.totalEarnings || 0} Rs.`}
-            icon={<TrendingUp className="h-6 w-6 text-primary" />}
+            icon={<TrendingUp className="h-5 w-5 md:h-6 md:w-6 text-primary" />}
           />
            <InfoCard
             title="Total ROI"
             value={`300% (${totalROI.toLocaleString('en-IN')} Rs.)`}
-            icon={<PiggyBank className="h-6 w-6 text-primary" />}
+            icon={<PiggyBank className="h-5 w-5 md:h-6 md:w-6 text-primary" />}
           />
           <InfoCard
             title="Referral"
             value={`${userData.totalReferralEarnings || 0} Rs.`}
-            icon={<Users className="h-6 w-6 text-primary" />}
+            icon={<Users className="h-5 w-5 md:h-6 md:w-6 text-primary" />}
           />
         </div>
         <ActiveInvestmentsCard />
