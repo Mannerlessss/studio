@@ -18,37 +18,55 @@ interface InvestmentPlanCardProps {
 }
 
 const CountdownTimer = () => {
-    const [timeLeft, setTimeLeft] = useState('');
+    const [timeLeft, setTimeLeft] = useState({
+        days: 0,
+        hours: 0,
+        minutes: 0,
+        seconds: 0,
+    });
+    const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
+        setIsClient(true);
         const calculateTimeLeft = () => {
             const now = new Date();
             const nextSunday = new Date();
+            // Set to next Sunday 23:59:59
             nextSunday.setDate(now.getDate() + (7 - now.getDay()) % 7);
             nextSunday.setHours(23, 59, 59, 999);
 
             const difference = nextSunday.getTime() - now.getTime();
 
             if (difference > 0) {
-                const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
-                const minutes = Math.floor((difference / 1000 / 60) % 60);
-                const seconds = Math.floor((difference / 1000) % 60);
-                setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+                setTimeLeft({
+                    days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+                    hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+                    minutes: Math.floor((difference / 1000 / 60) % 60),
+                    seconds: Math.floor((difference / 1000) % 60),
+                });
             } else {
-                setTimeLeft('Offer Expired');
+                 setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
             }
         };
 
         const timer = setInterval(calculateTimeLeft, 1000);
-        calculateTimeLeft();
+        calculateTimeLeft(); // Initial call
         return () => clearInterval(timer);
     }, []);
 
+    if (!isClient) {
+        return null; // Don't render on the server to avoid hydration mismatch
+    }
+
     return (
-        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-destructive mt-2">
-            <Clock className="w-4 h-4" />
-            <span>Offer ends in: {timeLeft}</span>
+        <div className="mt-2 p-2 rounded-lg bg-gradient-to-r from-red-500 to-orange-500 text-white animate-pulse">
+            <div className="flex items-center justify-center gap-1.5 text-center">
+                <Clock className="w-4 h-4" />
+                <p className="text-xs font-semibold uppercase tracking-wider">Offer Ends In:</p>
+            </div>
+            <div className="text-center font-mono text-lg font-bold tracking-widest">
+                {`${String(timeLeft.days).padStart(2, '0')}:${String(timeLeft.hours).padStart(2, '0')}:${String(timeLeft.minutes).padStart(2, '0')}:${String(timeLeft.seconds).padStart(2, '0')}`}
+            </div>
         </div>
     );
 };
@@ -77,7 +95,7 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
       )}
       <CardHeader>
         <div className="flex items-baseline justify-center text-center gap-2">
-            <CardTitle className={cn('text-2xl font-bold', 'text-primary')}>{amount} Rs.</CardTitle>
+            <CardTitle className={cn('text-2xl font-bold', originalAmount ? 'text-primary' : '')}>{amount} Rs.</CardTitle>
             {originalAmount && (
                 <p className="text-lg font-semibold text-muted-foreground line-through">{originalAmount} Rs.</p>
             )}
