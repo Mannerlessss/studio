@@ -15,19 +15,18 @@ import Link from 'next/link';
 
 export function SpecialOfferPopup() {
   const [isOpen, setIsOpen] = useState(false);
-  const { userData, loading } = useAuth(); // Destructure loading state
+  const { userData, loading } = useAuth();
   const POPUP_STORAGE_KEY = 'vaultboost-special-offer-10k-seen';
   const userName = userData?.name || 'User';
 
   useEffect(() => {
-    // Only run this effect if the initial data loading is complete
     if (!loading) {
       const hasSeenPopup = sessionStorage.getItem(POPUP_STORAGE_KEY);
       if (!hasSeenPopup) {
         setIsOpen(true);
       }
     }
-  }, [loading]); // Add loading as a dependency
+  }, [loading]);
 
   const handleClose = () => {
     sessionStorage.setItem(POPUP_STORAGE_KEY, 'true');
@@ -36,10 +35,6 @@ export function SpecialOfferPopup() {
   
   const message = `Hi, I'm ${userName} and I want to buy the special 10,000 Rs. plan.`;
   const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
-
-  if (!isOpen) {
-    return null;
-  }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
