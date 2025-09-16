@@ -9,11 +9,11 @@ import { useAuth } from '@/contexts/auth-context';
 
 const InvestmentPage: NextPage = () => {
   const plans = [
-    { amount: 100, dailyReturn: 10, duration: 30, mostPurchased: true, badgeText: 'Everyone Buys' },
     { amount: 300, dailyReturn: 30, duration: 30 },
-    { amount: 500, dailyReturn: 50, duration: 30, mostPurchased: true, badgeText: 'Hot' },
+    { amount: 400, originalAmount: 500, dailyReturn: 50, duration: 30, mostPurchased: true, badgeText: 'Hot Offer!' },
     { amount: 1000, dailyReturn: 100, duration: 30 },
-    { amount: 2000, dailyReturn: 200, duration: 30 },
+    { amount: 1600, originalAmount: 2000, dailyReturn: 200, duration: 30 },
+    { amount: 4000, originalAmount: 5000, dailyReturn: 500, duration: 30, mostPurchased: true, badgeText: 'Limited Time!' },
   ];
   const { userData } = useAuth();
   const userName = userData?.name || 'User';
@@ -22,7 +22,7 @@ const InvestmentPage: NextPage = () => {
     <div className="bg-background min-h-full">
       <Header />
       <div className="p-4 space-y-6">
-        <h2 className="text-2xl font-bold text-center">Investment Plans</h2>
+        <h2 className="text-2xl font-bold text-center">Special Offer Plans</h2>
         {plans.map((plan, index) => (
           <InvestmentPlanCard key={index} {...plan} userName={userName} />
         ))}
