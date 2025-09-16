@@ -34,6 +34,7 @@ export const ReferralLeaderboardCard = () => {
 
     useEffect(() => {
         const fetchLeaderboard = async () => {
+            setLoading(true);
             try {
                 const topUsers = await getLeaderboard();
                 setLeaderboard(topUsers);
@@ -42,7 +43,7 @@ export const ReferralLeaderboardCard = () => {
                  toast({
                     variant: 'destructive',
                     title: 'Could not load leaderboard',
-                    description: 'There was a problem fetching data from the server.'
+                    description: error.message || 'There was a problem fetching data from the server.'
                 })
             } finally {
                 setLoading(false);

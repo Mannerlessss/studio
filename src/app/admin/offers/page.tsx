@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import {
@@ -41,21 +40,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { clientDb as db } from '@/lib/firebase';
-import { addDoc, collection, deleteDoc, doc, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getAllOffers, createOffer, deleteOffer, Offer } from '@/ai/flows/offers-flow';
+
 
 type OfferSortableKeys = 'code' | 'rewardAmount' | 'usageCount' | 'createdAt';
 
-interface Offer {
-    id: string;
-    code: string;
-    rewardAmount: number;
-    maxUsers?: number | null;
-    expiresAt?: Timestamp | null;
-    usageCount: number;
-    createdAt: Timestamp;
-}
 
 export default function OffersPage() {
     const { toast } = useToast();
@@ -76,12 +66,11 @@ export default function OffersPage() {
         const fetchOffers = async () => {
             setLoading(true);
             try {
-                const offersSnapshot = await getDocs(collection(db, 'offers'));
-                const offersData: Offer[] = offersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Offer));
+                const offersData = await getAllOffers();
                 setOffers(offersData);
             } catch (error: any) {
                 console.error("Error fetching offers: ", error);
-                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch offer codes. Check permissions.' });
+                toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not fetch offer codes from server.' });
             } finally {
                 setLoading(false);
             }
@@ -104,11 +93,11 @@ export default function OffersPage() {
             .sort((a, b) => {
                 let aValue, bValue;
                  if (sortKey === 'createdAt') {
-                    aValue = a.createdAt?.toMillis() || 0;
-                    bValue = b.createdAt?.toMillis() || 0;
+                    aValue = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                    bValue = b.createdAt ? new Date(b.createdAt).getTime() : 0;
                 } else {
-                    aValue = a[sortKey] || 0;
-                    bValue = b[sortKey] || 0;
+                    aValue = a[sortKey as keyof Offer] as number || 0;
+                    bValue = b[sortKey as keyof Offer] as number || 0;
                 }
 
                 if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
@@ -130,51 +119,39 @@ export default function OffersPage() {
             return;
         }
 
-        let expiresAtTimestamp: Timestamp | null = null;
+        let expiresAt: string | undefined;
         if (expiresIn && expiresIn !== 'never') {
             const expiresAtDate = new Date();
             if (expiresIn === '1-day') expiresAtDate.setDate(expiresAtDate.getDate() + 1);
             else if (expiresIn === '7-days') expiresAtDate.setDate(expiresAtDate.getDate() + 7);
             else if (expiresIn === '30-days') expiresAtDate.setDate(expiresAtDate.getDate() + 30);
-            expiresAtTimestamp = Timestamp.fromDate(expiresAtDate);
+            expiresAt = expiresAtDate.toISOString();
         }
-
-        const newOfferData: any = {
-            code: newCode.toUpperCase(),
-            rewardAmount: Number(rewardAmount),
-            usageCount: 0,
-            createdAt: serverTimestamp(),
-        };
-
-        if (maxUsers) {
-            newOfferData.maxUsers = Number(maxUsers);
-        }
-
-        if (expiresAtTimestamp) {
-            newOfferData.expiresAt = expiresAtTimestamp;
-        }
-
 
         try {
-            const docRef = await addDoc(collection(db, 'offers'), newOfferData);
+            const result = await createOffer({
+                code: newCode,
+                rewardAmount: Number(rewardAmount),
+                maxUsers: maxUsers ? Number(maxUsers) : undefined,
+                expiresAt,
+            });
+
              toast({
                 title: 'Code Created!',
-                description: `New offer code "${newCode.toUpperCase()}" has been created.`,
+                description: result.message,
             });
             
              const newOfferForState: Offer = {
-                id: docRef.id,
-                code: newOfferData.code,
-                rewardAmount: newOfferData.rewardAmount,
-                maxUsers: newOfferData.maxUsers || null,
-                expiresAt: newOfferData.expiresAt || null,
+                id: result.id!,
+                code: newCode.toUpperCase(),
+                rewardAmount: Number(rewardAmount),
+                maxUsers: maxUsers ? Number(maxUsers) : null,
+                expiresAt: expiresAt || null,
                 usageCount: 0,
-                createdAt: Timestamp.now() // Use client-side timestamp for immediate UI update
+                createdAt: new Date().toISOString(),
             };
-
             setOffers(prev => [newOfferForState, ...prev]);
 
-            // Reset form
             setNewCode('');
             setRewardAmount('');
             setMaxUsers('');
@@ -198,9 +175,9 @@ export default function OffersPage() {
         });
     }
 
-    const deleteCode = async (id: string) => {
+    const handleDeleteCode = async (id: string) => {
         try {
-            await deleteDoc(doc(db, 'offers', id));
+            await deleteOffer(id);
             toast({
                 title: 'Code Deleted!',
                 description: `The offer code has been deleted.`,
@@ -219,7 +196,7 @@ export default function OffersPage() {
         if (offer.maxUsers && offer.usageCount >= offer.maxUsers) {
             return { text: 'Expired', variant: 'outline' };
         }
-        if (offer.expiresAt && offer.expiresAt.toMillis() < Date.now()) {
+        if (offer.expiresAt && new Date(offer.expiresAt).getTime() < Date.now()) {
              return { text: 'Expired', variant: 'outline' };
         }
         return { text: 'Active', variant: 'default' };
@@ -359,7 +336,7 @@ export default function OffersPage() {
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteCode(offer.id)}>
+                              <AlertDialogAction onClick={() => handleDeleteCode(offer.id)}>
                                 Yes, delete it
                               </AlertDialogAction>
                             </AlertDialogFooter>

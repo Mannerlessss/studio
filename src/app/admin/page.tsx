@@ -1,66 +1,37 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, HandCoins, Gift, TrendingUp } from "lucide-react";
-import { clientDb as db } from '@/lib/firebase';
-import { collection, collectionGroup, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getAdminDashboardStats, GetAdminDashboardStatsOutput } from '@/ai/flows/get-admin-dashboard-stats-flow';
+import { useToast } from '@/hooks/use-toast';
 
-interface Stats {
-    totalUsers: number;
-    pendingWithdrawals: number;
-    activeOffers: number;
-    totalInvestments: number;
-}
 
 export default function AdminDashboard() {
-    const [stats, setStats] = useState<Stats | null>(null);
+    const [stats, setStats] = useState<GetAdminDashboardStatsOutput | null>(null);
     const [loading, setLoading] = useState(true);
+    const { toast } = useToast();
 
     useEffect(() => {
         const fetchStats = async () => {
+            setLoading(true);
             try {
-                // Total Users
-                const usersSnapshot = await getDocs(collection(db, 'users'));
-                const totalUsers = usersSnapshot.size;
-
-                // Pending Withdrawals
-                const withdrawalsQuery = query(collectionGroup(db, 'withdrawals'), where('status', '==', 'Pending'));
-                const withdrawalsSnapshot = await getDocs(withdrawalsQuery);
-                const pendingWithdrawals = withdrawalsSnapshot.size;
-
-                // Active Offer Codes
-                const offersSnapshot = await getDocs(collection(db, 'offers'));
-                const activeOffers = offersSnapshot.docs.filter(doc => {
-                    const offer = doc.data();
-                    const now = new Date();
-                    const isExpiredByDate = offer.expiresAt && (offer.expiresAt as Timestamp).toDate() < now;
-                    const isExpiredByUsage = offer.maxUsers && offer.usageCount >= offer.maxUsers;
-                    return !isExpiredByDate && !isExpiredByUsage;
-                }).length;
-
-                // Total Investments - Sum of 'totalInvested' field from all users
-                let totalInvestments = 0;
-                usersSnapshot.forEach(doc => {
-                    totalInvestments += doc.data().totalInvested || 0;
-                });
-
-                setStats({
-                    totalUsers,
-                    pendingWithdrawals,
-                    activeOffers,
-                    totalInvestments
-                });
-            } catch (error) {
+                const fetchedStats = await getAdminDashboardStats();
+                setStats(fetchedStats);
+            } catch (error: any) {
                 console.error("Error fetching admin stats:", error);
+                 toast({
+                    variant: 'destructive',
+                    title: 'Failed to load dashboard',
+                    description: error.message || 'Could not fetch statistics from the server.'
+                });
             } finally {
                 setLoading(false);
             }
         };
 
         fetchStats();
-    }, []);
+    }, [toast]);
 
   return (
     <div className="space-y-6">
@@ -134,7 +105,7 @@ export default function AdminDashboard() {
             Welcome to the Admin Panel
           </h3>
           <p className="text-sm text-muted-foreground">
-            Use the bottom navigation to manage your app.
+            Use the navigation to manage your app.
           </p>
         </div>
       </div>

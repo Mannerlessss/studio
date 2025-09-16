@@ -27,38 +27,42 @@ export const updateWithdrawalStatusFlow = ai.defineFlow({
     inputSchema: UpdateWithdrawalStatusInputSchema,
     outputSchema: UpdateWithdrawalStatusOutputSchema,
 }, async ({ userId, withdrawalId, newStatus, amount }) => {
+    try {
+        const withdrawalDocRef = adminDb.doc(`users/${userId}/withdrawals/${withdrawalId}`);
+        const batch = adminDb.batch();
 
-    const withdrawalDocRef = adminDb.doc(`users/${userId}/withdrawals/${withdrawalId}`);
-    const batch = adminDb.batch();
-
-    batch.update(withdrawalDocRef, { status: newStatus });
-    
-    // Find and update the corresponding transaction document
-    const transactionQuery = adminDb.collection(`users/${userId}/transactions`) 
-        .where('type', '==', 'withdrawal')
-        .where('amount', '==', amount)
-        .where('status', '==', 'Pending')
-        .limit(1); // Find the first match
+        batch.update(withdrawalDocRef, { status: newStatus });
         
-    const transactionSnapshot = await transactionQuery.get();
-    if (!transactionSnapshot.empty) {
-        const transactionDocRef = transactionSnapshot.docs[0].ref;
-        batch.update(transactionDocRef, { status: newStatus });
+        // Find and update the corresponding transaction document
+        const transactionQuery = adminDb.collection(`users/${userId}/transactions`) 
+            .where('type', '==', 'withdrawal')
+            .where('amount', '==', amount)
+            .where('status', '==', 'Pending')
+            .limit(1); // Find the first match
+            
+        const transactionSnapshot = await transactionQuery.get();
+        if (!transactionSnapshot.empty) {
+            const transactionDocRef = transactionSnapshot.docs[0].ref;
+            batch.update(transactionDocRef, { status: newStatus });
+        }
+
+        if (newStatus === 'Rejected') {
+            const userDocRef = adminDb.doc(`users/${userId}`);
+            batch.update(userDocRef, {
+                totalBalance: FieldValue.increment(amount)
+            });
+        }
+
+        await batch.commit();
+
+        return {
+            success: true,
+            message: `Withdrawal request has been ${newStatus.toLowerCase()}.`,
+        };
+    } catch(e: any) {
+        console.error("Failed to update withdrawal status", e);
+        throw new Error(`Server failed to update status: ${e.message}`);
     }
-
-    if (newStatus === 'Rejected') {
-         const userDocRef = adminDb.doc(`users/${userId}`);
-         batch.update(userDocRef, {
-            totalBalance: FieldValue.increment(amount)
-        });
-    }
-
-    await batch.commit();
-
-    return {
-        success: true,
-        message: `Withdrawal request has been ${newStatus.toLowerCase()}.`,
-    };
 });
 
 // Exported wrapper function
