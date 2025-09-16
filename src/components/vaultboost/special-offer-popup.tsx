@@ -15,20 +15,23 @@ import Link from 'next/link';
 
 export function SpecialOfferPopup() {
   const [isOpen, setIsOpen] = useState(false);
-  const { userData } = useAuth();
+  const { userData, loading } = useAuth(); // Destructure loading state
   const POPUP_STORAGE_KEY = 'vaultboost-special-offer-10k-seen';
   const userName = userData?.name || 'User';
 
   useEffect(() => {
-    const hasSeenPopup = sessionStorage.getItem(POPUP_STORAGE_KEY);
-    if (!hasSeenPopup) {
-      const timer = setTimeout(() => {
-        setIsOpen(true);
-      }, 25000); // 25 seconds
+    // Only run this effect if the initial data loading is complete
+    if (!loading) {
+      const hasSeenPopup = sessionStorage.getItem(POPUP_STORAGE_KEY);
+      if (!hasSeenPopup) {
+        const timer = setTimeout(() => {
+          setIsOpen(true);
+        }, 25000); // 25 seconds
 
-      return () => clearTimeout(timer);
+        return () => clearTimeout(timer);
+      }
     }
-  }, []);
+  }, [loading]); // Add loading as a dependency
 
   const handleClose = () => {
     sessionStorage.setItem(POPUP_STORAGE_KEY, 'true');
