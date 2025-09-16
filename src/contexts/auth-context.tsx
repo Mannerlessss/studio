@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { clientAuth, clientDb } from '@/lib/firebaseClient';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc, increment } from 'firebase/firestore';
 import { redeemCode } from '@/ai/flows/redeem-code-flow';
-import { DiamondLogo } from '@/components/vaultboost/diamond-logo';
+import { Gem } from 'lucide-react';
 
 
 export interface Investment {
@@ -531,7 +531,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
          return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <div className="text-center">
-                    <DiamondLogo className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
+                    <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
                     <p className="text-lg text-muted-foreground">Loading...</p>
                 </div>
             </div>

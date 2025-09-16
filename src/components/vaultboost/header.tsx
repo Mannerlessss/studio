@@ -1,11 +1,10 @@
 'use client';
 import type { FC } from 'react';
-import { Headset, Crown } from 'lucide-react';
+import { Headset, Crown, Gem } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { DiamondLogo } from './diamond-logo';
 
 export const Header: FC = () => {
   const pathname = usePathname();
@@ -16,7 +15,7 @@ export const Header: FC = () => {
   return (
     <header className={`flex items-center justify-between p-3 md:p-4 border-b ${headerClasses}`}>
       <div className="flex items-center gap-2 md:gap-3">
-        <DiamondLogo className={`w-7 h-7 md:w-8 md:h-8 ${iconColor}`} />
+        <Gem className={`w-7 h-7 md:w-8 md:h-8 ${iconColor}`} />
         <h1 className="text-xl md:text-2xl font-bold font-headline">VaultBoost</h1>
       </div>
       <div className="flex items-center gap-1">

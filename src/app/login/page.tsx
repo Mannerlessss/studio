@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Lock, Mail, Phone, User, Users } from 'lucide-react';
+import { Gem, Lock, Mail, Phone, User, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -26,7 +26,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { DiamondLogo } from '@/components/vaultboost/diamond-logo';
 
 export default function LoginPage() {
     const { signUpWithEmail, signInWithEmail, loading, sendPasswordReset } = useAuth();
@@ -96,7 +95,7 @@ export default function LoginPage() {
        <AlertDialog>
         <Tabs defaultValue="login" className="w-full max-w-md">
             <div className="flex flex-col items-center justify-center mb-6 space-y-4">
-            <DiamondLogo className="w-12 h-12 text-primary" />
+            <Gem className="w-12 h-12 text-primary" />
             <h1 className="text-2xl font-bold tracking-widest text-primary">
                 VAULTBOOST
             </h1>
