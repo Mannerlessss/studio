@@ -21,8 +21,6 @@ function initializeAdmin() {
   }
 
   try {
-    // Vercel/Netlify/etc. will have this as a single-line JSON string.
-    // In local dev, it might be set in a .env.local file.
     const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
     if (!serviceAccountKey) {
