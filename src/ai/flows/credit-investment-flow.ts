@@ -34,11 +34,31 @@ export const creditInvestmentFlow = ai.defineFlow(
         const userDocRef = adminDb.collection('users').doc(userId);
         
         await adminDb.runTransaction(async (transaction) => {
+            // --- ALL READS MUST COME BEFORE WRITES ---
+
             const userDoc = await transaction.get(userDocRef);
             if (!userDoc.exists) {
                 throw new Error(`User with ID ${userId} not found.`);
             }
             const user = userDoc.data()!;
+            
+            let referrerDoc: admin.firestore.DocumentSnapshot | null = null;
+            let referredUserQuerySnapshot: admin.firestore.QuerySnapshot | null = null;
+            let referrerDocRef: admin.firestore.DocumentReference | null = null;
+
+            // If a referral is involved, read all necessary documents first.
+            if (!user.hasInvested && user.referredBy && amount >= 100) {
+                referrerDocRef = adminDb.collection('users').doc(user.referredBy);
+                referrerDoc = await transaction.get(referrerDocRef);
+
+                if (referrerDoc.exists) {
+                    const referrerReferralsRef = adminDb.collection('users').doc(user.referredBy).collection('referrals');
+                    const q = referrerReferralsRef.where("userId", "==", userId);
+                    referredUserQuerySnapshot = await transaction.get(q);
+                }
+            }
+            
+            // --- ALL WRITES AFTER THIS POINT ---
             const now = FieldValue.serverTimestamp();
 
             // 1. Create a new document in the `investments` subcollection
@@ -73,64 +93,58 @@ export const creditInvestmentFlow = ai.defineFlow(
             transaction.update(userDocRef, userUpdates);
 
             // 4. Handle Referral Logic (if it's the user's first investment >= 100)
-            if (!user.hasInvested && user.referredBy && amount >= 100) {
-                const referrerDocRef = adminDb.collection('users').doc(user.referredBy);
-                const referrerDoc = await transaction.get(referrerDocRef);
+            if (referrerDoc && referrerDoc.exists && referrerDocRef) {
+                const referrerData = referrerDoc.data()!;
+                const bonusAmount = 75;
 
-                if (referrerDoc.exists) {
-                    const referrerData = referrerDoc.data()!;
-                    const bonusAmount = 75;
+                transaction.update(userDocRef, {
+                    totalBalance: FieldValue.increment(bonusAmount),
+                    totalBonusEarnings: FieldValue.increment(bonusAmount),
+                    totalEarnings: FieldValue.increment(bonusAmount),
+                });
+                const userBonusTransactionRef = adminDb.collection(`users/${userId}/transactions`).doc();
+                transaction.set(userBonusTransactionRef, {
+                    type: 'bonus', amount: bonusAmount, description: `Welcome referral bonus!`, status: 'Completed', date: now,
+                });
 
-                    transaction.update(userDocRef, {
-                        totalBalance: FieldValue.increment(bonusAmount),
-                        totalBonusEarnings: FieldValue.increment(bonusAmount),
-                        totalEarnings: FieldValue.increment(bonusAmount),
-                    });
-                    const userBonusTransactionRef = adminDb.collection(`users/${userId}/transactions`).doc();
-                    transaction.set(userBonusTransactionRef, {
-                        type: 'bonus', amount: bonusAmount, description: `Welcome referral bonus!`, status: 'Completed', date: now,
-                    });
-
-                    const newReferralCount = (referrerData.investedReferralCount || 0) + 1;
-                    transaction.update(referrerDocRef, {
-                        totalBalance: FieldValue.increment(bonusAmount),
-                        totalReferralEarnings: FieldValue.increment(bonusAmount),
-                        totalEarnings: FieldValue.increment(bonusAmount),
-                        investedReferralCount: FieldValue.increment(1),
-                    });
-                    const referrerBonusTransactionRef = adminDb.collection(`users/${user.referredBy}/transactions`).doc();
-                    transaction.set(referrerBonusTransactionRef, {
-                        type: 'referral', amount: bonusAmount, description: `Referral bonus from ${user.name}`, status: 'Completed', date: now,
-                    });
-                    
-                    const claimedMilestones = referrerData.claimedMilestones || [];
-                    for (const milestone in milestones) {
-                        const milestoneNum = Number(milestone);
-                        if (newReferralCount >= milestoneNum && !claimedMilestones.includes(milestoneNum)) {
-                            const rewardAmount = milestones[milestoneNum];
-                            transaction.update(referrerDocRef, {
-                                totalBalance: FieldValue.increment(rewardAmount),
-                                totalReferralEarnings: FieldValue.increment(rewardAmount),
-                                totalEarnings: FieldValue.increment(rewardAmount),
-                                claimedMilestones: FieldValue.arrayUnion(milestoneNum)
-                            });
-                            const milestoneTransactionRef = adminDb.collection(`users/${user.referredBy}/transactions`).doc();
-                            transaction.set(milestoneTransactionRef, {
-                                type: 'bonus', amount: rewardAmount, description: `Milestone Bonus: ${milestone} referrals`, status: 'Completed', date: now,
-                            });
-                        }
+                const newReferralCount = (referrerData.investedReferralCount || 0) + 1;
+                transaction.update(referrerDocRef, {
+                    totalBalance: FieldValue.increment(bonusAmount),
+                    totalReferralEarnings: FieldValue.increment(bonusAmount),
+                    totalEarnings: FieldValue.increment(bonusAmount),
+                    investedReferralCount: FieldValue.increment(1),
+                });
+                const referrerBonusTransactionRef = adminDb.collection(`users/${user.referredBy}/transactions`).doc();
+                transaction.set(referrerBonusTransactionRef, {
+                    type: 'referral', amount: bonusAmount, description: `Referral bonus from ${user.name}`, status: 'Completed', date: now,
+                });
+                
+                const claimedMilestones = referrerData.claimedMilestones || [];
+                for (const milestone in milestones) {
+                    const milestoneNum = Number(milestone);
+                    if (newReferralCount >= milestoneNum && !claimedMilestones.includes(milestoneNum)) {
+                        const rewardAmount = milestones[milestoneNum];
+                        transaction.update(referrerDocRef, {
+                            totalBalance: FieldValue.increment(rewardAmount),
+                            totalReferralEarnings: FieldValue.increment(rewardAmount),
+                            totalEarnings: FieldValue.increment(rewardAmount),
+                            claimedMilestones: FieldValue.arrayUnion(milestoneNum)
+                        });
+                        const milestoneTransactionRef = adminDb.collection(`users/${user.referredBy}/transactions`).doc();
+                        transaction.set(milestoneTransactionRef, {
+                            type: 'bonus', amount: rewardAmount, description: `Milestone Bonus: ${milestone} referrals`, status: 'Completed', date: now,
+                        });
                     }
-                    
-                    const referrerReferralsRef = adminDb.collection('users').doc(user.referredBy).collection('referrals');
-                    const q = referrerReferralsRef.where("userId", "==", userId);
-                    const referredUserDocs = await transaction.get(q);
-
-                    if (referredUserDocs.empty) {
+                }
+                
+                if (referredUserQuerySnapshot) {
+                    if (referredUserQuerySnapshot.empty) {
+                        const referrerReferralsRef = adminDb.collection('users').doc(user.referredBy).collection('referrals');
                         transaction.set(referrerReferralsRef.doc(), {
                             userId, name: user.name, email: user.email, hasInvested: true, joinedAt: user.createdAt || now,
                         });
                     } else {
-                        transaction.update(referredUserDocs.docs[0].ref, { hasInvested: true });
+                        transaction.update(referredUserQuerySnapshot.docs[0].ref, { hasInvested: true });
                     }
                 }
             }
