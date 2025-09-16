@@ -2,60 +2,47 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
+
+    // Helper function to check if a user is an admin
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true || request.auth.token.admin == true;
+    }
+    
+    // Helper function to check if the user is the owner of the document
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-    
-    function isAdmin() {
-      return request.auth.token.admin == true;
-    }
 
-    // Rules for the `users` collection
+    // Rules for the 'users' collection
     match /users/{userId} {
-      // Allow create for any authenticated user (for sign-up)
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      
-      // Allow read, update only for the owner of the document or an admin
-      allow read, update: if isOwner(userId) || isAdmin();
-      
-      // Allow delete only for admin (should be handled via a backend function)
-      allow delete: if isAdmin();
-      
-      // Sub-collections for a specific user
-      match /{subcollection}/{docId} {
-         // Allow read/write on subcollections only for the owner or admin
-         allow read, write: if isOwner(userId) || isAdmin();
-      }
-      
-      // Specific rule for the `referrals` subcollection to allow another user to write to it.
-      // This is needed for the redeemReferralCode flow.
-       match /referrals/{referralId} {
-         // Owner can read their own referrals
-         allow read: if isOwner(userId);
-         // Any authenticated user can create a referral entry in someone else's list.
-         // This is secure because the backend flow validates the code first.
-         // We check that they are only setting specific, non-sensitive fields.
-         allow create: if request.auth != null && request.resource.data.keys().hasAll(['userId', 'name', 'email', 'hasInvested', 'joinedAt']);
-         
-         // Only the owner of the main user document can update/delete.
-         allow update, delete: if isOwner(userId);
-       }
-    }
-
-    // Rules for the `offers` collection
-    match /offers/{offerId} {
-      // Any authenticated user can read the list of offers
-      allow read: if request.auth != null;
-      
-      // Only admins can create, update, or delete offers
-      allow write: if isAdmin();
+      // Admins can read/write any user document
+      allow read, write: if isAdmin();
+      // Users can create their own document, read their own document, and update specific fields
+      allow create: if request.auth != null;
+      allow get: if isOwner(userId);
+      allow update: if isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'lastLogin', 'hasCollectedSignupBonus', 'lastBonusClaim', 'redeemedOfferCodes']);
+      // Any authenticated user can list users for referral leaderboard, but only specific fields
+      allow list: if request.auth != null;
     }
     
-     // Rules for collection groups
-    match /{path=**}/withdrawals/{withdrawalId} {
-      // Only admins can query across all `withdrawals` subcollections
-      allow read: if isAdmin();
+    // Rules for subcollections within 'users'
+    match /users/{userId}/{subcollection}/{docId} {
+        // Admins have full access to all subcollections
+        allow read, write: if isAdmin();
+        
+        // Users can read their own subcollection documents
+        allow get: if isOwner(userId);
+        
+        // Specific create/update rules for users
+        allow create: if isOwner(userId) && (subcollection == 'withdrawals' || subcollection == 'transactions');
+    }
+
+    // Rules for the 'offers' collection
+    match /offers/{offerId} {
+        // Only admins can create, update, or delete offers
+        allow write: if isAdmin();
+        // Any authenticated user can read the offers (e.g., to see if a code is valid)
+        allow read: if request.auth != null;
     }
   }
 }
