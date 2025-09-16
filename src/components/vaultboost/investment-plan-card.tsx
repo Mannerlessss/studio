@@ -77,7 +77,7 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
       )}
       <CardHeader>
         <div className="flex items-baseline justify-center text-center gap-2">
-            <CardTitle className={cn('text-2xl font-bold', originalAmount ? 'text-primary' : '')}>{amount} Rs.</CardTitle>
+            <CardTitle className={cn('text-2xl font-bold', 'text-primary')}>{amount} Rs.</CardTitle>
             {originalAmount && (
                 <p className="text-lg font-semibold text-muted-foreground line-through">{originalAmount} Rs.</p>
             )}
