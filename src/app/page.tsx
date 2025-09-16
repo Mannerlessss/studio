@@ -1,5 +1,4 @@
 'use client';
-import { useState, useEffect } from 'react';
 import type { NextPage } from 'next';
 import { WelcomeCard } from '@/components/vaultboost/welcome-card';
 import { InfoCard } from '@/components/vaultboost/info-card';
@@ -21,19 +20,7 @@ import { SpecialOfferPopup } from '@/components/vaultboost/special-offer-popup';
 
 const Dashboard: NextPage = () => {
   const { userData, loading, claimDailyBonus, totalROI } = useAuth();
-  const [showSpecialOffer, setShowSpecialOffer] = useState(false);
-  const POPUP_STORAGE_KEY = 'vaultboost-special-offer-10k-seen';
-
-  useEffect(() => {
-    if (!loading && userData) {
-        const hasSeenPopup = sessionStorage.getItem(POPUP_STORAGE_KEY);
-        if (!hasSeenPopup) {
-            setShowSpecialOffer(true);
-            sessionStorage.setItem(POPUP_STORAGE_KEY, 'true');
-        }
-    }
-  }, [loading, userData]);
-
+  
   if (loading || !userData) {
       return (
         <div className="flex items-center justify-center min-h-screen bg-background">
@@ -53,7 +40,7 @@ const Dashboard: NextPage = () => {
     <div className="bg-background min-h-full">
       <Header />
       <AnnouncementPopup />
-      <SpecialOfferPopup isOpen={showSpecialOffer} onOpenChange={setShowSpecialOffer} />
+      <SpecialOfferPopup />
       <GuidedTour />
       <div className="p-4 space-y-4">
         <div id="welcome-card">
