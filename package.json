@@ -11,7 +11,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "set-admin": "tsx src/lib/set-admin-claim.ts",
-    "clear-test-users": "tsx src/lib/clear-test-users.ts"
+    "clear-test-users": "tsx src/lib/clear-test-users.ts",
+    "import-data": "tsx src/lib/import-data.ts"
   },
   "dependencies": {
     "@genkit-ai/firebase": "^1.19.2",
@@ -42,6 +43,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
+    "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.6.0",
     "firebase": "^11.10.0",
     "firebase-admin": "^12.2.0",

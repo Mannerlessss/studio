@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Gagan Sharma",
+    "email": "gagan.sharma@example.com",
+    "phone": "9876543210",
+    "password": "temporaryPassword123",
+    "totalBalance": 500,
+    "totalInvested": 1000,
+    "totalEarnings": 650,
+    "totalReferralEarnings": 150,
+    "totalBonusEarnings": 50,
+    "totalInvestmentEarnings": 450
+  },
+  {
+    "name": "Jane Smith",
+    "email": "jane.smith@example.com",
+    "phone": "8765432109",
+    "password": "anotherSecurePassword456",
+    "totalBalance": 120,
+    "totalInvested": 300,
+    "totalEarnings": 120,
+    "totalReferralEarnings": 0,
+    "totalBonusEarnings": 20,
+    "totalInvestmentEarnings": 100
+  }
+]
