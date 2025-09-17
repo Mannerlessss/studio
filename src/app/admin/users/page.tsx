@@ -51,8 +51,7 @@ import {
 import { deleteUser } from '@/ai/flows/delete-user-flow';
 import { getAllUsers, UserForAdmin } from '@/ai/flows/get-all-users-flow';
 import { creditInvestment } from '@/ai/flows/credit-investment-flow';
-import { doc, updateDoc } from 'firebase/firestore';
-import { clientDb } from '@/lib/firebaseClient';
+import { upgradeUserToPro } from '@/ai/flows/upgrade-user-to-pro-flow';
 
 
 type UserSortableKeys = 'name' | 'email' | 'membership';
@@ -172,8 +171,7 @@ export default function UsersPage() {
     const handleUpgrade = async (userId: string) => {
         setIsSubmitting(userId);
         try {
-            const userDocRef = doc(clientDb, 'users', userId);
-            await updateDoc(userDocRef, { membership: 'Pro' });
+            await upgradeUserToPro(userId);
             toast({
                 title: `Upgraded to Pro`,
                 description: `User has been upgraded to the Pro plan.`,
