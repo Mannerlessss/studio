@@ -14,6 +14,7 @@ import { clientAuth, clientDb } from '@/lib/firebaseClient';
 import { doc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, addDoc, increment } from 'firebase/firestore';
 import { redeemCode } from '@/ai/flows/redeem-code-flow';
 import { Gem } from 'lucide-react';
+import { redeemOfferCode as redeemOfferCodeFlow } from '@/ai/flows/redeem-offer-code-flow';
 
 
 export interface Investment {
@@ -72,6 +73,7 @@ interface AuthContextType {
   collectSignupBonus: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   redeemReferralCode: (code: string) => Promise<void>;
+  redeemOfferCode: (code: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -488,6 +490,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    const redeemOfferCode = async (code: string) => {
+        if (!user) throw new Error("User is not authenticated.");
+        try {
+            const result = await redeemOfferCodeFlow({ userId: user.uid, code });
+            toast({
+                title: 'Success!',
+                description: result.message,
+            });
+        } catch (error: any) {
+             console.error("Offer code redemption failed:", error);
+             throw error;
+        }
+    };
+
+
     const value: AuthContextType = {
         user,
         userData,
@@ -503,6 +520,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         collectSignupBonus,
         sendPasswordReset,
         redeemReferralCode,
+        redeemOfferCode,
     };
     
     if (loading && !pathname.startsWith('/admin')) {
