@@ -29,7 +29,7 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
   return (
     <Card className="shadow-lg overflow-hidden">
       <CardHeader className="p-0">
-        <div className="flex items-center justify-between bg-primary p-3 text-primary-foreground">
+        <div className="flex items-center justify-between bg-primary p-2 text-primary-foreground">
             <h3 className="font-bold text-lg">{title}</h3>
             <Link href={whatsappUrl} target="_blank">
                 <Button variant="secondary" size="sm" className="bg-white text-primary hover:bg-white/90">Buy</Button>
