@@ -34,7 +34,7 @@ const ReturnComparisonRow = ({ investment, basic, pro }: { investment: number, b
     <div className="flex items-center space-x-2">
         <div className="p-3 rounded-lg bg-muted flex-1 text-center">
             <p className="text-sm text-muted-foreground">{investment.toLocaleString()} Rs. Investment</p>
-            <p className="text-xs text-muted-foreground">(30 Days)</p>
+            <p className="text-xs text-muted-foreground">(30 Days Profit)</p>
         </div>
         <div className="flex-1 space-y-1 text-center">
             <p className="text-sm font-semibold">{pro.toLocaleString()} Rs.</p>
@@ -53,17 +53,17 @@ const ProPage: NextPage = () => {
 
   const benefits = [
     { icon: ArrowUp, title: "Higher Daily Returns", description: "Increase all your investment returns from 10% to 13% daily." },
-    { icon: Star, title: "Enhanced Daily Bonus", description: "Get higher bonus rewards in daily bonus games (₹3-₹8)." },
+    { icon: Star, title: "Enhanced Daily Bonus", description: "Get higher bonus rewards in daily bonus games (3-8 Rs)." },
     { icon: Shield, title: "Priority Support", description: "Get faster response times and dedicated PRO support." },
     { icon: Award, title: "Early Access", description: "Access to new investment plans and features before others." },
   ];
 
   const returns = [
-      { investment: 100, basic: 100 + (100 * 0.10 * 30), pro: 100 + (100 * 0.13 * 30) },
-      { investment: 300, basic: 300 + (300 * 0.10 * 30), pro: 300 + (300 * 0.13 * 30) },
-      { investment: 500, basic: 500 + (500 * 0.10 * 30), pro: 500 + (500 * 0.13 * 30) },
-      { investment: 1000, basic: 1000 + (1000 * 0.10 * 30), pro: 1000 + (1000 * 0.13 * 30) },
-      { investment: 2000, basic: 2000 + (2000 * 0.10 * 30), pro: 2000 + (2000 * 0.13 * 30) },
+      { investment: 100, basic: (100 * 0.10 * 30), pro: (100 * 0.13 * 30) },
+      { investment: 300, basic: (300 * 0.10 * 30), pro: (300 * 0.13 * 30) },
+      { investment: 500, basic: (500 * 0.10 * 30), pro: (500 * 0.13 * 30) },
+      { investment: 1000, basic: (1000 * 0.10 * 30), pro: (1000 * 0.13 * 30) },
+      { investment: 2000, basic: (2000 * 0.10 * 30), pro: (2000 * 0.13 * 30) },
   ];
 
   return (
@@ -116,8 +116,8 @@ const ProPage: NextPage = () => {
         
          <Card>
             <CardHeader>
-                <CardTitle>PRO vs Basic Returns</CardTitle>
-                <CardDescription>30-day investment comparison</CardDescription>
+                <CardTitle>PRO vs Basic Profit</CardTitle>
+                <CardDescription>30-day investment profit comparison</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 {returns.map(r => (
