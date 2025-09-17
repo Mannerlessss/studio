@@ -1,12 +1,12 @@
 'use client';
 import type { FC } from 'react';
 import { Headset, Crown, Gem } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 export const Header: FC = () => {
   const headerClasses = 'bg-card text-foreground';
-  const buttonClasses = 'text-muted-foreground hover:bg-accent/10 hover:text-accent-foreground';
   const iconColor = 'text-primary';
   
   return (
@@ -16,17 +16,13 @@ export const Header: FC = () => {
         <h1 className="text-xl md:text-2xl font-bold font-headline">VaultBoost</h1>
       </div>
       <div className="flex items-center gap-1">
-        <Link href="/support">
-          <Button variant="ghost" size="icon" className={buttonClasses}>
-            <Headset className="h-5 w-5" />
-            <span className="sr-only">Customer Support</span>
-          </Button>
+        <Link href="/support" className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'text-muted-foreground hover:bg-accent/10 hover:text-accent-foreground')}>
+          <Headset className="h-5 w-5" />
+          <span className="sr-only">Customer Support</span>
         </Link>
-        <Link href="/pro">
-          <Button variant="ghost" size="icon" className={buttonClasses}>
-            <Crown className={`h-5 w-5 text-primary`} />
-            <span className="sr-only">Pro Plan</span>
-          </Button>
+        <Link href="/pro" className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'text-muted-foreground hover:bg-accent/10 hover:text-accent-foreground')}>
+          <Crown className={`h-5 w-5 text-primary`} />
+          <span className="sr-only">Pro Plan</span>
         </Link>
       </div>
     </header>
