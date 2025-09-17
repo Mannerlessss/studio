@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     // Function to process earnings for all active investments for a user
-    const processInvestmentEarnings = async (currentUserId: string) => {
+    const processInvestmentEarnings = async (currentUserId: string, currentUserData?: UserData) => {
         const investmentsColRef = collection(clientDb, `users/${currentUserId}/investments`);
         const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
         
@@ -132,6 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 
                 let totalEarningsToAdd = 0;
                 const currentData = userDoc.data() as UserData;
+                const isProMember = (currentUserData || currentData).membership === 'Pro';
                 const now = new Date();
                 const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                 
@@ -157,12 +158,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     
                     if (daysPassed <= 0) continue;
 
-                    const daysAlreadyProcessed = Math.round(investment.earnings / investment.dailyReturn);
+                    // Determine the correct daily return based on membership at time of calculation
+                    const dailyReturnRate = isProMember ? 0.13 : 0.10;
+                    const correctDailyReturn = investment.planAmount * dailyReturnRate;
+
+                    const daysAlreadyProcessed = Math.round(investment.earnings / investment.dailyReturn); // Use original dailyReturn for processed days
                     const remainingDaysInPlan = investment.durationDays - daysAlreadyProcessed;
                     const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
 
                     if (daysToCredit > 0) {
-                        const earningsForThisPlan = investment.dailyReturn * daysToCredit;
+                        const earningsForThisPlan = correctDailyReturn * daysToCredit;
                         totalEarningsToAdd += earningsForThisPlan;
 
                         const newEarnings = investment.earnings + earningsForThisPlan;
@@ -179,7 +184,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             const earningDay = new Date(startOfToday.getTime() - (daysPassed - i - 1) * msInDay);
                             transaction.set(transactionRef, {
                                 type: 'earning',
-                                amount: investment.dailyReturn,
+                                amount: correctDailyReturn,
                                 description: `Earning from Plan ${investment.planAmount}`,
                                 status: 'Completed',
                                 date: Timestamp.fromDate(earningDay),
@@ -245,10 +250,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                      setUserData(null);
                      setLoading(false);
                 } else {
-                    await processInvestmentEarnings(currentUser.uid); 
-                    
+                    // We need user data to know if they are 'Pro' before processing earnings
                     const userDocRef = doc(clientDb, 'users', currentUser.uid);
-                    unsubFromUser = onSnapshot(userDocRef, (userDocSnap) => {
+                    unsubFromUser = onSnapshot(userDocRef, async (userDocSnap) => {
                         if (!userDocSnap.exists()) {
                             console.warn(`No Firestore document found for user ${currentUser.uid}. This can happen briefly during sign up.`);
                             return;
@@ -256,6 +260,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         
                         const baseUserData = { uid: userDocSnap.id, ...userDocSnap.data() } as UserData;
                         
+                        // Process earnings now that we have user data (for membership status)
+                        await processInvestmentEarnings(currentUser.uid, baseUserData);
+
                         const investmentsColRef = collection(clientDb, `users/${currentUser.uid}/investments`);
                         unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
                             const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));

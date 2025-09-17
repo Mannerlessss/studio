@@ -17,7 +17,6 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Card,
@@ -255,7 +254,7 @@ export default function UsersPage() {
                 <TableCell className="text-right">
                     <div className='flex gap-2 justify-end'>
                         <Dialog onOpenChange={(isOpen) => { if (!isOpen) setSelectedUser(null); }}>
-                            <DialogTrigger asChild>
+                           <DialogTrigger asChild>
                                 <Button variant="ghost" size="icon" onClick={() => setSelectedUser(user)}>
                                     <Eye className='w-4 h-4' />
                                     <span className="sr-only">View Details</span>

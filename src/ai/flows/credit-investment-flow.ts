@@ -34,12 +34,12 @@ const creditInvestmentFlow = ai.defineFlow(
         const adminDb = await getAdminDb();
         
         let referredUserDocRefToUpdate: admin.firestore.DocumentReference | null = null;
+        
+        // --- PRE-TRANSACTION READ ---
         const userDoc = await adminDb.collection('users').doc(userId).get();
         if(!userDoc.exists) throw new Error(`User with ID ${userId} not found.`);
         const user = userDoc.data()!;
         
-        // --- PRE-TRANSACTION READ ---
-        // If there's a referrer, find the sub-collection document that needs updating beforehand.
         if (user.referredBy) {
              const referrerReferralsRef = adminDb.collection('users').doc(user.referredBy).collection('referrals');
              const q = referrerReferralsRef.where("userId", "==", userId);
@@ -53,7 +53,6 @@ const creditInvestmentFlow = ai.defineFlow(
         await adminDb.runTransaction(async (transaction) => {
             const userDocRef = adminDb.collection('users').doc(userId);
             // --- ALL READS MUST HAPPEN BEFORE WRITES ---
-            // Re-read user doc inside transaction for consistency
             const userDocInTransaction = await transaction.get(userDocRef);
             if (!userDocInTransaction.exists) {
                 throw new Error(`User with ID ${userId} not found.`);
@@ -63,7 +62,6 @@ const creditInvestmentFlow = ai.defineFlow(
             let referrerDoc: admin.firestore.DocumentSnapshot | null = null;
             let referrerDocRef: admin.firestore.DocumentReference | null = null;
             
-            // If it's the user's first investment, we might need referrer data. Read it now.
             if (!userInTransaction.hasInvested && userInTransaction.referredBy && amount >= 100) {
                 referrerDocRef = adminDb.collection('users').doc(userInTransaction.referredBy);
                 referrerDoc = await transaction.get(referrerDocRef);
@@ -115,7 +113,6 @@ const creditInvestmentFlow = ai.defineFlow(
 
             transaction.update(userDocRef, userUpdates);
 
-            // Handle referral logic if a valid referrer was read earlier
             if (referrerDocRef && referrerDoc && referrerDoc.exists) {
                 const referrerData = referrerDoc.data()!;
                 const bonusAmount = 75;
@@ -153,7 +150,6 @@ const creditInvestmentFlow = ai.defineFlow(
                 
                 transaction.update(referrerDocRef, referrerUpdates);
                 
-                // Finally, update the referral subcollection document if its ref was found before the transaction
                 if (referredUserDocRefToUpdate) {
                     transaction.update(referredUserDocRefToUpdate, { hasInvested: true });
                 }
