@@ -56,7 +56,7 @@ import { clientDb } from '@/lib/firebaseClient';
 
 
 type UserSortableKeys = 'name' | 'email' | 'membership';
-const investmentPlans = [100, 300, 500, 1000, 2000];
+const investmentPlans = [150, 300, 400, 1000, 1600, 4000, 10000, 25000, 30000, 50000, 60000, 100000];
 
 
 export default function UsersPage() {
@@ -64,7 +64,7 @@ export default function UsersPage() {
     const [users, setUsers] = useState<UserForAdmin[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedUser, setSelectedUser] = useState<UserForAdmin | null>(null);
-    const [creditAmount, setCreditAmount] = useState('100'); // Default to the smallest plan
+    const [creditAmount, setCreditAmount] = useState('150'); // Default to a valid plan
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortKey, setSortKey] = useState<UserSortableKeys>('name');
@@ -157,7 +157,7 @@ export default function UsersPage() {
                 hasInvested: true, 
                 totalInvested: (u.totalInvested || 0) + amount,
             } : u));
-            setCreditAmount('100');
+            setCreditAmount('150');
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -262,7 +262,7 @@ export default function UsersPage() {
                                 </Button>
                             </DialogTrigger>
                         </Dialog>
-                       <AlertDialog onOpenChange={(open) => !open && setCreditAmount('100')}>
+                       <AlertDialog onOpenChange={(open) => !open && setCreditAmount('150')}>
                           <AlertDialogTrigger asChild>
                              <Button variant="outline" size="sm" disabled={!!isSubmitting}>
                                 <DollarSign className='w-4 h-4 mr-1' /> Credit
