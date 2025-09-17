@@ -4,12 +4,14 @@ import Link from 'next/link';
 import { LayoutDashboard, TrendingUp, Users, Settings, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { usePathname } from 'next/navigation';
 
 interface BottomNavProps {
   activePage: 'dashboard' | 'investment' | 'pro' | 'refer' | 'settings' | 'support';
 }
 
 export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {
+  const pathname = usePathname();
   const navItems = [
     { href: '/', icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard' },
     { href: '/investment', icon: TrendingUp, label: 'Invest', page: 'investment' },
@@ -27,7 +29,7 @@ export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {
               variant="ghost"
               className={cn(
                 'flex flex-col items-center justify-center h-full w-full rounded-none',
-                activePage === item.page
+                pathname === item.href
                   ? 'text-primary bg-primary/10'
                   : 'text-muted-foreground',
                 item.page === 'pro' && 'text-primary'
