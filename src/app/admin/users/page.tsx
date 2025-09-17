@@ -41,7 +41,7 @@ import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { db } from '@/lib/firebase';
+import { clientDb as db } from '@/lib/firebaseClient';
 import { collection, doc, getDoc, getDocs, updateDoc, writeBatch, serverTimestamp, query, where, addDoc, increment, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -73,7 +73,7 @@ interface User {
     createdAt?: Timestamp;
 }
 
-const investmentPlans = [100, 300, 500, 1000, 2000];
+const investmentPlans = [150, 300, 400, 1000, 1600, 4000, 10000];
 const milestones: { [key: number]: number } = {
   5: 250, 10: 500, 20: 1000, 30: 1500, 40: 2000, 50: 2500,
 };
@@ -83,7 +83,7 @@ export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
-    const [creditAmount, setCreditAmount] = useState('100'); // Default to the smallest plan
+    const [creditAmount, setCreditAmount] = useState('150'); // Default to the smallest plan
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortKey, setSortKey] = useState<UserSortableKeys>('name');
@@ -290,7 +290,7 @@ export default function UsersPage() {
                 hasInvested: true, 
                 totalInvested: (u.totalInvested || 0) + amount,
             } : u));
-            setCreditAmount('100');
+            setCreditAmount('150');
         } catch (error: any) {
              toast({
                 variant: 'destructive',
@@ -395,7 +395,7 @@ export default function UsersPage() {
                                 </Button>
                             </DialogTrigger>
                         </Dialog>
-                       <AlertDialog onOpenChange={(open) => !open && setCreditAmount('100')}>
+                       <AlertDialog onOpenChange={(open) => !open && setCreditAmount('150')}>
                           <AlertDialogTrigger asChild>
                              <Button variant="outline" size="sm" disabled={!!isSubmitting}>
                                 <DollarSign className='w-4 h-4 mr-1' /> Credit
