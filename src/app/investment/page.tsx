@@ -8,28 +8,27 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 
 const InvestmentPage: NextPage = () => {
-  const welfarePlans = [
-    { id: 'vip1', title: 'VIP1 Welfare', amount: 150, dailyReturn: 15, duration: 30 },
-    { id: 'vip2', title: 'VIP2 Welfare', amount: 300, originalAmount: 400, dailyReturn: 40, duration: 30, mostPurchased: true },
-    { id: 'vip3', title: 'VIP3 Welfare', amount: 400, originalAmount: 500, dailyReturn: 50, duration: 30, mostPurchased: true },
-    { id: 'vip4', title: 'VIP4 Welfare', amount: 1000, dailyReturn: 100, duration: 30 },
-    { id: 'vip5', title: 'VIP5 Welfare', amount: 1600, originalAmount: 2000, dailyReturn: 200, duration: 30, mostPurchased: true },
-    { id: 'vip6', title: 'VIP6 Welfare', amount: 4000, originalAmount: 5000, dailyReturn: 500, duration: 30 },
-    { id: 'vip7', title: 'VIP7 Special', amount: 10000, dailyReturn: 5000, duration: 4, mostPurchased: true }
+    const welfarePlans = [
+    { id: 'vip1', title: 'VIP1 Welfare', price: 150, days: 30, daily: 15, total: 450, color: "from-yellow-400 to-yellow-600", badge: "🥉 Bronze" },
+    { id: 'vip2', title: 'VIP2 Welfare', price: 300, days: 30, daily: 40, total: 1200, color: "from-orange-400 to-orange-600", badge: "🥈 Silver" },
+    { id: 'vip3', title: 'VIP3 Welfare', price: 400, days: 30, daily: 50, total: 1500, color: "from-red-500 to-yellow-500", badge: "🥇 Gold" },
+    { id: 'vip4', title: 'VIP4 Welfare', price: 1000, days: 30, daily: 100, total: 3000, color: "from-purple-500 to-pink-500", badge: "🏆 Platinum" },
+    { id: 'vip5', title: 'VIP5 Welfare', price: 1600, days: 30, daily: 200, total: 6000, color: "from-blue-500 to-cyan-500", badge: "💎 Diamond" },
+    { id: 'vip6', title: 'VIP6 Welfare', price: 4000, days: 30, daily: 500, total: 15000, color: "from-green-500 to-teal-500", badge: "👑 Master" },
+    { id: 'vip7', title: 'VIP7 Special', price: 10000, days: 4, daily: 5000, total: 20000, color: "from-indigo-500 to-violet-500", badge: "🔥 Special" },
   ];
 
   const fixedPlans = [
-     { id: 'sip1', title: 'Monthly SIP 2500', monthlyInvestment: 2500, amount: 30000, totalReturn: 100000, duration: 365 },
-     { id: 'sip2', title: 'Monthly SIP 5000', monthlyInvestment: 5000, amount: 60000, totalReturn: 250000, duration: 365 },
+     { id: 'sip1', title: 'Monthly SIP 2500', price: 30000, days: 365, total: 100000, color: "from-slate-500 to-slate-700", badge: "🏦 Fixed" },
+     { id: 'sip2', title: 'Monthly SIP 5000', price: 60000, days: 365, total: 250000, color: "from-gray-600 to-gray-800", badge: "🏦 Fixed" },
   ];
 
   const activityPlans = [
-    { id: 'act1', title: 'Activity Fund 10K', amount: 10000, totalReturn: 30000, duration: 4 },
-    { id: 'act2', title: 'Activity Fund 25K', amount: 25000, totalReturn: 75000, duration: 4 },
-    { id: 'act3', title: 'Activity Fund 50K', amount: 50000, totalReturn: 150000, duration: 4 },
-    { id: 'act4', title: 'Activity Fund 100K', amount: 100000, totalReturn: 300000, duration: 4 },
+    { id: 'act1', title: 'Activity Fund 10K', price: 10000, days: 4, total: 30000, color: "from-rose-400 to-red-500", badge: "⚡️ Activity" },
+    { id: 'act2', title: 'Activity Fund 25K', price: 25000, days: 4, total: 75000, color: "from-amber-400 to-orange-500", badge: "⚡️ Activity" },
+    { id: 'act3', title: 'Activity Fund 50K', price: 50000, days: 4, total: 150000, color: "from-lime-400 to-green-500", badge: "⚡️ Activity" },
+    { id: 'act4', title: 'Activity Fund 100K', price: 100000, days: 4, total: 300000, color: "from-cyan-400 to-blue-500", badge: "⚡️ Activity" },
   ];
-
   const { userData } = useAuth();
   const userName = userData?.name || 'User';
 
@@ -46,20 +45,29 @@ const InvestmentPage: NextPage = () => {
             </TabsTrigger>
             <TabsTrigger value="activity">Activity Fund</TabsTrigger>
           </TabsList>
-          <TabsContent value="welfare" className="mt-6 space-y-4">
-            {welfarePlans.map((plan) => (
-              <InvestmentPlanCard key={plan.id} {...plan} userName={userName} />
-            ))}
+          
+          <TabsContent value="welfare" className="mt-6">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {welfarePlans.map((plan) => (
+                  <InvestmentPlanCard key={plan.id} {...plan} userName={userName} />
+                ))}
+            </div>
           </TabsContent>
-          <TabsContent value="fixed" className="mt-6 space-y-4">
-             {fixedPlans.map((plan) => (
-              <InvestmentPlanCard key={plan.id} {...plan} userName={userName} />
-            ))}
-          </TabsContent>
-           <TabsContent value="activity" className="mt-6 space-y-4">
-             {activityPlans.map((plan) => (
+
+          <TabsContent value="fixed" className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {fixedPlans.map((plan) => (
                 <InvestmentPlanCard key={plan.id} {...plan} userName={userName} />
-              ))}
+                ))}
+            </div>
+          </TabsContent>
+
+           <TabsContent value="activity" className="mt-6">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {activityPlans.map((plan) => (
+                    <InvestmentPlanCard key={plan.id} {...plan} userName={userName} />
+                ))}
+            </div>
           </TabsContent>
         </Tabs>
       </div>

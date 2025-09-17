@@ -1,77 +1,51 @@
 'use client';
 import { FC } from 'react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Gem } from 'lucide-react';
 import Link from 'next/link';
 
 interface InvestmentPlanCardProps {
   title: string;
-  amount: number;
-  dailyReturn?: number;
-  totalReturn?: number;
-  monthlyInvestment?: number;
-  duration: number;
+  price: number;
+  days: number;
+  daily?: number;
+  total: number;
+  color: string;
+  badge: string;
   userName?: string;
-  originalAmount?: number;
-  mostPurchased?: boolean;
 }
 
 export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
   title,
-  amount,
-  dailyReturn,
-  totalReturn,
-  monthlyInvestment,
-  duration,
+  price,
+  days,
+  daily,
+  total,
+  color,
+  badge,
   userName = 'User',
 }) => {
-  const totalProfit = totalReturn || (dailyReturn ? dailyReturn * duration : 0);
-  const message = `Hi, I'm ${userName} and I want to buy the ${title} plan for ${amount} Rs.`;
-  const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
-
+    const message = `Hi, I'm ${userName} and I want to buy the ${title} plan for ${price} Rs.`;
+    const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
   return (
-    <Card className="shadow-lg overflow-hidden">
-      <CardHeader className="p-0">
-        <div className="flex items-center justify-between bg-primary p-1 text-primary-foreground">
-            <h3 className="font-bold text-lg pl-3">{title}</h3>
-            <Link href={whatsappUrl} target="_blank">
-                <Button variant="secondary" size="sm" className="bg-white text-primary hover:bg-white/90 m-1">Buy</Button>
-            </Link>
-        </div>
-      </CardHeader>
-      <CardContent className="p-6 flex items-center gap-6">
-        <div className="p-3 bg-muted rounded-lg">
-            <Gem className="w-14 h-14 text-primary" />
-        </div>
-        <div className="w-full space-y-2 text-sm">
-            {monthlyInvestment ? (
-                 <div className="flex justify-between">
-                    <span className="text-muted-foreground">Monthly Price</span>
-                    <span className="font-semibold">{monthlyInvestment} Rs.</span>
-                </div>
-            ) : (
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Each Price</span>
-                    <span className="font-semibold">{amount} Rs.</span>
-                </div>
-            )}
-             <div className="flex justify-between">
-                <span className="text-muted-foreground">Revenue</span>
-                <span className="font-semibold">{duration} Days</span>
-            </div>
-            {dailyReturn && (
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Daily Earnings</span>
-                    <span className="font-semibold">{dailyReturn} Rs.</span>
-                </div>
-            )}
-             <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Revenue</span>
-                <span className="font-semibold">{totalProfit} Rs.</span>
-            </div>
-        </div>
-      </CardContent>
-    </Card>
+    <div
+      className={`rounded-2xl shadow-xl p-6 text-white bg-gradient-to-br ${color} relative transform hover:scale-105 transition duration-300`}
+    >
+      <span className="absolute top-3 right-3 bg-black/30 px-3 py-1 text-xs rounded-full">
+        {badge}
+      </span>
+
+      <div className="text-2xl font-bold mb-2">{title}</div>
+      <div className="space-y-2 text-sm">
+        <p>💎 Each Price: <b>{price.toLocaleString('en-IN')} Rs.</b></p>
+        <p>📅 Revenue: <b>{days} Days</b></p>
+        {daily && <p>💰 Daily Earnings: <b>{daily.toLocaleString('en-IN')} Rs.</b></p>}
+        <p>🏆 Total Revenue: <b>{total.toLocaleString('en-IN')} Rs.</b></p>
+      </div>
+
+       <Link href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+          <button className="mt-4 w-full py-2 rounded-xl bg-white text-black font-semibold hover:bg-gray-200 transition">
+            Buy Now
+          </button>
+      </Link>
+    </div>
   );
 };
