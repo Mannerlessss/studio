@@ -76,7 +76,7 @@ const Dashboard: NextPage = () => {
             <WithdrawCard />
         </div>
         <TransactionHistoryCard />
-        <UpgradeCard userName={userData.name}/>
+        {userData.membership !== 'Pro' && <UpgradeCard userName={userData.name}/>}
       </div>
       <BottomNav activePage="dashboard" />
     </div>
