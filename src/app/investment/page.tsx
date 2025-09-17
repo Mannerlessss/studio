@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 
 const InvestmentPage: NextPage = () => {
-  const plans = [
+  const welfarePlans = [
     { id: 'vip1', title: 'VIP1 Welfare', amount: 150, dailyReturn: 15, duration: 30 },
     { id: 'vip2', title: 'VIP2 Welfare', amount: 300, originalAmount: 400, dailyReturn: 40, duration: 30, mostPurchased: true },
     { id: 'vip3', title: 'VIP3 Welfare', amount: 400, originalAmount: 500, dailyReturn: 50, duration: 30, mostPurchased: true },
@@ -17,6 +17,12 @@ const InvestmentPage: NextPage = () => {
     { id: 'vip6', title: 'VIP6 Welfare', amount: 4000, originalAmount: 5000, dailyReturn: 500, duration: 30 },
     { id: 'vip7', title: 'VIP7 Special', amount: 10000, dailyReturn: 5000, duration: 4, mostPurchased: true }
   ];
+
+  const fixedPlans = [
+     { id: 'sip1', title: 'Monthly SIP 2500', monthlyInvestment: 2500, amount: 30000, totalReturn: 100000, duration: 365 },
+     { id: 'sip2', title: 'Monthly SIP 5000', monthlyInvestment: 5000, amount: 60000, totalReturn: 250000, duration: 365 },
+  ];
+
   const { userData } = useAuth();
   const userName = userData?.name || 'User';
 
@@ -34,12 +40,14 @@ const InvestmentPage: NextPage = () => {
             <TabsTrigger value="activity">Activity Fund</TabsTrigger>
           </TabsList>
           <TabsContent value="welfare" className="mt-6 space-y-4">
-            {plans.map((plan) => (
+            {welfarePlans.map((plan) => (
               <InvestmentPlanCard key={plan.id} {...plan} userName={userName} />
             ))}
           </TabsContent>
-          <TabsContent value="fixed">
-             <p className="text-center text-muted-foreground p-8">No fixed funds available at the moment.</p>
+          <TabsContent value="fixed" className="mt-6 space-y-4">
+             {fixedPlans.map((plan) => (
+              <InvestmentPlanCard key={plan.id} {...plan} userName={userName} />
+            ))}
           </TabsContent>
            <TabsContent value="activity">
              <p className="text-center text-muted-foreground p-8">No activity funds available at the moment.</p>

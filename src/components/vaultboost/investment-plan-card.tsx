@@ -8,7 +8,9 @@ import Link from 'next/link';
 interface InvestmentPlanCardProps {
   title: string;
   amount: number;
-  dailyReturn: number;
+  dailyReturn?: number;
+  totalReturn?: number;
+  monthlyInvestment?: number;
   duration: number;
   userName?: string;
   originalAmount?: number;
@@ -19,10 +21,12 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
   title,
   amount,
   dailyReturn,
+  totalReturn,
+  monthlyInvestment,
   duration,
   userName = 'User',
 }) => {
-  const totalProfit = dailyReturn * duration;
+  const totalProfit = totalReturn || (dailyReturn ? dailyReturn * duration : 0);
   const message = `Hi, I'm ${userName} and I want to buy the ${title} plan for ${amount} Rs.`;
   const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
 
@@ -41,18 +45,27 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
             <Gem className="w-12 h-12 text-primary" />
         </div>
         <div className="w-full space-y-2 text-sm">
-            <div className="flex justify-between">
-                <span className="text-muted-foreground">Each Price</span>
-                <span className="font-semibold">{amount} Rs.</span>
-            </div>
+            {monthlyInvestment ? (
+                 <div className="flex justify-between">
+                    <span className="text-muted-foreground">Monthly Price</span>
+                    <span className="font-semibold">{monthlyInvestment} Rs.</span>
+                </div>
+            ) : (
+                <div className="flex justify-between">
+                    <span className="text-muted-foreground">Each Price</span>
+                    <span className="font-semibold">{amount} Rs.</span>
+                </div>
+            )}
              <div className="flex justify-between">
                 <span className="text-muted-foreground">Revenue</span>
                 <span className="font-semibold">{duration} Days</span>
             </div>
-             <div className="flex justify-between">
-                <span className="text-muted-foreground">Daily Earnings</span>
-                <span className="font-semibold">{dailyReturn} Rs.</span>
-            </div>
+            {dailyReturn && (
+                <div className="flex justify-between">
+                    <span className="text-muted-foreground">Daily Earnings</span>
+                    <span className="font-semibold">{dailyReturn} Rs.</span>
+                </div>
+            )}
              <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Revenue</span>
                 <span className="font-semibold">{totalProfit} Rs.</span>
