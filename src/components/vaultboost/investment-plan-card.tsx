@@ -11,6 +11,8 @@ interface InvestmentPlanCardProps {
   dailyReturn: number;
   duration: number;
   userName?: string;
+  originalAmount?: number;
+  mostPurchased?: boolean;
 }
 
 export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
@@ -27,10 +29,10 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
   return (
     <Card className="shadow-lg overflow-hidden">
       <CardHeader className="p-0">
-        <div className="flex items-center justify-between bg-green-500/80 p-3 text-white">
+        <div className="flex items-center justify-between bg-primary p-3 text-primary-foreground">
             <h3 className="font-bold text-lg">{title}</h3>
             <Link href={whatsappUrl} target="_blank">
-                <Button variant="secondary" size="sm" className="bg-white text-green-600 hover:bg-white/90">Buy</Button>
+                <Button variant="secondary" size="sm" className="bg-white text-primary hover:bg-white/90">Buy</Button>
             </Link>
         </div>
       </CardHeader>
