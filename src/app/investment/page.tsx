@@ -3,19 +3,19 @@ import type { NextPage } from 'next';
 import { Header } from '@/components/vaultboost/header';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
 import { InvestmentPlanCard } from '@/components/vaultboost/investment-plan-card';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Info } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 
 const InvestmentPage: NextPage = () => {
   const plans = [
-    { amount: 150, dailyReturn: 15, duration: 30 },
-    { amount: 300, originalAmount: 400, dailyReturn: 40, duration: 30, mostPurchased: true, badgeText: 'Limited Offer' },
-    { amount: 400, originalAmount: 500, dailyReturn: 50, duration: 30, mostPurchased: true, badgeText: 'Hot' },
-    { amount: 1000, dailyReturn: 100, duration: 30 },
-    { amount: 1600, originalAmount: 2000, dailyReturn: 200, duration: 30, mostPurchased: true, badgeText: 'Best Value' },
-    { amount: 4000, originalAmount: 5000, dailyReturn: 500, duration: 30 },
-    { amount: 10000, dailyReturn: 5000, duration: 4, mostPurchased: true, badgeText: 'Special Offer' }
+    { id: 'vip1', title: 'VIP1 Welfare', amount: 150, dailyReturn: 15, duration: 30 },
+    { id: 'vip2', title: 'VIP2 Welfare', amount: 300, originalAmount: 400, dailyReturn: 40, duration: 30, mostPurchased: true },
+    { id: 'vip3', title: 'VIP3 Welfare', amount: 400, originalAmount: 500, dailyReturn: 50, duration: 30, mostPurchased: true },
+    { id: 'vip4', title: 'VIP4 Welfare', amount: 1000, dailyReturn: 100, duration: 30 },
+    { id: 'vip5', title: 'VIP5 Welfare', amount: 1600, originalAmount: 2000, dailyReturn: 200, duration: 30, mostPurchased: true },
+    { id: 'vip6', title: 'VIP6 Welfare', amount: 4000, originalAmount: 5000, dailyReturn: 500, duration: 30 },
+    { id: 'vip7', title: 'VIP7 Special', amount: 10000, dailyReturn: 5000, duration: 4, mostPurchased: true }
   ];
   const { userData } = useAuth();
   const userName = userData?.name || 'User';
@@ -24,24 +24,27 @@ const InvestmentPage: NextPage = () => {
     <div className="bg-background min-h-full">
       <Header />
       <div className="p-4 space-y-6">
-        <h2 className="text-2xl font-bold text-center">Investment Plans</h2>
-        {plans.map((plan, index) => (
-          <InvestmentPlanCard key={index} {...plan} userName={userName} />
-        ))}
-
-        <Card className="bg-muted/50 border-dashed">
-            <CardHeader>
-                <div className="flex items-center gap-3">
-                    <Info className="w-6 h-6 text-muted-foreground" />
-                    <CardTitle className="text-lg font-semibold">Please Note</CardTitle>
-                </div>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground space-y-2">
-                <p>• All investment plans will automatically expire after 30 days from the date of purchase.</p>
-                <p>• Daily earnings are credited to your account every 24 hours.</p>
-            </CardContent>
-        </Card>
-
+        <Tabs defaultValue="welfare">
+          <TabsList className="grid w-full grid-cols-3 bg-muted/80">
+            <TabsTrigger value="fixed">Fixed Fund</TabsTrigger>
+            <TabsTrigger value="welfare" className="relative">
+              Welfare Fund
+              <Badge className="absolute -top-2 -right-2 bg-red-500 text-white">HOT</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="activity">Activity Fund</TabsTrigger>
+          </TabsList>
+          <TabsContent value="welfare" className="mt-6 space-y-4">
+            {plans.map((plan) => (
+              <InvestmentPlanCard key={plan.id} {...plan} userName={userName} />
+            ))}
+          </TabsContent>
+          <TabsContent value="fixed">
+             <p className="text-center text-muted-foreground p-8">No fixed funds available at the moment.</p>
+          </TabsContent>
+           <TabsContent value="activity">
+             <p className="text-center text-muted-foreground p-8">No activity funds available at the moment.</p>
+          </TabsContent>
+        </Tabs>
       </div>
       <BottomNav activePage="investment" />
     </div>
