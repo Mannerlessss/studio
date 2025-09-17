@@ -22,7 +22,7 @@ const UpdateWithdrawalStatusOutputSchema = z.object({
 });
 
 
-export const updateWithdrawalStatusFlow = ai.defineFlow({
+const updateWithdrawalStatusFlow = ai.defineFlow({
     name: 'updateWithdrawalStatusFlow',
     inputSchema: UpdateWithdrawalStatusInputSchema,
     outputSchema: UpdateWithdrawalStatusOutputSchema,

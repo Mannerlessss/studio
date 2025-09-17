@@ -28,7 +28,7 @@ export type UserForAdmin = z.infer<typeof UserForAdminSchema>;
 
 const GetAllUsersOutputSchema = z.array(UserForAdminSchema);
 
-export const getAllUsersFlow = ai.defineFlow(
+const getAllUsersFlow = ai.defineFlow(
   {
     name: 'getAllUsersFlow',
     inputSchema: z.void(),

@@ -39,7 +39,7 @@ const GetAllOffersOutputSchema = z.array(OfferSchema);
 
 
 // Flow to get all offers
-export const getAllOffersFlow = ai.defineFlow({
+const getAllOffersFlow = ai.defineFlow({
     name: 'getAllOffersFlow',
     inputSchema: z.void(),
     outputSchema: GetAllOffersOutputSchema,
@@ -61,7 +61,7 @@ export const getAllOffersFlow = ai.defineFlow({
 });
 
 // Flow to create a new offer
-export const createOfferFlow = ai.defineFlow({
+const createOfferFlow = ai.defineFlow({
     name: 'createOfferFlow',
     inputSchema: CreateOfferInputSchema,
     outputSchema: OfferOutputSchema,
@@ -86,7 +86,7 @@ export const createOfferFlow = ai.defineFlow({
 });
 
 // Flow to delete an offer
-export const deleteOfferFlow = ai.defineFlow({
+const deleteOfferFlow = ai.defineFlow({
     name: 'deleteOfferFlow',
     inputSchema: z.string(), // Expects offer ID
     outputSchema: OfferOutputSchema,

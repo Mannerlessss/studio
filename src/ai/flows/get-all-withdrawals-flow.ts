@@ -29,7 +29,7 @@ export type WithdrawalRequest = z.infer<typeof WithdrawalRequestSchema>;
 
 const GetAllWithdrawalsOutputSchema = z.array(WithdrawalRequestSchema);
 
-export const getAllWithdrawalsFlow = ai.defineFlow(
+const getAllWithdrawalsFlow = ai.defineFlow(
   {
     name: 'getAllWithdrawalsFlow',
     inputSchema: z.void(),

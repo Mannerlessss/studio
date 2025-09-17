@@ -15,7 +15,7 @@ const GetAdminDashboardStatsOutputSchema = z.object({
 });
 export type GetAdminDashboardStatsOutput = z.infer<typeof GetAdminDashboardStatsOutputSchema>;
 
-export const getAdminDashboardStatsFlow = ai.defineFlow(
+const getAdminDashboardStatsFlow = ai.defineFlow(
   {
     name: 'getAdminDashboardStatsFlow',
     inputSchema: z.void(),

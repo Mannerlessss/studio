@@ -22,7 +22,7 @@ const RedeemCodeOutputSchema = z.object({
 export type RedeemCodeOutput = z.infer<typeof RedeemCodeOutputSchema>;
 
 
-export const redeemCodeFlow = ai.defineFlow({
+const redeemCodeFlow = ai.defineFlow({
     name: 'redeemCodeFlow',
     inputSchema: RedeemCodeInputSchema,
     outputSchema: RedeemCodeOutputSchema,

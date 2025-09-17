@@ -22,7 +22,7 @@ const milestones: { [key: number]: number } = {
   5: 250, 10: 500, 20: 1000, 30: 1500, 40: 2000, 50: 2500,
 };
 
-export const creditInvestmentFlow = ai.defineFlow(
+const creditInvestmentFlow = ai.defineFlow(
   {
     name: 'creditInvestmentFlow',
     inputSchema: CreditInvestmentInputSchema,
