@@ -95,7 +95,7 @@ export const creditInvestmentFlow = ai.defineFlow(
             // 4. Handle Referral Logic (if it's the user's first investment >= 100)
             if (referrerDoc && referrerDoc.exists && referrerDocRef) {
                 const referrerData = referrerDoc.data()!;
-                const bonusAmount = 75;
+                const bonusAmount = 151;
 
                 transaction.update(userDocRef, {
                     totalBalance: FieldValue.increment(bonusAmount),

@@ -10,9 +10,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { collection, query, onSnapshot } from 'firebase/firestore';
-import { clientDb } from '@/lib/firebaseClient';
+import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReferralMilestonesCard } from '@/components/vaultboost/referral-milestones-card';
+import { ReferralLeaderboardCard } from '@/components/vaultboost/referral-leaderboard-card';
 
 interface ReferredUser {
     id: string;
@@ -37,7 +38,7 @@ const ReferPage: NextPage = () => {
     useEffect(() => {
         if (!user) return;
 
-        const referralsRef = collection(clientDb, `users/${user.uid}/referrals`);
+        const referralsRef = collection(db, `users/${user.uid}/referrals`);
         const q = query(referralsRef);
         
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -103,7 +104,7 @@ const ReferPage: NextPage = () => {
       <div className="p-4 space-y-6 text-center">
         <h2 className="text-2xl font-bold">Turn your network into your net worth!</h2>
         <div className="p-4 rounded-lg border border-primary">
-          <p className="text-lg text-foreground">Earn <span className="font-bold text-primary">75 Rs.</span> for every friend who joins the action.</p>
+          <p className="text-lg text-foreground">Earn <span className="font-bold text-primary">151 Rs.</span> for every friend who joins the action.</p>
         </div>
         <p className="flex items-center justify-center gap-2 text-accent font-semibold">
             <Star className="w-5 h-5" />
@@ -166,6 +167,7 @@ const ReferPage: NextPage = () => {
             </CardContent>
         </Card>
         
+        <ReferralLeaderboardCard />
         <ReferralMilestonesCard successfullyInvested={userData?.investedReferralCount || 0} />
 
          <Card className="text-left shadow-lg">
@@ -175,7 +177,7 @@ const ReferPage: NextPage = () => {
              <CardContent className="text-sm text-muted-foreground space-y-3">
                  <p>1. Share your referral code with your friends.</p>
                  <p>2. Your friend signs up and invests at least 100 Rs. in a plan.</p>
-                 <p>3. You get a <span className='font-bold text-primary'>75 Rs.</span> bonus instantly! (Only after your friend's first investment of 100 Rs. or more)</p>
+                 <p>3. You get a <span className='font-bold text-primary'>151 Rs.</span> bonus instantly! (Only after your friend's first investment of 100 Rs. or more)</p>
                  <p>4. You also get a <span className='font-bold text-primary'>3% commission</span> on all their future earnings, forever!</p>
              </CardContent>
         </Card>
