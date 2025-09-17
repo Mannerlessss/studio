@@ -11,7 +11,7 @@ import {
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { clientAuth, clientDb } from '@/lib/firebaseClient';
-import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, arrayUnion, addDoc, increment } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, addDoc, increment } from 'firebase/firestore';
 import { redeemCode } from '@/ai/flows/redeem-code-flow';
 import { Gem } from 'lucide-react';
 
@@ -304,28 +304,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [user, isAdmin, loading, pathname, router]);
 
-    useEffect(() => {
-        let timeout: NodeJS.Timeout;
-        if (loading) {
-            timeout = setTimeout(() => {
-                // Re-check loading state inside the timeout
-                // to avoid race conditions
-                if (loading && !user) {
-                     toast({
-                        variant: 'destructive',
-                        title: 'Loading Timeout',
-                        description: 'Could not connect to the server. Please try again.',
-                    });
-                    logOut();
-                }
-            }, 10000); // 10 seconds
-        }
-
-        return () => {
-            clearTimeout(timeout);
-        };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [loading]);
 
     const signUpWithEmail = async ({ name, email, phone, password, referralCode: providedCode }: any) => {
         setLoading(true);

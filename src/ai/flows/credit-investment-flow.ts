@@ -95,8 +95,9 @@ export const creditInvestmentFlow = ai.defineFlow(
             // 4. Handle Referral Logic (if it's the user's first investment >= 100)
             if (referrerDoc && referrerDoc.exists && referrerDocRef) {
                 const referrerData = referrerDoc.data()!;
-                const bonusAmount = 151;
+                const bonusAmount = 75; // Standard referral bonus
 
+                // Give welcome bonus to the new investor
                 transaction.update(userDocRef, {
                     totalBalance: FieldValue.increment(bonusAmount),
                     totalBonusEarnings: FieldValue.increment(bonusAmount),
@@ -107,6 +108,7 @@ export const creditInvestmentFlow = ai.defineFlow(
                     type: 'bonus', amount: bonusAmount, description: `Welcome referral bonus!`, status: 'Completed', date: now,
                 });
 
+                // Give standard referral bonus to the referrer & increment their count
                 const newReferralCount = (referrerData.investedReferralCount || 0) + 1;
                 transaction.update(referrerDocRef, {
                     totalBalance: FieldValue.increment(bonusAmount),
@@ -119,6 +121,7 @@ export const creditInvestmentFlow = ai.defineFlow(
                     type: 'referral', amount: bonusAmount, description: `Referral bonus from ${user.name}`, status: 'Completed', date: now,
                 });
                 
+                // CHECK FOR MILESTONES
                 const claimedMilestones = referrerData.claimedMilestones || [];
                 for (const milestone in milestones) {
                     const milestoneNum = Number(milestone);

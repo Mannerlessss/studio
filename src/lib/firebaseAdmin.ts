@@ -1,3 +1,4 @@
+'use server';
 import admin from 'firebase-admin';
 
 let adminDb: admin.firestore.Firestore;
@@ -7,6 +8,7 @@ let adminAuth: admin.auth.Auth;
 function initializeFirebaseAdmin() {
   if (admin.apps.length === 0) {
     try {
+      // This environment variable is set in next.config.ts
       const serviceAccount = JSON.parse(
         process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string
       );
