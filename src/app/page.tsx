@@ -14,12 +14,11 @@ import { ProfileCompletionCard } from '@/components/vaultboost/profile-completio
 import { AnnouncementPopup } from '@/components/vaultboost/announcement-popup';
 import { ActiveInvestmentsCard } from '@/components/vaultboost/active-investments-card';
 import { CollectBonusCard } from '@/components/vaultboost/collect-bonus-card';
-import { SpecialOfferPopup } from '@/components/vaultboost/special-offer-popup';
 
 
 const Dashboard: NextPage = () => {
   const { userData, loading, claimDailyBonus, totalROI } = useAuth();
-  
+
   if (loading || !userData) {
       return (
         <div className="flex items-center justify-center min-h-screen bg-background">
@@ -39,9 +38,8 @@ const Dashboard: NextPage = () => {
     <div className="bg-background min-h-full">
       <Header />
       <AnnouncementPopup />
-      <SpecialOfferPopup />
       <GuidedTour />
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-6">
         <div id="welcome-card">
           <WelcomeCard name={userData.name} membership={`${userData.membership} Member`} />
         </div>
@@ -51,22 +49,22 @@ const Dashboard: NextPage = () => {
           <InfoCard
             title="Invested"
             value={`${userData.totalInvested || 0} Rs.`}
-            icon={<Wallet className="h-5 w-5 md:h-6 md:w-6 text-primary" />}
+            icon={<Wallet className="h-6 w-6 text-primary" />}
           />
           <InfoCard
             title="Earnings"
             value={`${userData.totalEarnings || 0} Rs.`}
-            icon={<TrendingUp className="h-5 w-5 md:h-6 md:w-6 text-primary" />}
+            icon={<TrendingUp className="h-6 w-6 text-primary" />}
           />
            <InfoCard
             title="Total ROI"
             value={`300% (${totalROI.toLocaleString('en-IN')} Rs.)`}
-            icon={<PiggyBank className="h-5 w-5 md:h-6 md:w-6 text-primary" />}
+            icon={<PiggyBank className="h-6 w-6 text-primary" />}
           />
           <InfoCard
             title="Referral"
             value={`${userData.totalReferralEarnings || 0} Rs.`}
-            icon={<Users className="h-5 w-5 md:h-6 md:w-6 text-primary" />}
+            icon={<Users className="h-6 w-6 text-primary" />}
           />
         </div>
         <ActiveInvestmentsCard />
