@@ -23,6 +23,13 @@ const InvestmentPage: NextPage = () => {
      { id: 'sip2', title: 'Monthly SIP 5000', monthlyInvestment: 5000, amount: 60000, totalReturn: 250000, duration: 365 },
   ];
 
+  const activityPlans = [
+    { id: 'act1', title: 'Activity Fund 10K', amount: 10000, totalReturn: 30000, duration: 4 },
+    { id: 'act2', title: 'Activity Fund 25K', amount: 25000, totalReturn: 75000, duration: 4 },
+    { id: 'act3', title: 'Activity Fund 50K', amount: 50000, totalReturn: 150000, duration: 4 },
+    { id: 'act4', title: 'Activity Fund 100K', amount: 100000, totalReturn: 300000, duration: 4 },
+  ];
+
   const { userData } = useAuth();
   const userName = userData?.name || 'User';
 
@@ -49,8 +56,10 @@ const InvestmentPage: NextPage = () => {
               <InvestmentPlanCard key={plan.id} {...plan} userName={userName} />
             ))}
           </TabsContent>
-           <TabsContent value="activity">
-             <p className="text-center text-muted-foreground p-8">No activity funds available at the moment.</p>
+           <TabsContent value="activity" className="mt-6 space-y-4">
+             {activityPlans.map((plan) => (
+                <InvestmentPlanCard key={plan.id} {...plan} userName={userName} />
+              ))}
           </TabsContent>
         </Tabs>
       </div>
