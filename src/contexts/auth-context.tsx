@@ -101,6 +101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             await signOut(clientAuth);
             sessionStorage.removeItem('vaultboost-announcement-seen');
+            sessionStorage.removeItem('vaultboost-special-offer-10k-seen');
         } catch (error) {
             console.error("Error signing out: ", error);
         } finally {

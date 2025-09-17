@@ -59,11 +59,11 @@ const ProPage: NextPage = () => {
   ];
 
   const returns = [
-      { investment: 100, basic: (100 * 0.10 * 30), pro: (100 * 0.20 * 30) },
+      { investment: 150, basic: (150 * 0.10 * 30), pro: (150 * 0.20 * 30) },
       { investment: 300, basic: (300 * 0.10 * 30), pro: (300 * 0.20 * 30) },
-      { investment: 500, basic: (500 * 0.10 * 30), pro: (500 * 0.20 * 30) },
+      { investment: 400, basic: (400 * 0.10 * 30), pro: (400 * 0.20 * 30) },
       { investment: 1000, basic: (1000 * 0.10 * 30), pro: (1000 * 0.20 * 30) },
-      { investment: 2000, basic: (2000 * 0.10 * 30), pro: (2000 * 0.20 * 30) },
+      { investment: 1600, basic: (1600 * 0.10 * 30), pro: (1600 * 0.20 * 30) },
   ];
 
   return (
@@ -76,8 +76,8 @@ const ProPage: NextPage = () => {
         </div>
 
         <div className="flex flex-col md:flex-row gap-4">
-            <ComparisonCard title="Basic Plan" returns="10%" examples={[{plan: 100, daily: 10}, {plan: 500, daily: 50}, {plan: 1000, daily: 100}]} />
-            <ComparisonCard title="PRO Plan" returns="20%" examples={[{plan: 100, daily: 20}, {plan: 500, daily: 100}, {plan: 1000, daily: 200}]} isPro />
+            <ComparisonCard title="Basic Plan" returns="10%" examples={[{plan: 150, daily: 15}, {plan: 400, daily: 40}, {plan: 1000, daily: 100}]} />
+            <ComparisonCard title="PRO Plan" returns="20%" examples={[{plan: 150, daily: 30}, {plan: 400, daily: 80}, {plan: 1000, daily: 200}]} isPro />
         </div>
 
         <Card className="bg-gradient-to-tr from-primary/10 to-card">

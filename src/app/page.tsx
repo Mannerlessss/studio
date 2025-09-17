@@ -14,6 +14,7 @@ import { ProfileCompletionCard } from '@/components/vaultboost/profile-completio
 import { AnnouncementPopup } from '@/components/vaultboost/announcement-popup';
 import { ActiveInvestmentsCard } from '@/components/vaultboost/active-investments-card';
 import { CollectBonusCard } from '@/components/vaultboost/collect-bonus-card';
+import { SpecialOfferPopup } from '@/components/vaultboost/special-offer-popup';
 
 
 const Dashboard: NextPage = () => {
@@ -38,6 +39,7 @@ const Dashboard: NextPage = () => {
     <div className="bg-background min-h-full">
       <Header />
       <AnnouncementPopup />
+      <SpecialOfferPopup />
       <GuidedTour />
       <div className="p-4 space-y-6">
         <div id="welcome-card">
@@ -53,17 +55,17 @@ const Dashboard: NextPage = () => {
           />
           <InfoCard
             title="Earnings"
-            value={`${userData.totalEarnings || 0} Rs.`}
+            value={`${(userData.totalEarnings || 0).toLocaleString('en-IN')} Rs.`}
             icon={<TrendingUp className="h-6 w-6 text-primary" />}
           />
            <InfoCard
             title="Total ROI"
-            value={`300% (${totalROI.toLocaleString('en-IN')} Rs.)`}
+            value={`${totalROI.toLocaleString('en-IN')} Rs.`}
             icon={<PiggyBank className="h-6 w-6 text-primary" />}
           />
           <InfoCard
             title="Referral"
-            value={`${userData.totalReferralEarnings || 0} Rs.`}
+            value={`${(userData.totalReferralEarnings || 0).toLocaleString('en-IN')} Rs.`}
             icon={<Users className="h-6 w-6 text-primary" />}
           />
         </div>
