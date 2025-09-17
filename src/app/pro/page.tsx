@@ -48,22 +48,22 @@ const ReturnComparisonRow = ({ investment, basic, pro }: { investment: number, b
 const ProPage: NextPage = () => {
   const { userData } = useAuth();
   const userName = userData?.name || 'User';
-  const message = `Hi, I'm ${userName} and I want to upgrade to the PRO plan for 99 Rs.`;
+  const message = `Hi, I'm ${userName} and I want to upgrade to the PRO plan for 4999 Rs.`;
   const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
 
   const benefits = [
-    { icon: ArrowUp, title: "Higher Daily Returns", description: "Increase all your investment returns from 10% to 13% daily." },
+    { icon: ArrowUp, title: "Higher Daily Returns", description: "Increase all your investment returns from 10% to 20% daily." },
     { icon: Star, title: "Enhanced Daily Bonus", description: "Get higher bonus rewards in daily bonus games (3-8 Rs)." },
     { icon: Shield, title: "Priority Support", description: "Get faster response times and dedicated PRO support." },
     { icon: Award, title: "Early Access", description: "Access to new investment plans and features before others." },
   ];
 
   const returns = [
-      { investment: 100, basic: (100 * 0.10 * 30), pro: (100 * 0.13 * 30) },
-      { investment: 300, basic: (300 * 0.10 * 30), pro: (300 * 0.13 * 30) },
-      { investment: 500, basic: (500 * 0.10 * 30), pro: (500 * 0.13 * 30) },
-      { investment: 1000, basic: (1000 * 0.10 * 30), pro: (1000 * 0.13 * 30) },
-      { investment: 2000, basic: (2000 * 0.10 * 30), pro: (2000 * 0.13 * 30) },
+      { investment: 100, basic: (100 * 0.10 * 30), pro: (100 * 0.20 * 30) },
+      { investment: 300, basic: (300 * 0.10 * 30), pro: (300 * 0.20 * 30) },
+      { investment: 500, basic: (500 * 0.10 * 30), pro: (500 * 0.20 * 30) },
+      { investment: 1000, basic: (1000 * 0.10 * 30), pro: (1000 * 0.20 * 30) },
+      { investment: 2000, basic: (2000 * 0.10 * 30), pro: (2000 * 0.20 * 30) },
   ];
 
   return (
@@ -77,14 +77,14 @@ const ProPage: NextPage = () => {
 
         <div className="flex flex-col md:flex-row gap-4">
             <ComparisonCard title="Basic Plan" returns="10%" examples={[{plan: 100, daily: 10}, {plan: 500, daily: 50}, {plan: 1000, daily: 100}]} />
-            <ComparisonCard title="PRO Plan" returns="13%" examples={[{plan: 100, daily: 13}, {plan: 500, daily: 65}, {plan: 1000, daily: 130}]} isPro />
+            <ComparisonCard title="PRO Plan" returns="20%" examples={[{plan: 100, daily: 20}, {plan: 500, daily: 100}, {plan: 1000, daily: 200}]} isPro />
         </div>
 
         <Card className="bg-gradient-to-tr from-primary/10 to-card">
             <CardContent className="p-6 text-center space-y-4">
                 <div>
                     <p className="text-muted-foreground">One-Time Upgrade Fee</p>
-                    <p className="text-5xl font-bold">99 <span className="text-2xl">Rs.</span></p>
+                    <p className="text-5xl font-bold">4999 <span className="text-2xl">Rs.</span></p>
                     <p className="font-semibold text-primary">Lifetime PRO membership</p>
                 </div>
                 <Link href={whatsappUrl} className='w-full' target='_blank'>
@@ -136,7 +136,7 @@ const ProPage: NextPage = () => {
                         <AvatarFallback>RK</AvatarFallback>
                     </Avatar>
                     <div>
-                        <p className="text-sm italic">"Upgraded to PRO and my daily earnings increased by 30%! Worth every penny."</p>
+                        <p className="text-sm italic">"Upgraded to PRO and my daily earnings doubled! Worth every penny."</p>
                         <p className="text-xs font-semibold mt-1">- Ravi K., PRO Member</p>
                     </div>
                 </div>
