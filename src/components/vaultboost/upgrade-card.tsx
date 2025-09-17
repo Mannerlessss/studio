@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
+import { ArrowRight } from 'lucide-react';
 
 interface UpgradeCardProps {
     userName?: string;
@@ -12,31 +13,21 @@ interface UpgradeCardProps {
 export const UpgradeCard: FC<UpgradeCardProps> = ({ userName: propUserName }) => {
     const { userData } = useAuth();
     const userName = propUserName || userData?.name || 'User';
-    const message = `Hi, I'm ${userName} and I want to upgrade to the PRO plan for 99 Rs.`;
-    const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
 
   return (
     <Card className="shadow-md border border-accent bg-accent/5">
         <CardHeader>
             <CardTitle className="text-accent text-lg">Upgrade to PRO Plan</CardTitle>
             <CardDescription>
-                Increase your daily earnings to 13%!
+                Increase your daily earnings from 10% to 13%!
             </CardDescription>
         </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <p className="text-sm">Basic Plan:</p>
-                <p className="text-sm font-semibold">10% daily returns</p>
-            </div>
-            <div className="flex justify-between items-center text-accent">
-                <p className="text-sm font-semibold">PRO Plan:</p>
-                <p className="text-sm font-bold">13% daily returns</p>
-            </div>
-            <Link href={whatsappUrl} className='w-full' target='_blank'>
-                <Button className="w-full" size="lg">Upgrade for 99 Rs.</Button>
+            <Link href="/pro" className='w-full'>
+                <Button className="w-full" size="lg">
+                    View PRO Benefits <ArrowRight className="ml-2"/>
+                </Button>
             </Link>
-        </div>
       </CardContent>
     </Card>
   );
