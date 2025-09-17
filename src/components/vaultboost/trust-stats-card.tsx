@@ -51,12 +51,12 @@ export function TrustStatsCard() {
 
     const formatCurrency = (num: number) => {
          if (num >= 10000000) { // Crores
-            return `₹ ${(num / 10000000).toFixed(2)} Cr`;
+            return `${(num / 10000000).toFixed(2)} Cr Rs.`;
         }
         if (num >= 100000) { // Lakhs
-            return `₹ ${(num / 100000).toFixed(2)} L`;
+            return `${(num / 100000).toFixed(2)} L Rs.`;
         }
-        return `₹ ${num.toLocaleString('en-IN')}`;
+        return `${num.toLocaleString('en-IN')} Rs.`;
     };
 
     return (
