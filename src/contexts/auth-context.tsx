@@ -159,7 +159,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     if (daysPassed <= 0) continue;
 
                     // Determine the correct daily return based on membership at time of calculation
-                    const dailyReturnRate = isProMember ? 0.20 : 0.10;
+                    const dailyReturnRate = isProMember ? 0.13 : 0.10;
                     const correctDailyReturn = investment.planAmount * dailyReturnRate;
 
                     const daysAlreadyProcessed = Math.round(investment.earnings / investment.dailyReturn); // Use original dailyReturn for processed days

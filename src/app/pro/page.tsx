@@ -4,65 +4,153 @@ import { Header } from '@/components/vaultboost/header';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, CheckCircle, Crown } from 'lucide-react';
+import { Zap, CheckCircle, ArrowUp, Star, Shield, Award } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
+
+const ComparisonCard = ({ title, returns, examples, isPro }: { title: string; returns: string; examples: {plan: number, daily: number}[], isPro?: boolean }) => (
+    <Card className={cn("flex-1", isPro && "border-2 border-primary bg-primary/5")}>
+        <CardHeader>
+            <CardTitle className={cn(isPro && "text-primary")}>{title}</CardTitle>
+            {isPro && <Badge className="w-fit">Recommended</Badge>}
+        </CardHeader>
+        <CardContent className="space-y-3">
+            <p className="text-4xl font-bold">{returns}<span className="text-xl font-medium text-muted-foreground"> Daily</span></p>
+            <div className="text-xs text-muted-foreground space-y-1">
+                {examples.map(ex => (
+                    <p key={ex.plan}>• {ex.plan.toLocaleString()} Rs. Plan Daily: <span className="font-semibold text-foreground">{ex.daily.toLocaleString()} Rs.</span></p>
+                ))}
+            </div>
+        </CardContent>
+    </Card>
+);
+
+const ReturnComparisonRow = ({ investment, basic, pro }: { investment: number, basic: number, pro: number }) => (
+    <div className="flex items-center space-x-2">
+        <div className="p-3 rounded-lg bg-muted flex-1 text-center">
+            <p className="text-sm text-muted-foreground">{investment.toLocaleString()} Rs. Investment</p>
+            <p className="text-xs text-muted-foreground">(30 Days)</p>
+        </div>
+        <div className="flex-1 space-y-1 text-center">
+            <p className="text-sm font-semibold">{pro.toLocaleString()} Rs.</p>
+            <p className="text-xs text-muted-foreground line-through">{basic.toLocaleString()} Rs.</p>
+            <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-none">+{(pro - basic).toLocaleString()} Rs. Extra</Badge>
+        </div>
+    </div>
+);
+
 
 const ProPage: NextPage = () => {
   const { userData } = useAuth();
   const userName = userData?.name || 'User';
-  const message = `Hi, I'm ${userName} and I want to upgrade to the PRO plan for 4999 Rs.`;
+  const message = `Hi, I'm ${userName} and I want to upgrade to the PRO plan for 99 Rs.`;
   const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
+
+  const benefits = [
+    { icon: ArrowUp, title: "Higher Daily Returns", description: "Increase all your investment returns from 10% to 13% daily." },
+    { icon: Star, title: "Enhanced Daily Bonus", description: "Get higher bonus rewards in daily bonus games (₹3-₹8)." },
+    { icon: Shield, title: "Priority Support", description: "Get faster response times and dedicated PRO support." },
+    { icon: Award, title: "Early Access", description: "Access to new investment plans and features before others." },
+  ];
+
+  const returns = [
+      { investment: 100, basic: 400, pro: 490 },
+      { investment: 300, basic: 1200, pro: 1470 },
+      { investment: 500, basic: 2000, pro: 2450 },
+      { investment: 1000, basic: 4000, pro: 4900 },
+      { investment: 2000, basic: 8000, pro: 9800 },
+  ];
 
   return (
     <div className="bg-background min-h-full">
       <Header />
-      <div className="p-4 space-y-6">
-        <Card className="shadow-lg border-2 border-primary bg-gradient-to-br from-card to-primary/5">
-            <CardHeader className="text-center items-center">
-                <div className="p-4 bg-primary/10 rounded-full mb-2">
-                    <Crown className="w-10 h-10 text-primary"/>
-                </div>
-                <CardTitle className="text-3xl font-bold text-primary">VaultBoost PRO</CardTitle>
-                <CardDescription className="text-base">Unlock your full earning potential with a lifetime membership.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="p-4 rounded-lg bg-muted/50 text-center">
-                    <p className="text-muted-foreground">One-Time Lifetime Fee</p>
-                    <p className="text-4xl font-bold">4999 <span className="text-2xl">Rs.</span></p>
-                </div>
+      <div className="p-4 space-y-8">
+        <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold">Upgrade to PRO</h1>
+            <p className="text-muted-foreground">Unlock premium features and higher returns.</p>
+        </div>
 
-                <div className="space-y-3 text-left">
-                    <div className="flex items-start gap-3">
-                        <CheckCircle className="w-5 h-5 text-green-500 mt-1 shrink-0" />
-                        <div>
-                            <p className="font-semibold">20% Daily Returns</p>
-                            <p className="text-sm text-muted-foreground">Boost your daily earnings on all active and future investments from 10% to an incredible <span className="font-bold text-primary">20%</span>.</p>
-                        </div>
-                    </div>
-                     <div className="flex items-start gap-3">
-                        <CheckCircle className="w-5 h-5 text-green-500 mt-1 shrink-0" />
-                        <div>
-                            <p className="font-semibold">Priority Support</p>
-                            <p className="text-sm text-muted-foreground">Get faster responses from our customer support team for any queries.</p>
-                        </div>
-                    </div>
-                     <div className="flex items-start gap-3">
-                        <CheckCircle className="w-5 h-5 text-green-500 mt-1 shrink-0" />
-                        <div>
-                            <p className="font-semibold">Lifetime Membership</p>
-                            <p className="text-sm text-muted-foreground">Pay once and enjoy the PRO benefits for a lifetime. No recurring fees.</p>
-                        </div>
-                    </div>
+        <div className="flex flex-col md:flex-row gap-4">
+            <ComparisonCard title="Basic Plan" returns="10%" examples={[{plan: 100, daily: 10}, {plan: 500, daily: 50}, {plan: 1000, daily: 100}]} />
+            <ComparisonCard title="PRO Plan" returns="13%" examples={[{plan: 100, daily: 13}, {plan: 500, daily: 65}, {plan: 1000, daily: 130}]} isPro />
+        </div>
+
+        <Card className="bg-gradient-to-tr from-primary/10 to-card">
+            <CardContent className="p-6 text-center space-y-4">
+                <div>
+                    <p className="text-muted-foreground">One-Time Upgrade Fee</p>
+                    <p className="text-5xl font-bold">99 <span className="text-2xl">Rs.</span></p>
+                    <p className="font-semibold text-primary">Lifetime PRO membership</p>
                 </div>
-                
                 <Link href={whatsappUrl} className='w-full' target='_blank'>
                     <Button className="w-full" size="lg">
-                        <Zap className="mr-2" /> Upgrade Now & Earn More
+                        <Zap className="mr-2" /> Upgrade to PRO Now
                     </Button>
                 </Link>
             </CardContent>
         </Card>
+        
+        <Card>
+            <CardHeader>
+                <CardTitle>PRO Benefits</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                 {benefits.map(benefit => (
+                    <div key={benefit.title} className="flex items-start gap-4">
+                        <div className="p-2 bg-primary/10 rounded-full mt-1">
+                            <benefit.icon className="w-5 h-5 text-primary"/>
+                        </div>
+                        <div>
+                            <p className="font-semibold">{benefit.title}</p>
+                            <p className="text-sm text-muted-foreground">{benefit.description}</p>
+                        </div>
+                    </div>
+                ))}
+            </CardContent>
+        </Card>
+        
+         <Card>
+            <CardHeader>
+                <CardTitle>PRO vs Basic Returns</CardTitle>
+                <CardDescription>30-day investment comparison</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {returns.map(r => (
+                    <ReturnComparisonRow key={r.investment} {...r} />
+                ))}
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>What PRO Members Say</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="flex gap-4">
+                    <Avatar>
+                        <AvatarFallback>RK</AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <p className="text-sm italic">"Upgraded to PRO and my daily earnings increased by 30%! Worth every penny."</p>
+                        <p className="text-xs font-semibold mt-1">- Ravi K., PRO Member</p>
+                    </div>
+                </div>
+                 <div className="flex gap-4">
+                    <Avatar>
+                        <AvatarFallback>PS</AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <p className="text-sm italic">"The higher daily bonus and priority support make PRO membership amazing."</p>
+                        <p className="text-xs font-semibold mt-1">- Priya S., PRO Member</p>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+
       </div>
       <BottomNav activePage="pro" />
     </div>
