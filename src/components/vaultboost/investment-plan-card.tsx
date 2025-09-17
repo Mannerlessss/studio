@@ -34,25 +34,42 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
     <div
       className={`rounded-2xl shadow-xl p-4 text-white bg-gradient-to-br ${color} relative transform hover:scale-105 transition duration-300 flex flex-col`}
     >
-       <div className='flex justify-between items-start'>
-         <div className="text-xl font-bold mb-2">{title}</div>
-        <span className="bg-black/30 px-3 py-1 text-xs rounded-full">
-            {badge}
-        </span>
+       <div className="flex-grow">
+        <div className='flex justify-between items-start'>
+            <div className="text-xl font-bold">{title}</div>
+            <span className="bg-black/30 px-3 py-1 text-xs rounded-full">
+                {badge}
+            </span>
+        </div>
+
+        <div className="mt-4 space-y-2 text-sm">
+            {monthly && (
+                <div className="flex justify-between">
+                    <span className="opacity-80">Monthly</span>
+                    <b>{monthly.toLocaleString('en-IN')} Rs.</b>
+                </div>
+            )}
+            <div className="flex justify-between">
+                <span className="opacity-80">Each Price</span>
+                <b>{price.toLocaleString('en-IN')} Rs.</b>
+            </div>
+             <div className="flex justify-between">
+                <span className="opacity-80">Revenue Days</span>
+                <b>{days} Days</b>
+            </div>
+            {daily && (
+                 <div className="flex justify-between">
+                    <span className="opacity-80">Daily Earnings</span>
+                    <b>{daily.toLocaleString('en-IN')} Rs.</b>
+                </div>
+            )}
+             <div className="flex justify-between">
+                <span className="opacity-80">Total Revenue</span>
+                <b>{total.toLocaleString('en-IN')} Rs.</b>
+            </div>
+        </div>
        </div>
 
-      <div className="flex-grow flex items-center justify-between mt-2">
-        <div className="flex-shrink-0">
-          <Gem className="w-16 h-16 text-white/50" />
-        </div>
-        <div className="space-y-1 text-sm text-right">
-            {monthly && <p>📈 Monthly: <b>{monthly.toLocaleString('en-IN')} Rs.</b></p>}
-            <p>💎 Each Price: <b>{price.toLocaleString('en-IN')} Rs.</b></p>
-            <p>📅 Days: <b>{days} Days</b></p>
-            {daily && <p>💰 Daily Earnings: <b>{daily.toLocaleString('en-IN')} Rs.</b></p>}
-            <p>🏆 Total Revenue: <b>{total.toLocaleString('en-IN')} Rs.</b></p>
-        </div>
-      </div>
 
        <Link href={whatsappUrl} target="_blank" rel="noopener noreferrer">
           <button className="mt-4 w-full py-2 rounded-xl bg-white text-black font-semibold hover:bg-gray-200 transition">
