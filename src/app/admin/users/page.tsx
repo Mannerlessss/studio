@@ -17,6 +17,7 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Card,
@@ -62,7 +63,6 @@ export default function UsersPage() {
     const { toast } = useToast();
     const [users, setUsers] = useState<UserForAdmin[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selectedUser, setSelectedUser] = useState<UserForAdmin | null>(null);
     const [creditAmount, setCreditAmount] = useState('100'); // Default to the smallest plan
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -253,13 +253,53 @@ export default function UsersPage() {
                 </TableCell>
                 <TableCell className="text-right">
                     <div className='flex gap-2 justify-end'>
-                        <Dialog onOpenChange={(isOpen) => { if (!isOpen) setSelectedUser(null); }}>
+                        <Dialog>
                             <DialogTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={() => setSelectedUser(user)}>
+                                <Button variant="ghost" size="icon">
                                     <Eye className='w-4 h-4' />
                                     <span className="sr-only">View Details</span>
                                 </Button>
                             </DialogTrigger>
+                             <DialogContent className="sm:max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle>User Details: {user.name}</DialogTitle>
+                                    <DialogDescription>
+                                        Financial overview for {user.email}.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
+                                        <div className="flex items-center gap-3">
+                                            <Wallet className="w-5 h-5 text-primary" />
+                                            <span className="font-semibold">Total Balance</span>
+                                        </div>
+                                        <span className="font-bold text-lg">{user.totalBalance || 0} Rs.</span>
+                                    </div>
+                                    <div className="space-y-2 text-sm">
+                                    <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                                <TrendingUp className="w-4 h-4" />
+                                                <span>Investment Earnings</span>
+                                            </div>
+                                            <span>{user.totalInvestmentEarnings || 0} Rs.</span>
+                                    </div>
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                                <Users className="w-4 h-4" />
+                                                <span>Referral Earnings</span>
+                                            </div>
+                                            <span>{user.totalReferralEarnings || 0} Rs.</span>
+                                    </div>
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                                <Gift className="w-4 h-4" />
+                                                <span>Bonus Earnings</span>
+                                            </div>
+                                            <span>{user.totalBonusEarnings || 0} Rs.</span>
+                                    </div>
+                                    </div>
+                                </div>
+                            </DialogContent>
                         </Dialog>
                        <AlertDialog onOpenChange={(open) => !open && setCreditAmount('100')}>
                           <AlertDialogTrigger asChild>
@@ -339,50 +379,6 @@ export default function UsersPage() {
         </Table>
       </CardContent>
     </Card>
-     {selectedUser && (
-        <Dialog open={!!selectedUser} onOpenChange={(isOpen) => !isOpen && setSelectedUser(null)}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>User Details: {selectedUser.name}</DialogTitle>
-                    <DialogDescription>
-                        Financial overview for {selectedUser.email}.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
-                        <div className="flex items-center gap-3">
-                            <Wallet className="w-5 h-5 text-primary" />
-                            <span className="font-semibold">Total Balance</span>
-                        </div>
-                        <span className="font-bold text-lg">{selectedUser.totalBalance || 0} Rs.</span>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                       <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                                <TrendingUp className="w-4 h-4" />
-                                <span>Investment Earnings</span>
-                            </div>
-                            <span>{selectedUser.totalInvestmentEarnings || 0} Rs.</span>
-                       </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                                <Users className="w-4 h-4" />
-                                <span>Referral Earnings</span>
-                            </div>
-                            <span>{selectedUser.totalReferralEarnings || 0} Rs.</span>
-                       </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                                <Gift className="w-4 h-4" />
-                                <span>Bonus Earnings</span>
-                            </div>
-                            <span>{selectedUser.totalBonusEarnings || 0} Rs.</span>
-                       </div>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
-    )}
     </>
   );
 }
