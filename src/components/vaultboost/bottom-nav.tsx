@@ -1,19 +1,19 @@
-
 'use client';
 import type { FC } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, TrendingUp, Users, Settings } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Users, Settings, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface BottomNavProps {
-  activePage: 'dashboard' | 'investment' | 'refer' | 'settings' | 'support';
+  activePage: 'dashboard' | 'investment' | 'pro' | 'refer' | 'settings' | 'support';
 }
 
 export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {
   const navItems = [
     { href: '/', icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard' },
-    { href: '/investment', icon: TrendingUp, label: 'Investment', page: 'investment' },
+    { href: '/investment', icon: TrendingUp, label: 'Invest', page: 'investment' },
+    { href: '/pro', icon: Crown, label: 'Pro', page: 'pro' },
     { href: '/refer', icon: Users, label: 'Refer', page: 'refer' },
     { href: '/settings', icon: Settings, label: 'Settings', page: 'settings' },
   ];
@@ -29,7 +29,8 @@ export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {
                 'flex flex-col items-center justify-center h-full w-full rounded-none',
                 activePage === item.page
                   ? 'text-primary bg-primary/10'
-                  : 'text-muted-foreground'
+                  : 'text-muted-foreground',
+                item.page === 'pro' && 'text-primary'
               )}
             >
               <item.icon className="h-6 w-6 mb-1" />

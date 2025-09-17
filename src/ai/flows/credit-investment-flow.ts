@@ -72,7 +72,7 @@ const creditInvestmentFlow = ai.defineFlow(
 
             // --- ALL WRITES START HERE ---
             const newInvestmentRef = adminDb.collection(`users/${userId}/investments`).doc();
-            const dailyReturnRate = userInTransaction.membership === 'Pro' ? 0.13 : 0.10;
+            const dailyReturnRate = userInTransaction.membership === 'Pro' ? 0.20 : 0.10;
             transaction.set(newInvestmentRef, {
                 planAmount: amount,
                 dailyReturn: amount * dailyReturnRate,

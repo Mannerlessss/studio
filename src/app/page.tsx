@@ -5,7 +5,6 @@ import { InfoCard } from '@/components/vaultboost/info-card';
 import { DailyBonusCard } from '@/components/vaultboost/daily-bonus-card';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
 import { Wallet, TrendingUp, Users, PiggyBank, Gem } from 'lucide-react';
-import { UpgradeCard } from '@/components/vaultboost/upgrade-card';
 import { WithdrawCard } from '@/components/vaultboost/withdraw-card';
 import { TransactionHistoryCard } from '@/components/vaultboost/transaction-history-card';
 import { Header } from '@/components/vaultboost/header';
@@ -76,7 +75,6 @@ const Dashboard: NextPage = () => {
             <WithdrawCard />
         </div>
         <TransactionHistoryCard />
-        {userData.membership !== 'Pro' && <UpgradeCard userName={userData.name}/>}
       </div>
       <BottomNav activePage="dashboard" />
     </div>
