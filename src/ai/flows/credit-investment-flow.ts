@@ -32,22 +32,40 @@ const creditInvestmentFlow = ai.defineFlow(
     
     try {
         const adminDb = await getAdminDb();
-        const userDocRef = adminDb.collection('users').doc(userId);
         
+        let referredUserDocRefToUpdate: admin.firestore.DocumentReference | null = null;
+        const userDoc = await adminDb.collection('users').doc(userId).get();
+        if(!userDoc.exists) throw new Error(`User with ID ${userId} not found.`);
+        const user = userDoc.data()!;
+        
+        // --- PRE-TRANSACTION READ ---
+        // If there's a referrer, find the sub-collection document that needs updating beforehand.
+        if (user.referredBy) {
+             const referrerReferralsRef = adminDb.collection('users').doc(user.referredBy).collection('referrals');
+             const q = referrerReferralsRef.where("userId", "==", userId);
+             const referredUserQuerySnapshot = await q.get();
+             if (!referredUserQuerySnapshot.empty) {
+                referredUserDocRefToUpdate = referredUserQuerySnapshot.docs[0].ref;
+             }
+        }
+
+
         await adminDb.runTransaction(async (transaction) => {
+            const userDocRef = adminDb.collection('users').doc(userId);
             // --- ALL READS MUST HAPPEN BEFORE WRITES ---
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists) {
+            // Re-read user doc inside transaction for consistency
+            const userDocInTransaction = await transaction.get(userDocRef);
+            if (!userDocInTransaction.exists) {
                 throw new Error(`User with ID ${userId} not found.`);
             }
-            const user = userDoc.data()!;
+            const userInTransaction = userDocInTransaction.data()!;
             
             let referrerDoc: admin.firestore.DocumentSnapshot | null = null;
             let referrerDocRef: admin.firestore.DocumentReference | null = null;
             
             // If it's the user's first investment, we might need referrer data. Read it now.
-            if (!user.hasInvested && user.referredBy && amount >= 100) {
-                referrerDocRef = adminDb.collection('users').doc(user.referredBy);
+            if (!userInTransaction.hasInvested && userInTransaction.referredBy && amount >= 100) {
+                referrerDocRef = adminDb.collection('users').doc(userInTransaction.referredBy);
                 referrerDoc = await transaction.get(referrerDocRef);
             }
             // --- END OF READS ---
@@ -56,7 +74,7 @@ const creditInvestmentFlow = ai.defineFlow(
 
             // --- ALL WRITES START HERE ---
             const newInvestmentRef = adminDb.collection(`users/${userId}/investments`).doc();
-            const dailyReturnRate = user.membership === 'Pro' ? 0.13 : 0.10;
+            const dailyReturnRate = userInTransaction.membership === 'Pro' ? 0.13 : 0.10;
             transaction.set(newInvestmentRef, {
                 planAmount: amount,
                 dailyReturn: amount * dailyReturnRate,
@@ -75,10 +93,10 @@ const creditInvestmentFlow = ai.defineFlow(
             const userUpdates: { [key: string]: any } = {
                 totalInvested: admin.firestore.FieldValue.increment(amount),
             };
-            if (!user.hasInvested) {
+            if (!userInTransaction.hasInvested) {
                 userUpdates.hasInvested = true;
-                if (user.referredBy) {
-                    userUpdates.commissionParent = user.referredBy;
+                if (userInTransaction.referredBy) {
+                    userUpdates.commissionParent = userInTransaction.referredBy;
                 }
             }
             
@@ -111,9 +129,9 @@ const creditInvestmentFlow = ai.defineFlow(
                     investedReferralCount: admin.firestore.FieldValue.increment(1),
                 };
 
-                const referrerBonusTransactionRef = adminDb.collection(`users/${user.referredBy}/transactions`).doc();
+                const referrerBonusTransactionRef = adminDb.collection(`users/${userInTransaction.referredBy}/transactions`).doc();
                 transaction.set(referrerBonusTransactionRef, {
-                    type: 'referral', amount: bonusAmount, description: `Referral bonus from ${user.name}`, status: 'Completed', date: now,
+                    type: 'referral', amount: bonusAmount, description: `Referral bonus from ${userInTransaction.name}`, status: 'Completed', date: now,
                 });
                 
                 const claimedMilestones = referrerData.claimedMilestones || [];
@@ -126,7 +144,7 @@ const creditInvestmentFlow = ai.defineFlow(
                         referrerUpdates.totalEarnings = admin.firestore.FieldValue.increment(rewardAmount);
                         referrerUpdates.claimedMilestones = admin.firestore.FieldValue.arrayUnion(milestoneNum);
 
-                        const milestoneTransactionRef = adminDb.collection(`users/${user.referredBy}/transactions`).doc();
+                        const milestoneTransactionRef = adminDb.collection(`users/${userInTransaction.referredBy}/transactions`).doc();
                         transaction.set(milestoneTransactionRef, {
                             type: 'bonus', amount: rewardAmount, description: `Milestone Bonus: ${milestone} referrals`, status: 'Completed', date: now,
                         });
@@ -135,18 +153,9 @@ const creditInvestmentFlow = ai.defineFlow(
                 
                 transaction.update(referrerDocRef, referrerUpdates);
                 
-                // Finally, update the referral subcollection document
-                const referrerReferralsRef = adminDb.collection('users').doc(user.referredBy).collection('referrals');
-                const q = referrerReferralsRef.where("userId", "==", userId);
-                const referredUserQuerySnapshot = await q.get(); // This is a read OUTSIDE the transaction, but it's safe to find the doc to update.
-                
-                if (referredUserQuerySnapshot.empty) {
-                    // This should ideally not happen if the referral was recorded at signup, but as a fallback:
-                    const newSubDoc = referrerReferralsRef.doc();
-                    transaction.set(newSubDoc, { hasInvested: true }, { merge: true });
-                } else {
-                    const referredUserDocRef = referredUserQuerySnapshot.docs[0].ref;
-                    transaction.update(referredUserDocRef, { hasInvested: true });
+                // Finally, update the referral subcollection document if its ref was found before the transaction
+                if (referredUserDocRefToUpdate) {
+                    transaction.update(referredUserDocRefToUpdate, { hasInvested: true });
                 }
             }
         });
