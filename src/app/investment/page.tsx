@@ -6,6 +6,8 @@ import { InvestmentPlanCard } from '@/components/vaultboost/investment-plan-card
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Info } from 'lucide-react';
 
 const InvestmentPage: NextPage = () => {
     const welfarePlans = [
@@ -19,8 +21,8 @@ const InvestmentPage: NextPage = () => {
   ];
 
   const fixedPlans = [
-     { id: 'sip1', title: 'Monthly SIP 2500', price: 30000, days: 365, total: 100000, color: "from-slate-500 to-slate-700", badge: "🏦 Fixed" },
-     { id: 'sip2', title: 'Monthly SIP 5000', price: 60000, days: 365, total: 250000, color: "from-gray-600 to-gray-800", badge: "🏦 Fixed" },
+     { id: 'sip1', title: 'Monthly SIP 2500', price: 30000, days: 365, total: 100000, color: "from-slate-500 to-slate-700", badge: "🏦 Fixed", monthly: 2500 },
+     { id: 'sip2', title: 'Monthly SIP 5000', price: 60000, days: 365, total: 250000, color: "from-gray-600 to-gray-800", badge: "🏦 Fixed", monthly: 5000 },
   ];
 
   const activityPlans = [
@@ -54,12 +56,24 @@ const InvestmentPage: NextPage = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="fixed" className="mt-6">
+          <TabsContent value="fixed" className="mt-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {fixedPlans.map((plan) => (
                 <InvestmentPlanCard key={plan.id} {...plan} userName={userName} />
                 ))}
             </div>
+             <Card className="bg-muted/50 border-dashed">
+                <CardHeader>
+                    <div className="flex items-center gap-3">
+                        <Info className="w-6 h-6 text-muted-foreground" />
+                        <CardTitle className="text-lg font-semibold">Please Note</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground space-y-2">
+                    <p>• Fixed Fund plans work like a Systematic Investment Plan (SIP).</p>
+                    <p>• You must pay the specified monthly amount for the duration of the plan to receive the total revenue at the end of the term.</p>
+                </CardContent>
+            </Card>
           </TabsContent>
 
            <TabsContent value="activity" className="mt-6">
