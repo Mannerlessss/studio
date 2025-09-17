@@ -4,23 +4,24 @@ import { Header } from '@/components/vaultboost/header';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, CheckCircle, ArrowUp, Star, Shield, Award } from 'lucide-react';
+import { Zap, ArrowUp, Star, Shield, Award } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 
 const ComparisonCard = ({ title, returns, examples, isPro }: { title: string; returns: string; examples: {plan: number, daily: number}[], isPro?: boolean }) => (
     <Card className={cn("flex-1", isPro && "border-2 border-primary bg-primary/5")}>
         <CardHeader>
-            <CardTitle className={cn(isPro && "text-primary")}>{title}</CardTitle>
+            <CardTitle className={cn("text-xl", isPro && "text-primary")}>{title}</CardTitle>
+            {!isPro && <CardDescription>Current Plan</CardDescription>}
             {isPro && <Badge className="w-fit">Recommended</Badge>}
         </CardHeader>
         <CardContent className="space-y-3">
             <p className="text-4xl font-bold">{returns}<span className="text-xl font-medium text-muted-foreground"> Daily</span></p>
-            <div className="text-xs text-muted-foreground space-y-1">
+            <div className="text-xs text-muted-foreground space-y-1 pt-2">
                 {examples.map(ex => (
                     <p key={ex.plan}>• {ex.plan.toLocaleString()} Rs. Plan Daily: <span className="font-semibold text-foreground">{ex.daily.toLocaleString()} Rs.</span></p>
                 ))}
@@ -58,11 +59,11 @@ const ProPage: NextPage = () => {
   ];
 
   const returns = [
-      { investment: 100, basic: 400, pro: 490 },
-      { investment: 300, basic: 1200, pro: 1470 },
-      { investment: 500, basic: 2000, pro: 2450 },
-      { investment: 1000, basic: 4000, pro: 4900 },
-      { investment: 2000, basic: 8000, pro: 9800 },
+      { investment: 100, basic: 100 + (100 * 0.10 * 30), pro: 100 + (100 * 0.13 * 30) },
+      { investment: 300, basic: 300 + (300 * 0.10 * 30), pro: 300 + (300 * 0.13 * 30) },
+      { investment: 500, basic: 500 + (500 * 0.10 * 30), pro: 500 + (500 * 0.13 * 30) },
+      { investment: 1000, basic: 1000 + (1000 * 0.10 * 30), pro: 1000 + (1000 * 0.13 * 30) },
+      { investment: 2000, basic: 2000 + (2000 * 0.10 * 30), pro: 2000 + (2000 * 0.13 * 30) },
   ];
 
   return (
@@ -146,6 +147,15 @@ const ProPage: NextPage = () => {
                     <div>
                         <p className="text-sm italic">"The higher daily bonus and priority support make PRO membership amazing."</p>
                         <p className="text-xs font-semibold mt-1">- Priya S., PRO Member</p>
+                    </div>
+                </div>
+                 <div className="flex gap-4">
+                    <Avatar>
+                        <AvatarFallback>AT</AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <p className="text-sm italic">"Best investment I made was upgrading to PRO. Returns are consistently higher."</p>
+                        <p className="text-xs font-semibold mt-1">- Amit T., PRO Member</p>
                     </div>
                 </div>
             </CardContent>
