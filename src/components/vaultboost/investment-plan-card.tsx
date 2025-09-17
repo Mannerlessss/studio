@@ -63,9 +63,9 @@ export const InvestmentPlanCard: FC<InvestmentPlanCardProps> = ({
                     <b>{daily.toLocaleString('en-IN')} Rs.</b>
                 </div>
             )}
-             <div className="flex justify-between">
-                <span className="opacity-80">Total Revenue</span>
-                <b>{total.toLocaleString('en-IN')} Rs.</b>
+             <div className="flex justify-between text-base mt-2">
+                <b className="font-bold">Total Revenue</b>
+                <b className="font-bold">{total.toLocaleString('en-IN')} Rs.</b>
             </div>
         </div>
        </div>
