@@ -4,7 +4,7 @@ import { Header } from '@/components/vaultboost/header';
 import { BottomNav } from '@/components/vaultboost/bottom-nav';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, TrendingUp, CheckCircle, Crown } from 'lucide-react';
+import { Zap, CheckCircle, Crown } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 
