@@ -531,7 +531,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         redeemOfferCode,
     };
     
-    if (loading && !pathname.startsWith('/admin')) {
+    if (loading && !pathname.startsWith('/admin') && !pathname.startsWith('/login') && !pathname.startsWith('/ref/')) {
          return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <div className="text-center">
@@ -552,3 +552,5 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
