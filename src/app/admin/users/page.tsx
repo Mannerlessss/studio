@@ -73,7 +73,7 @@ interface User {
     createdAt?: Timestamp;
 }
 
-const investmentPlans = [150, 300, 400, 1000, 1600, 4000, 10000];
+const investmentPlans = [150, 300, 400, 1000, 1600, 4000, 10000, 25000, 30000, 50000, 60000, 100000];
 const milestones: { [key: number]: number } = {
   5: 250, 10: 500, 20: 1000, 30: 1500, 40: 2000, 50: 2500,
 };
@@ -416,7 +416,7 @@ export default function UsersPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {investmentPlans.map(plan => (
-                                            <SelectItem key={plan} value={String(plan)}>{plan} Rs. Plan</SelectItem>
+                                            <SelectItem key={plan} value={String(plan)}>{plan.toLocaleString('en-IN')} Rs. Plan</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
