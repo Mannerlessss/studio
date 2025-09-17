@@ -2,15 +2,19 @@
 import type { FC } from 'react';
 import { Headset, Crown, Gem } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/auth-context';
 
 export const Header: FC = () => {
-  const pathname = usePathname();
+  const { userData } = useAuth();
   const headerClasses = 'bg-card text-foreground';
   const buttonClasses = 'text-muted-foreground hover:bg-accent/10 hover:text-accent-foreground';
   const iconColor = 'text-primary';
+  
+  const userName = userData?.name || 'User';
+  const message = `Hi, I'm ${userName} and I want to upgrade to the PRO plan for 99 Rs.`;
+  const whatsappUrl = `https://wa.me/7888540806?text=${encodeURIComponent(message)}`;
 
   return (
     <header className={`flex items-center justify-between p-3 md:p-4 border-b ${headerClasses}`}>
@@ -25,10 +29,12 @@ export const Header: FC = () => {
             <span className="sr-only">Customer Support</span>
           </Button>
         </Link>
-        <Button variant="ghost" size="icon" className={buttonClasses}>
-          <Crown className={`h-5 w-5 text-primary`} />
-          <span className="sr-only">Pro Plan</span>
-        </Button>
+        <Link href={whatsappUrl} target='_blank'>
+          <Button variant="ghost" size="icon" className={buttonClasses}>
+            <Crown className={`h-5 w-5 text-primary`} />
+            <span className="sr-only">Pro Plan</span>
+          </Button>
+        </Link>
       </div>
     </header>
   );
