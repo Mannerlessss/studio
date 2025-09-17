@@ -3,7 +3,7 @@
  * @fileOverview A server-side flow to securely fetch all user data for the admin panel.
  */
 import { z } from 'zod';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { getAdminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import { Timestamp } from 'firebase-admin/firestore';
 
@@ -21,7 +21,7 @@ const UserForAdminSchema = z.object({
     claimedMilestones: z.array(z.number()).optional(),
     investedReferralCount: z.number(),
     referredBy: z.string().optional(),
-    createdAt: z.any().optional(), // Allow any for Timestamp
+    createdAt: z.any().optional(),
 });
 
 export type UserForAdmin = z.infer<typeof UserForAdminSchema>;
@@ -35,10 +35,10 @@ const getAllUsersFlow = ai.defineFlow(
     outputSchema: GetAllUsersOutputSchema,
   },
   async () => {
+    const adminDb = await getAdminDb();
     const usersSnapshot = await adminDb.collection('users').get();
     const usersData: UserForAdmin[] = usersSnapshot.docs.map(doc => {
         const data = doc.data();
-        // Convert Firestore Timestamps to serializable format (ISO string)
         const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : null;
 
         return {
@@ -63,7 +63,5 @@ const getAllUsersFlow = ai.defineFlow(
 );
 
 export async function getAllUsers(): Promise<UserForAdmin[]> {
-    const result = await getAllUsersFlow();
-    // The flow now returns serializable data, so we can just return it.
-    return result;
+    return await getAllUsersFlow();
 }

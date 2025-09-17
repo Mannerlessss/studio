@@ -3,11 +3,10 @@
  * @fileOverview A server-side flow to securely update the status of a withdrawal request.
  */
 import { z } from 'zod';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { getAdminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import { FieldValue } from 'firebase-admin/firestore';
 
-// Schema for updating a withdrawal status
 const UpdateWithdrawalStatusInputSchema = z.object({
     userId: z.string(),
     withdrawalId: z.string(),
@@ -21,24 +20,23 @@ const UpdateWithdrawalStatusOutputSchema = z.object({
     message: z.string(),
 });
 
-
 const updateWithdrawalStatusFlow = ai.defineFlow({
     name: 'updateWithdrawalStatusFlow',
     inputSchema: UpdateWithdrawalStatusInputSchema,
     outputSchema: UpdateWithdrawalStatusOutputSchema,
 }, async ({ userId, withdrawalId, newStatus, amount }) => {
     try {
+        const adminDb = await getAdminDb();
         const withdrawalDocRef = adminDb.doc(`users/${userId}/withdrawals/${withdrawalId}`);
         const batch = adminDb.batch();
 
         batch.update(withdrawalDocRef, { status: newStatus });
         
-        // Find and update the corresponding transaction document
         const transactionQuery = adminDb.collection(`users/${userId}/transactions`) 
             .where('type', '==', 'withdrawal')
             .where('amount', '==', amount)
             .where('status', '==', 'Pending')
-            .limit(1); // Find the first match
+            .limit(1);
             
         const transactionSnapshot = await transactionQuery.get();
         if (!transactionSnapshot.empty) {
@@ -65,7 +63,6 @@ const updateWithdrawalStatusFlow = ai.defineFlow({
     }
 });
 
-// Exported wrapper function
 export async function updateWithdrawalStatus(input: UpdateWithdrawalStatusInput): Promise<{success: boolean, message: string}> {
     return updateWithdrawalStatusFlow(input);
 }

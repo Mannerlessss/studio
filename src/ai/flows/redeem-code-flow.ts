@@ -3,7 +3,7 @@
  * @fileOverview A server-side flow to securely redeem a referral code.
  */
 import { z } from 'zod';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { getAdminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -19,14 +19,13 @@ const RedeemCodeOutputSchema = z.object({
     success: z.boolean(),
     message: z.string(),
 });
-export type RedeemCodeOutput = z.infer<typeof RedeemCodeOutputSchema>;
-
 
 const redeemCodeFlow = ai.defineFlow({
     name: 'redeemCodeFlow',
     inputSchema: RedeemCodeInputSchema,
     outputSchema: RedeemCodeOutputSchema,
 }, async ({ userId, userName, userEmail, code }) => {
+    const adminDb = await getAdminDb();
     const userRef = adminDb.collection('users').doc(userId);
 
     try {
@@ -41,7 +40,6 @@ const redeemCodeFlow = ai.defineFlow({
                 throw new Error('A referral code has already been used for this account.');
             }
 
-            // Find the referrer by their code
             const usersRef = adminDb.collection('users');
             const referrerQuery = usersRef.where('referralCode', '==', code.toUpperCase()).limit(1);
             const referrerSnapshot = await transaction.get(referrerQuery);
@@ -55,13 +53,11 @@ const redeemCodeFlow = ai.defineFlow({
                 throw new Error('You cannot use your own referral code.');
             }
             
-            // 1. Update the user who redeemed the code to link them to the referrer
             transaction.update(userRef, {
                 usedReferralCode: code.toUpperCase(),
                 referredBy: referrerDoc.id,
             });
 
-            // 2. Add the new user to the referrer's `referrals` subcollection
             const newReferralRef = adminDb.collection('users').doc(referrerDoc.id).collection('referrals').doc();
             transaction.set(newReferralRef, {
                 userId: userId,

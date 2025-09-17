@@ -6,8 +6,7 @@
  * and their corresponding document in the Firestore database. This is a
  * privileged operation that requires the Firebase Admin SDK.
  */
-import { z } from 'zod';
-import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
+import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 
 export async function deleteUser(uid: string): Promise<{ success: boolean; message: string; }> {
     if (!uid) {
@@ -15,10 +14,11 @@ export async function deleteUser(uid: string): Promise<{ success: boolean; messa
     }
     
     try {
-        // Delete from Firebase Authentication
+        const adminAuth = await getAdminAuth();
+        const adminDb = await getAdminDb();
+
         await adminAuth.deleteUser(uid);
 
-        // Delete from Firestore database
         const userDocRef = adminDb.collection('users').doc(uid);
         
         const docSnap = await userDocRef.get();
@@ -34,6 +34,7 @@ export async function deleteUser(uid: string): Promise<{ success: boolean; messa
         console.error(`Failed to delete user ${uid}:`, error);
         if (error.code === 'auth/user-not-found') {
             try {
+                const adminDb = await getAdminDb();
                 const userDocRef = adminDb.collection('users').doc(uid);
                 const docSnap = await userDocRef.get();
                 if (docSnap.exists) {

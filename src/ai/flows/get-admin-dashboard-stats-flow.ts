@@ -3,7 +3,7 @@
  * @fileOverview A server-side flow to securely fetch admin dashboard statistics.
  */
 import { z } from 'zod';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { getAdminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import { Timestamp } from 'firebase-admin/firestore';
 
@@ -22,15 +22,13 @@ const getAdminDashboardStatsFlow = ai.defineFlow(
     outputSchema: GetAdminDashboardStatsOutputSchema,
   },
   async () => {
-    // Total Users
+    const adminDb = await getAdminDb();
     const usersSnapshot = await adminDb.collection('users').get();
     const totalUsers = usersSnapshot.size;
 
-    // Pending Withdrawals
     const withdrawalsSnapshot = await adminDb.collectionGroup('withdrawals').where('status', '==', 'Pending').get();
     const pendingWithdrawals = withdrawalsSnapshot.size;
 
-    // Active Offer Codes
     const offersSnapshot = await adminDb.collection('offers').get();
     const activeOffers = offersSnapshot.docs.filter(doc => {
         const offer = doc.data();
@@ -40,7 +38,6 @@ const getAdminDashboardStatsFlow = ai.defineFlow(
         return !isExpiredByDate && !isExpiredByUsage;
     }).length;
 
-    // Total Investments
     let totalInvestments = 0;
     usersSnapshot.forEach(doc => {
         totalInvestments += doc.data().totalInvested || 0;
@@ -55,7 +52,6 @@ const getAdminDashboardStatsFlow = ai.defineFlow(
   }
 );
 
-// Exported wrapper function
 export async function getAdminDashboardStats(): Promise<GetAdminDashboardStatsOutput> {
     return getAdminDashboardStatsFlow();
 }

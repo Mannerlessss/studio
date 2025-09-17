@@ -3,27 +3,24 @@
  * @fileOverview Server-side flows for managing offer codes.
  */
 import { z } from 'zod';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { getAdminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 
-// Schema for creating an offer
 const CreateOfferInputSchema = z.object({
     code: z.string().min(1),
     rewardAmount: z.number().positive(),
     maxUsers: z.number().positive().optional(),
-    expiresAt: z.string().optional(), // ISO date string
+    expiresAt: z.string().optional(),
 });
 export type CreateOfferInput = z.infer<typeof CreateOfferInputSchema>;
 
-// Schema for the output of offer operations
 const OfferOutputSchema = z.object({
     success: z.boolean(),
     message: z.string(),
     id: z.string().optional(),
 });
 
-// Schema for a single offer object when fetched
 const OfferSchema = z.object({
   id: z.string(),
   code: z.string(),
@@ -38,12 +35,12 @@ export type Offer = z.infer<typeof OfferSchema>;
 const GetAllOffersOutputSchema = z.array(OfferSchema);
 
 
-// Flow to get all offers
 const getAllOffersFlow = ai.defineFlow({
     name: 'getAllOffersFlow',
     inputSchema: z.void(),
     outputSchema: GetAllOffersOutputSchema,
 }, async () => {
+    const adminDb = await getAdminDb();
     const offersSnapshot = await adminDb.collection('offers').get();
     const offersData: Offer[] = offersSnapshot.docs.map(doc => {
         const data = doc.data();
@@ -60,12 +57,12 @@ const getAllOffersFlow = ai.defineFlow({
     return offersData;
 });
 
-// Flow to create a new offer
 const createOfferFlow = ai.defineFlow({
     name: 'createOfferFlow',
     inputSchema: CreateOfferInputSchema,
     outputSchema: OfferOutputSchema,
 }, async (input) => {
+    const adminDb = await getAdminDb();
     const newOfferData: any = {
         code: input.code.toUpperCase(),
         rewardAmount: input.rewardAmount,
@@ -85,19 +82,17 @@ const createOfferFlow = ai.defineFlow({
     };
 });
 
-// Flow to delete an offer
 const deleteOfferFlow = ai.defineFlow({
     name: 'deleteOfferFlow',
-    inputSchema: z.string(), // Expects offer ID
+    inputSchema: z.string(),
     outputSchema: OfferOutputSchema,
 }, async (offerId) => {
     if (!offerId) throw new Error('Offer ID is required.');
+    const adminDb = await getAdminDb();
     await adminDb.collection('offers').doc(offerId).delete();
     return { success: true, message: 'Offer code deleted successfully.' };
 });
 
-
-// Exported wrapper functions
 export async function getAllOffers(): Promise<Offer[]> {
     return getAllOffersFlow();
 }

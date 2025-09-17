@@ -3,9 +3,9 @@
  * @fileOverview A server-side flow to securely credit an investment to a user.
  */
 import { z } from 'zod';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { getAdminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import * as admin from 'firebase-admin';
 
 const CreditInvestmentInputSchema = z.object({
   userId: z.string(),
@@ -31,11 +31,10 @@ const creditInvestmentFlow = ai.defineFlow(
   async ({ userId, amount }) => {
     
     try {
+        const adminDb = await getAdminDb();
         const userDocRef = adminDb.collection('users').doc(userId);
         
         await adminDb.runTransaction(async (transaction) => {
-            // --- ALL READS MUST COME BEFORE WRITES ---
-
             const userDoc = await transaction.get(userDocRef);
             if (!userDoc.exists) {
                 throw new Error(`User with ID ${userId} not found.`);
@@ -46,7 +45,6 @@ const creditInvestmentFlow = ai.defineFlow(
             let referredUserQuerySnapshot: admin.firestore.QuerySnapshot | null = null;
             let referrerDocRef: admin.firestore.DocumentReference | null = null;
 
-            // If a referral is involved, read all necessary documents first.
             if (!user.hasInvested && user.referredBy && amount >= 100) {
                 referrerDocRef = adminDb.collection('users').doc(user.referredBy);
                 referrerDoc = await transaction.get(referrerDocRef);
@@ -58,10 +56,8 @@ const creditInvestmentFlow = ai.defineFlow(
                 }
             }
             
-            // --- ALL WRITES AFTER THIS POINT ---
-            const now = FieldValue.serverTimestamp();
+            const now = admin.firestore.FieldValue.serverTimestamp();
 
-            // 1. Create a new document in the `investments` subcollection
             const newInvestmentRef = adminDb.collection(`users/${userId}/investments`).doc();
             const dailyReturnRate = user.membership === 'Pro' ? 0.13 : 0.10;
             transaction.set(newInvestmentRef, {
@@ -74,15 +70,13 @@ const creditInvestmentFlow = ai.defineFlow(
                 status: 'active',
             });
 
-            // 2. Create a transaction record
             const transactionRef = adminDb.collection(`users/${userId}/transactions`).doc();
             transaction.set(transactionRef, {
                 type: 'investment', amount, description: `Invested in Plan ${amount}`, status: 'Completed', date: now,
             });
             
-            // 3. Update the user's main document
             const userUpdates: { [key: string]: any } = {
-                totalInvested: FieldValue.increment(amount),
+                totalInvested: admin.firestore.FieldValue.increment(amount),
             };
             if (!user.hasInvested) {
                 userUpdates.hasInvested = true;
@@ -92,46 +86,42 @@ const creditInvestmentFlow = ai.defineFlow(
             }
             transaction.update(userDocRef, userUpdates);
 
-            // 4. Handle Referral Logic (if it's the user's first investment >= 100)
             if (referrerDoc && referrerDoc.exists && referrerDocRef) {
                 const referrerData = referrerDoc.data()!;
-                const bonusAmount = 75; // Standard referral bonus
+                const bonusAmount = 75;
 
-                // Give welcome bonus to the new investor
                 transaction.update(userDocRef, {
-                    totalBalance: FieldValue.increment(bonusAmount),
-                    totalBonusEarnings: FieldValue.increment(bonusAmount),
-                    totalEarnings: FieldValue.increment(bonusAmount),
+                    totalBalance: admin.firestore.FieldValue.increment(bonusAmount),
+                    totalBonusEarnings: admin.firestore.FieldValue.increment(bonusAmount),
+                    totalEarnings: admin.firestore.FieldValue.increment(bonusAmount),
                 });
                 const userBonusTransactionRef = adminDb.collection(`users/${userId}/transactions`).doc();
                 transaction.set(userBonusTransactionRef, {
                     type: 'bonus', amount: bonusAmount, description: `Welcome referral bonus!`, status: 'Completed', date: now,
                 });
 
-                // Give standard referral bonus to the referrer & increment their count
                 const newReferralCount = (referrerData.investedReferralCount || 0) + 1;
                 transaction.update(referrerDocRef, {
-                    totalBalance: FieldValue.increment(bonusAmount),
-                    totalReferralEarnings: FieldValue.increment(bonusAmount),
-                    totalEarnings: FieldValue.increment(bonusAmount),
-                    investedReferralCount: FieldValue.increment(1),
+                    totalBalance: admin.firestore.FieldValue.increment(bonusAmount),
+                    totalReferralEarnings: admin.firestore.FieldValue.increment(bonusAmount),
+                    totalEarnings: admin.firestore.FieldValue.increment(bonusAmount),
+                    investedReferralCount: admin.firestore.FieldValue.increment(1),
                 });
                 const referrerBonusTransactionRef = adminDb.collection(`users/${user.referredBy}/transactions`).doc();
                 transaction.set(referrerBonusTransactionRef, {
                     type: 'referral', amount: bonusAmount, description: `Referral bonus from ${user.name}`, status: 'Completed', date: now,
                 });
                 
-                // CHECK FOR MILESTONES
                 const claimedMilestones = referrerData.claimedMilestones || [];
                 for (const milestone in milestones) {
                     const milestoneNum = Number(milestone);
                     if (newReferralCount >= milestoneNum && !claimedMilestones.includes(milestoneNum)) {
                         const rewardAmount = milestones[milestoneNum];
                         transaction.update(referrerDocRef, {
-                            totalBalance: FieldValue.increment(rewardAmount),
-                            totalReferralEarnings: FieldValue.increment(rewardAmount),
-                            totalEarnings: FieldValue.increment(rewardAmount),
-                            claimedMilestones: FieldValue.arrayUnion(milestoneNum)
+                            totalBalance: admin.firestore.FieldValue.increment(rewardAmount),
+                            totalReferralEarnings: admin.firestore.FieldValue.increment(rewardAmount),
+                            totalEarnings: admin.firestore.FieldValue.increment(rewardAmount),
+                            claimedMilestones: admin.firestore.FieldValue.arrayUnion(milestoneNum)
                         });
                         const milestoneTransactionRef = adminDb.collection(`users/${user.referredBy}/transactions`).doc();
                         transaction.set(milestoneTransactionRef, {
@@ -163,5 +153,5 @@ const creditInvestmentFlow = ai.defineFlow(
 
 
 export async function creditInvestment(input: CreditInvestmentInput): Promise<{success: boolean, message: string}> {
-    return await creditInvestmentFlow(input);
+    return creditInvestmentFlow(input);
 }
