@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { collection, query, onSnapshot } from 'firebase/firestore';
-import { clientDb as db } from '@/lib/firebaseClient';
+import { clientDb } from '@/lib/firebaseClient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReferralMilestonesCard } from '@/components/vaultboost/referral-milestones-card';
 
@@ -37,7 +37,7 @@ const ReferPage: NextPage = () => {
     useEffect(() => {
         if (!user) return;
 
-        const referralsRef = collection(db, `users/${user.uid}/referrals`);
+        const referralsRef = collection(clientDb, `users/${user.uid}/referrals`);
         const q = query(referralsRef);
         
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -186,3 +186,5 @@ const ReferPage: NextPage = () => {
 };
 
 export default ReferPage;
+
+    

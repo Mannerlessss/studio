@@ -11,7 +11,7 @@ import {
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { clientAuth, clientDb } from '@/lib/firebaseClient';
-import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, addDoc, increment } from 'firebase/firestore';
+import { doc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, addDoc, increment, getDoc } from 'firebase/firestore';
 import { redeemCode as redeemReferralCodeFlow } from '@/ai/flows/redeem-code-flow';
 import { Gem } from 'lucide-react';
 import { redeemOfferCode as redeemOfferCodeFlow } from '@/ai/flows/redeem-offer-code-flow';
@@ -256,7 +256,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     await processInvestmentEarnings(currentUser.uid);
                     
                     const userDocRef = doc(clientDb, 'users', currentUser.uid);
-                    unsubFromUser = onSnapshot(userDocRef, async (userDocSnap) => {
+                    unsubFromUser = onSnapshot(userDocRef, (userDocSnap) => {
                         if (!userDocSnap.exists()) {
                             console.warn(`No Firestore document found for user ${currentUser.uid}. This can happen briefly during sign up.`);
                             return;
@@ -267,16 +267,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         const investmentsColRef = collection(clientDb, `users/${currentUser.uid}/investments`);
                         unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
                             const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));
-                            // We need to re-fetch the user data after processing earnings might have run
-                            getDoc(userDocRef).then(refreshedUserDoc => {
-                                if (refreshedUserDoc.exists()){
-                                    const refreshedBaseUserData = { uid: refreshedUserDoc.id, ...refreshedUserDoc.data() } as UserData;
-                                    setUserData({ ...refreshedBaseUserData, investments });
-                                } else {
-                                     setUserData({ ...baseUserData, investments });
-                                }
-                                setLoading(false);
-                            })
+                            setUserData({ ...baseUserData, investments });
+                            setLoading(false);
                         }, (error) => {
                             console.error("Error fetching investments:", error);
                             setUserData(baseUserData);
@@ -559,5 +551,7 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
+
+    
 
     
