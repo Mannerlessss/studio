@@ -12,7 +12,6 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrustStatsCard } from '@/components/vaultboost/trust-stats-card';
 
 const SettingsPage: NextPage = () => {
     const { userData, loading: authLoading, logOut, updateUserPhone, updateUserName, redeemReferralCode, redeemOfferCode } = useAuth();
@@ -155,8 +154,6 @@ const SettingsPage: NextPage = () => {
       <Header />
       <div className="p-4 space-y-6">
         <h2 className="text-2xl font-bold text-center">My Account</h2>
-
-        <TrustStatsCard />
 
         <Card>
           <CardHeader>
