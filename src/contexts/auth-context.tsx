@@ -1,3 +1,4 @@
+
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
 import { 
@@ -551,7 +552,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
-
-    
