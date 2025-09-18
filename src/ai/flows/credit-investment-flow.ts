@@ -71,6 +71,7 @@ const creditInvestmentFlow = ai.defineFlow(
                 startDate: now,
                 lastUpdate: now,
                 durationDays: 30,
+                daysProcessed: 0,
                 earnings: 0,
                 status: 'active',
             });

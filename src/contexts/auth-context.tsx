@@ -24,6 +24,7 @@ export interface Investment {
     startDate: Timestamp;
     lastUpdate: Timestamp;
     durationDays: number;
+    daysProcessed: number;
     earnings: number;
     status: 'active' | 'completed';
 }
@@ -159,12 +160,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     
                     if (daysPassed <= 0) continue;
 
-                    // Determine the correct daily return based on membership at time of calculation
                     const dailyReturnRate = isProMember ? 0.20 : 0.10;
                     const correctDailyReturn = investment.planAmount * dailyReturnRate;
-
-                    const daysAlreadyProcessed = Math.floor(investment.earnings / (investment.planAmount * (isProMember ? 0.20 : 0.10)));
-                    const remainingDaysInPlan = investment.durationDays - daysAlreadyProcessed;
+                    
+                    const remainingDaysInPlan = investment.durationDays - investment.daysProcessed;
                     const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
 
                     if (daysToCredit > 0) {
@@ -172,10 +171,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         totalEarningsToAdd += earningsForThisPlan;
 
                         const newEarnings = investment.earnings + earningsForThisPlan;
-                        const newStatus = (daysAlreadyProcessed + daysToCredit) >= investment.durationDays ? 'completed' : 'active';
+                        const newDaysProcessed = investment.daysProcessed + daysToCredit;
+                        const newStatus = newDaysProcessed >= investment.durationDays ? 'completed' : 'active';
                         
                         transaction.update(currentInvestmentRef, {
                             earnings: newEarnings,
+                            daysProcessed: newDaysProcessed,
                             lastUpdate: serverTimestamp(),
                             status: newStatus
                         });

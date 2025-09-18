@@ -10,8 +10,7 @@ import { Button } from '../ui/button';
 
 const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
     
-    const daysProcessed = Math.round(investment.earnings / investment.dailyReturn);
-    const progress = (daysProcessed / investment.durationDays) * 100;
+    const progress = (investment.daysProcessed / investment.durationDays) * 100;
     const dailyReturnRate = (investment.dailyReturn / investment.planAmount) * 100;
 
     return (
@@ -38,7 +37,7 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
                 </div>
                 <Progress value={progress} />
                 <div className="flex justify-between items-center text-xs text-muted-foreground">
-                    <p>Day {daysProcessed} of {investment.durationDays}</p>
+                    <p>Day {investment.daysProcessed} of {investment.durationDays}</p>
                     <p>Daily: {investment.dailyReturn.toLocaleString()} Rs.</p>
                 </div>
             </div>
