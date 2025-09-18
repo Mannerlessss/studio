@@ -3,7 +3,7 @@
  * @fileOverview A server-side flow to securely fetch all withdrawal requests for the admin panel.
  */
 import { z } from 'zod';
-import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import { Timestamp } from 'firebase-admin/firestore';
 
@@ -36,7 +36,6 @@ const getAllWithdrawalsFlow = ai.defineFlow(
     outputSchema: GetAllWithdrawalsOutputSchema,
   },
   async () => {
-    const { db: adminDb } = getFirebaseAdmin();
     const withdrawalsSnapshot = await adminDb.collectionGroup('withdrawals').get();
     
     const requests: WithdrawalRequest[] = [];

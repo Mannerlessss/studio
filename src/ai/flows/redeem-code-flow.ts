@@ -3,7 +3,7 @@
  * @fileOverview A server-side flow to securely redeem a referral code.
  */
 import { z } from 'zod';
-import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -25,7 +25,6 @@ const redeemCodeFlow = ai.defineFlow({
     inputSchema: RedeemCodeInputSchema,
     outputSchema: RedeemCodeOutputSchema,
 }, async ({ userId, userName, userEmail, code }) => {
-    const { db: adminDb } = getFirebaseAdmin();
     const userRef = adminDb.collection('users').doc(userId);
 
     try {

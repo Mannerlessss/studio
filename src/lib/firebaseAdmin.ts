@@ -1,25 +1,25 @@
-import * as admin from 'firebase-admin';
+import { getApps, initializeApp, cert, App } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
-// This function ensures that Firebase is initialized only once.
-export function getFirebaseAdmin() {
-  if (admin.apps.length === 0) {
-    try {
-      const serviceAccount = JSON.parse(
-        process.env.FIREBASE_SERVICE_ACCOUNT_KEY!
-      );
+let app: App;
 
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
-    } catch (error: any) {
-      console.error('Firebase admin initialization error', error.stack);
-      throw new Error('Failed to initialize Firebase Admin SDK. Check that FIREBASE_SERVICE_ACCOUNT_KEY environment variable is set correctly.');
-    }
+if (!getApps().length) {
+  try {
+    const serviceAccount = JSON.parse(
+      process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string
+    );
+
+    app = initializeApp({
+      credential: cert(serviceAccount),
+    });
+  } catch (error: any) {
+    console.error('Firebase admin initialization error', error.stack);
+    throw new Error('Failed to initialize Firebase Admin SDK. Check that FIREBASE_SERVICE_ACCOUNT_KEY environment variable is set correctly.');
   }
-
-  return {
-    db: admin.firestore(),
-    auth: admin.auth(),
-    admin,
-  };
+} else {
+  app = getApps()[0];
 }
+
+export const adminAuth = getAuth(app);
+export const adminDb = getFirestore(app);

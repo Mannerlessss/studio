@@ -3,7 +3,7 @@
  * @fileOverview A server-side flow to securely fetch admin dashboard statistics.
  */
 import { z } from 'zod';
-import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import { Timestamp } from 'firebase-admin/firestore';
 
@@ -22,7 +22,6 @@ const getAdminDashboardStatsFlow = ai.defineFlow(
     outputSchema: GetAdminDashboardStatsOutputSchema,
   },
   async () => {
-    const { db: adminDb } = getFirebaseAdmin();
     const usersSnapshot = await adminDb.collection('users').get();
     const totalUsers = usersSnapshot.size;
 

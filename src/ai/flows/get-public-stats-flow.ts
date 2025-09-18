@@ -3,7 +3,7 @@
  * @fileOverview A server-side flow to securely fetch public-facing application statistics.
  */
 import { z } from 'zod';
-import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 
 const PublicStatsSchema = z.object({
@@ -21,8 +21,6 @@ const getPublicStatsFlow = ai.defineFlow(
     outputSchema: PublicStatsSchema,
   },
   async () => {
-    const { db: adminDb } = getFirebaseAdmin();
-    
     // 1. Total Users
     const usersSnapshot = await adminDb.collection('users').get();
     const totalUsers = usersSnapshot.size;

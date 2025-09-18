@@ -3,7 +3,7 @@
  * @fileOverview A server-side flow to securely fetch all user data for the admin panel.
  */
 import { z } from 'zod';
-import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import { Timestamp } from 'firebase-admin/firestore';
 
@@ -34,7 +34,6 @@ const getAllUsersFlow = ai.defineFlow(
     outputSchema: GetAllUsersOutputSchema,
   },
   async () => {
-    const { db: adminDb } = getFirebaseAdmin();
     const usersSnapshot = await adminDb.collection('users').get();
     const usersData: UserForAdmin[] = usersSnapshot.docs.map(doc => {
         const data = doc.data();
