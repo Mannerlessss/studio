@@ -32,26 +32,10 @@ const creditInvestmentFlow = ai.defineFlow(
     
     try {
         const adminDb = await getAdminDb();
-        
-        let referredUserDocRefToUpdate: admin.firestore.DocumentReference | null = null;
-        
-        // --- PRE-TRANSACTION READ ---
-        const userDoc = await adminDb.collection('users').doc(userId).get();
-        if(!userDoc.exists) throw new Error(`User with ID ${userId} not found.`);
-        const user = userDoc.data()!;
-        
-        if (user.referredBy) {
-             const referrerReferralsRef = adminDb.collection('users').doc(user.referredBy).collection('referrals');
-             const q = referrerReferralsRef.where("userId", "==", userId);
-             const referredUserQuerySnapshot = await q.get();
-             if (!referredUserQuerySnapshot.empty) {
-                referredUserDocRefToUpdate = referredUserQuerySnapshot.docs[0].ref;
-             }
-        }
-
 
         await adminDb.runTransaction(async (transaction) => {
             const userDocRef = adminDb.collection('users').doc(userId);
+            
             // --- ALL READS MUST HAPPEN BEFORE WRITES ---
             const userDocInTransaction = await transaction.get(userDocRef);
             if (!userDocInTransaction.exists) {
@@ -61,16 +45,24 @@ const creditInvestmentFlow = ai.defineFlow(
             
             let referrerDoc: admin.firestore.DocumentSnapshot | null = null;
             let referrerDocRef: admin.firestore.DocumentReference | null = null;
-            
+            let referredUserDocRefToUpdate: admin.firestore.DocumentReference | null = null;
+
             if (!userInTransaction.hasInvested && userInTransaction.referredBy && amount >= 100) {
                 referrerDocRef = adminDb.collection('users').doc(userInTransaction.referredBy);
                 referrerDoc = await transaction.get(referrerDocRef);
+
+                const referrerReferralsRef = adminDb.collection('users').doc(userInTransaction.referredBy).collection('referrals');
+                const q = referrerReferralsRef.where("userId", "==", userId);
+                const referredUserQuerySnapshot = await transaction.get(q);
+                if (!referredUserQuerySnapshot.empty) {
+                    referredUserDocRefToUpdate = referredUserQuerySnapshot.docs[0].ref;
+                }
             }
             // --- END OF READS ---
 
-            const now = admin.firestore.FieldValue.serverTimestamp();
-
             // --- ALL WRITES START HERE ---
+            const now = admin.firestore.FieldValue.serverTimestamp();
+            
             const newInvestmentRef = adminDb.collection(`users/${userId}/investments`).doc();
             const dailyReturnRate = userInTransaction.membership === 'Pro' ? 0.20 : 0.10;
             transaction.set(newInvestmentRef, {
@@ -98,8 +90,7 @@ const creditInvestmentFlow = ai.defineFlow(
                 }
             }
             
-            // Give welcome bonus to the new investor if they were referred on their first investment
-            if (referrerDoc?.exists) {
+            if (referrerDoc?.exists()) {
                  const bonusAmount = 75;
                  userUpdates.totalBalance = admin.firestore.FieldValue.increment(bonusAmount);
                  userUpdates.totalBonusEarnings = admin.firestore.FieldValue.increment(bonusAmount);
