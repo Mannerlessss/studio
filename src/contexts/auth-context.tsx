@@ -134,7 +134,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 let totalEarningsToAdd = 0;
                 const currentData = userDoc.data() as UserData;
                 const now = new Date();
-                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                 
                 const commissionParentRef = currentData.commissionParent ? doc(clientDb, 'users', currentData.commissionParent) : null;
                 let commissionParentDoc: any = null;
@@ -151,14 +150,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                     const investment = currentInvestmentDoc.data() as Investment;
                     const lastUpdateDate = investment.lastUpdate.toDate();
-                    const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
                     
                     const msInDay = 24 * 60 * 60 * 1000;
-                    const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
+                    const daysPassed = Math.floor((now.getTime() - lastUpdateDate.getTime()) / msInDay);
                     
                     if (daysPassed <= 0) continue;
 
-                    const dailyReturnRate = 0.10;
+                    const dailyReturnRate = 0.10; // Removed Pro plan, so rate is always 10%
                     const correctDailyReturn = investment.planAmount * dailyReturnRate;
                     
                     const remainingDaysInPlan = investment.durationDays - investment.daysProcessed;
@@ -181,7 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                         for (let i = 0; i < daysToCredit; i++) {
                             const transactionRef = doc(collection(clientDb, `users/${currentUserId}/transactions`));
-                            const earningDay = new Date(startOfToday.getTime() - (daysPassed - i - 1) * msInDay);
+                            const earningDay = new Date(lastUpdateDate.getTime() + (i + 1) * msInDay);
                             transaction.set(transactionRef, {
                                 type: 'earning',
                                 amount: correctDailyReturn,
@@ -250,7 +248,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                      setUserData(null);
                      setLoading(false);
                 } else {
-                    // We need user data to know if they are 'Pro' before processing earnings
                     const userDocRef = doc(clientDb, 'users', currentUser.uid);
                     unsubFromUser = onSnapshot(userDocRef, async (userDocSnap) => {
                         if (!userDocSnap.exists()) {
@@ -260,14 +257,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         
                         const baseUserData = { uid: userDocSnap.id, ...userDocSnap.data() } as UserData;
                         
-                        // Process earnings now that we have user data (for membership status)
                         await processInvestmentEarnings(currentUser.uid, baseUserData);
 
                         const investmentsColRef = collection(clientDb, `users/${currentUser.uid}/investments`);
                         unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
                             const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));
-                            setUserData({ ...baseUserData, investments });
-                            setLoading(false);
+                            // We need to re-fetch the user data after processing earnings
+                            getDoc(userDocRef).then(refreshedUserDoc => {
+                                const refreshedBaseUserData = { uid: refreshedUserDoc.id, ...refreshedUserDoc.data() } as UserData;
+                                setUserData({ ...refreshedBaseUserData, investments });
+                                setLoading(false);
+                            })
                         }, (error) => {
                             console.error("Error fetching investments:", error);
                             setUserData(baseUserData);
