@@ -163,7 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const dailyReturnRate = isProMember ? 0.20 : 0.10;
                     const correctDailyReturn = investment.planAmount * dailyReturnRate;
 
-                    const daysAlreadyProcessed = Math.round(investment.earnings / investment.dailyReturn); // Use original dailyReturn for processed days
+                    const daysAlreadyProcessed = Math.floor(investment.earnings / investment.dailyReturn); // Use original dailyReturn for processed days
                     const remainingDaysInPlan = investment.durationDays - daysAlreadyProcessed;
                     const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
 
@@ -531,17 +531,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         redeemOfferCode,
     };
     
-    if (loading && !pathname.startsWith('/admin') && !pathname.startsWith('/login') && !pathname.startsWith('/ref/')) {
-         return (
-            <div className="flex items-center justify-center min-h-screen bg-background">
-                <div className="text-center">
-                    <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
-                    <p className="text-lg text-muted-foreground">Loading...</p>
-                </div>
-            </div>
-        );
-    }
-
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
