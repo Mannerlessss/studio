@@ -133,7 +133,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 
                 let totalEarningsToAdd = 0;
                 const currentData = userDoc.data() as UserData;
-                const now = new Date();
                 
                 const commissionParentRef = currentData.commissionParent ? doc(clientDb, 'users', currentData.commissionParent) : null;
                 let commissionParentDoc: any = null;
@@ -149,14 +148,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     if (!currentInvestmentDoc.exists()) continue;
 
                     const investment = currentInvestmentDoc.data() as Investment;
+
+                    // --- START OF THE FIX ---
+                    // This logic now correctly calculates days passed based on calendar date, not timestamp.
+                    const now = new Date();
                     const lastUpdateDate = investment.lastUpdate.toDate();
-                    
+
+                    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
+
                     const msInDay = 24 * 60 * 60 * 1000;
-                    const daysPassed = Math.floor((now.getTime() - lastUpdateDate.getTime()) / msInDay);
+                    const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
+                    // --- END OF THE FIX ---
                     
                     if (daysPassed <= 0) continue;
 
-                    const dailyReturnRate = 0.10; // Removed Pro plan, so rate is always 10%
+                    const dailyReturnRate = 0.10; // Daily return is always 10%
                     const correctDailyReturn = investment.planAmount * dailyReturnRate;
                     
                     const remainingDaysInPlan = investment.durationDays - investment.daysProcessed;
@@ -179,7 +186,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                         for (let i = 0; i < daysToCredit; i++) {
                             const transactionRef = doc(collection(clientDb, `users/${currentUserId}/transactions`));
-                            const earningDay = new Date(lastUpdateDate.getTime() + (i + 1) * msInDay);
+                            const earningDay = new Date(startOfLastUpdateDay.getTime() + (i + 1) * msInDay);
                             transaction.set(transactionRef, {
                                 type: 'earning',
                                 amount: correctDailyReturn,
