@@ -163,7 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const dailyReturnRate = isProMember ? 0.20 : 0.10;
                     const correctDailyReturn = investment.planAmount * dailyReturnRate;
 
-                    const daysAlreadyProcessed = Math.floor(investment.earnings / investment.dailyReturn); // Use original dailyReturn for processed days
+                    const daysAlreadyProcessed = Math.floor(investment.earnings / (investment.planAmount * (isProMember ? 0.20 : 0.10)));
                     const remainingDaysInPlan = investment.durationDays - daysAlreadyProcessed;
                     const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
 
