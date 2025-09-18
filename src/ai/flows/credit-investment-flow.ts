@@ -90,7 +90,7 @@ const creditInvestmentFlow = ai.defineFlow(
                 }
             }
             
-            if (referrerDoc?.exists()) {
+            if (referrerDoc?.exists) {
                  const bonusAmount = 75;
                  userUpdates.totalBalance = admin.firestore.FieldValue.increment(bonusAmount);
                  userUpdates.totalBonusEarnings = admin.firestore.FieldValue.increment(bonusAmount);
