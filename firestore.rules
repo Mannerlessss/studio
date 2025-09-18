@@ -1,74 +1,26 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-    
-    function isAdmin() {
-      return request.auth.token.admin == true;
-    }
-
-    // Default deny all
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // USERS Collection
+    // Users can read their own document, but cannot write to it.
+    // All writes are handled by trusted server flows.
     match /users/{userId} {
-      // Admins can read/write any user document
-      allow read, write: if isAdmin();
-      
-      // A user can read/update their own document
-      // Note: `create` is handled by server-side logic in signUp to prevent abuse.
-      // Note: `delete` is handled by a server-side flow.
-      allow read, update: if isAuthenticated() && isOwner(userId);
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false; // Deny all client-side writes
+
+      // Users can read their own subcollections.
+      match /{allSubcollections}/{docId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if false; // Deny all client-side writes
+      }
     }
     
-    // Subcollections of USERS
-    match /users/{userId}/{collection} {
-        // Admins can do anything in user subcollections
-        allow read, write: if isAdmin();
-    }
-
-    match /users/{userId}/transactions/{transactionId} {
-        // A user can read their own transactions
-        allow read: if isAuthenticated() && isOwner(userId);
-    }
-
-    match /users/{userId}/investments/{investmentId} {
-        // A user can read their own investments
-        allow read: if isAuthenticated() && isOwner(userId);
-    }
-
-    match /users/{userId}/referrals/{referralId} {
-        // A user can read their own referral list
-        allow read: if isAuthenticated() && isOwner(userId);
-    }
-    
-    match /users/{userId}/withdrawals/{withdrawalId} {
-        // A user can read their own withdrawal requests
-        allow read: if isAuthenticated() && isOwner(userId);
-        
-        // A user can create their own withdrawal request
-        allow create: if isAuthenticated() && isOwner(userId);
-    }
-
-    // OFFERS Collection
+    // Offers are public-read, but admin-only write (handled by server flow).
     match /offers/{offerId} {
-        // Any authenticated user can read offer codes
-        // (Needed for client-side redemption checks)
-        allow read: if isAuthenticated();
-        
-        // Only admins can create, update, or delete offers
-        allow write: if isAdmin();
+        allow read: if true;
+        allow write: if false; // Deny all client-side writes
     }
   }
 }
