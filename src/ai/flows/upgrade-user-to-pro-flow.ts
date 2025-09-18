@@ -3,7 +3,7 @@
  * @fileOverview A server-side flow to securely upgrade a user to the Pro membership.
  */
 import { z } from 'zod';
-import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 
 const UpgradeUserToProInputSchema = z.object({
@@ -24,7 +24,6 @@ const upgradeUserToProFlow = ai.defineFlow({
         throw new Error('User ID is required.');
     }
     try {
-        const { db: adminDb } = getFirebaseAdmin();
         const userDocRef = adminDb.collection('users').doc(userId);
         
         await userDocRef.update({ membership: 'Pro' });
