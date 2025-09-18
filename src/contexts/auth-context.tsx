@@ -12,7 +12,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { clientAuth, clientDb } from '@/lib/firebaseClient';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, addDoc, increment } from 'firebase/firestore';
-import { redeemCode } from '@/ai/flows/redeem-code-flow';
+import { redeemCode as redeemReferralCodeFlow } from '@/ai/flows/redeem-code-flow';
 import { Gem } from 'lucide-react';
 import { redeemOfferCode as redeemOfferCodeFlow } from '@/ai/flows/redeem-offer-code-flow';
 
@@ -488,7 +488,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         try {
-            const result = await redeemCode({
+            const result = await redeemReferralCodeFlow({
                 userId: currentUser.uid,
                 userName: currentUserName,
                 userEmail: currentUserEmail,
