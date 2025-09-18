@@ -3,11 +3,15 @@ import fs from 'fs';
 import path from 'path';
 
 let serviceAccountKey: string | undefined;
+let serviceAccount: any = {};
 
 try {
   const keyPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
   if (fs.existsSync(keyPath)) {
     serviceAccountKey = fs.readFileSync(keyPath, 'utf8');
+    serviceAccount = JSON.parse(serviceAccountKey);
+  } else {
+    console.warn("serviceAccountKey.json not found. Some server-side Firebase features may not work.");
   }
 } catch (error) {
   console.warn(`Could not load serviceAccountKey.json: ${error}`);
@@ -49,6 +53,9 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "upi-boost-vault-f64fw.firebasestorage.app",
     NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "1017948596718",
     NEXT_PUBLIC_FIREBASE_APP_ID: "1:1017948596718:web:b25de6f4ed5d179b5046ff",
+    FIREBASE_PROJECT_ID: serviceAccount.project_id,
+    FIREBASE_CLIENT_EMAIL: serviceAccount.client_email,
+    FIREBASE_PRIVATE_KEY: serviceAccount.private_key,
   }
 };
 
