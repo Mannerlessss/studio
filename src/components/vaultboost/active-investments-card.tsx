@@ -1,3 +1,4 @@
+
 'use client';
 import { FC, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -11,7 +12,7 @@ import { Button } from '../ui/button';
 const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
     
     const progress = (investment.daysProcessed / investment.durationDays) * 100;
-    const dailyReturnRate = (investment.dailyReturn / investment.planAmount) * 100;
+    const dailyReturnRate = 10; // Hardcoded to 10% as per business logic
 
     return (
         <div className="p-4 rounded-lg bg-muted/50 border relative">
@@ -38,7 +39,7 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
                 <Progress value={progress} />
                 <div className="flex justify-between items-center text-xs text-muted-foreground">
                     <p>Day {investment.daysProcessed} of {investment.durationDays}</p>
-                    <p>Daily: {investment.dailyReturn.toLocaleString()} Rs.</p>
+                    <p>Daily: {(investment.planAmount * 0.10).toLocaleString()} Rs.</p>
                 </div>
             </div>
         </div>
