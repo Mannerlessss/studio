@@ -64,7 +64,7 @@ const creditInvestmentFlow = ai.defineFlow(
             const now = admin.firestore.FieldValue.serverTimestamp();
             
             const newInvestmentRef = adminDb.collection(`users/${userId}/investments`).doc();
-            const dailyReturnRate = userInTransaction.membership === 'Pro' ? 0.20 : 0.10;
+            const dailyReturnRate = 0.10;
             transaction.set(newInvestmentRef, {
                 planAmount: amount,
                 dailyReturn: amount * dailyReturnRate,

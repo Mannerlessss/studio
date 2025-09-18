@@ -34,9 +34,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DollarSign, Crown, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2, ArrowUpDown, Search } from 'lucide-react';
+import { DollarSign, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2, ArrowUpDown, Search } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -51,10 +50,9 @@ import {
 import { deleteUser } from '@/ai/flows/delete-user-flow';
 import { getAllUsers, UserForAdmin } from '@/ai/flows/get-all-users-flow';
 import { creditInvestment } from '@/ai/flows/credit-investment-flow';
-import { upgradeUserToPro } from '@/ai/flows/upgrade-user-to-pro-flow';
 
 
-type UserSortableKeys = 'name' | 'email' | 'membership';
+type UserSortableKeys = 'name' | 'email';
 const investmentPlans = [150, 300, 400, 1000, 1600, 4000, 10000, 25000, 30000, 50000, 60000, 100000];
 
 
@@ -168,26 +166,6 @@ export default function UsersPage() {
         }
     }
 
-    const handleUpgrade = async (userId: string) => {
-        setIsSubmitting(userId);
-        try {
-            await upgradeUserToPro(userId);
-            toast({
-                title: `Upgraded to Pro`,
-                description: `User has been upgraded to the Pro plan.`,
-            });
-            setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, membership: 'Pro' } : u));
-        } catch (error: any) {
-             toast({
-                variant: 'destructive',
-                title: `Upgrade Failed`,
-                description: error.message,
-            });
-        } finally {
-            setIsSubmitting(null);
-        }
-    }
-
   return (
     <>
     <Card>
@@ -223,11 +201,6 @@ export default function UsersPage() {
                     Email <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
               </TableHead>
-              <TableHead>
-                 <Button variant="ghost" onClick={() => handleSort('membership')}>
-                    Membership <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-              </TableHead>
               <TableHead className='text-right'>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -237,7 +210,6 @@ export default function UsersPage() {
                     <TableRow key={i}>
                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="h-8 w-48" /></TableCell>
                     </TableRow>
                 ))
@@ -245,11 +217,6 @@ export default function UsersPage() {
               <TableRow key={user.id}>
                 <TableCell className="font-medium">{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>
-                <TableCell>
-                  <Badge variant={user.membership === 'Pro' ? 'default' : 'secondary'}>
-                    {user.membership}
-                  </Badge>
-                </TableCell>
                 <TableCell className="text-right">
                     <div className='flex gap-2 justify-end'>
                         <Dialog onOpenChange={(isOpen) => { if (!isOpen) setSelectedUser(null); }}>
@@ -295,12 +262,6 @@ export default function UsersPage() {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
-                        {user.membership !== 'Pro' && (
-                            <Button size="sm" onClick={() => handleUpgrade(user.id)} disabled={!!isSubmitting}>
-                                {isSubmitting === user.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                <Crown className='w-4 h-4 mr-1' /> Upgrade
-                            </Button>
-                        )}
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button variant="destructive" size="sm" disabled={!!isSubmitting}>
@@ -329,7 +290,7 @@ export default function UsersPage() {
             ))}
              {!loading && filteredAndSortedUsers.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center">
+                    <TableCell colSpan={3} className="h-24 text-center">
                         No users found.
                     </TableCell>
                 </TableRow>

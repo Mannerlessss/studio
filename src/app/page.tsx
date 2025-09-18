@@ -43,7 +43,7 @@ const Dashboard: NextPage = () => {
       <GuidedTour />
       <div className="p-4 space-y-6">
         <div id="welcome-card">
-          <WelcomeCard name={userData.name} membership={`${userData.membership} Member`} />
+          <WelcomeCard name={userData.name} membership="Member" />
         </div>
         <CollectBonusCard />
         <ProfileCompletionCard />

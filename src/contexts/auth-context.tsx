@@ -40,7 +40,6 @@ interface UserData {
     commissionParent?: string; // UID of the user who gets commission
     investedReferralCount: number;
     referrals?: any[]; // Array of referred user objects
-    membership: 'Basic' | 'Pro';
     rank: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
     totalBalance: number;
     totalInvested: number; // Sum of all planAmounts
@@ -134,7 +133,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 
                 let totalEarningsToAdd = 0;
                 const currentData = userDoc.data() as UserData;
-                const isProMember = (currentUserData || currentData).membership === 'Pro';
                 const now = new Date();
                 const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                 
@@ -160,7 +158,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     
                     if (daysPassed <= 0) continue;
 
-                    const dailyReturnRate = isProMember ? 0.20 : 0.10;
+                    const dailyReturnRate = 0.10;
                     const correctDailyReturn = investment.planAmount * dailyReturnRate;
                     
                     const remainingDaysInPlan = investment.durationDays - investment.daysProcessed;
@@ -330,7 +328,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 name,
                 email,
                 phone,
-                membership: 'Basic',
                 totalBalance: 0,
                 totalInvested: 0,
                 totalEarnings: 0,
@@ -542,5 +539,3 @@ export const useAuth = (): AuthContextType => {
     }
     return context;
 };
-
-    
