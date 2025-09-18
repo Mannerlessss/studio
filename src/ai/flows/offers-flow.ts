@@ -3,7 +3,7 @@
  * @fileOverview Server-side flows for managing offer codes.
  */
 import { z } from 'zod';
-import { getAdminDb } from '@/lib/firebaseAdmin';
+import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 
@@ -40,7 +40,7 @@ const getAllOffersFlow = ai.defineFlow({
     inputSchema: z.void(),
     outputSchema: GetAllOffersOutputSchema,
 }, async () => {
-    const adminDb = await getAdminDb();
+    const { db: adminDb } = getFirebaseAdmin();
     const offersSnapshot = await adminDb.collection('offers').get();
     const offersData: Offer[] = offersSnapshot.docs.map(doc => {
         const data = doc.data();
@@ -62,7 +62,7 @@ const createOfferFlow = ai.defineFlow({
     inputSchema: CreateOfferInputSchema,
     outputSchema: OfferOutputSchema,
 }, async (input) => {
-    const adminDb = await getAdminDb();
+    const { db: adminDb } = getFirebaseAdmin();
     const newOfferData: any = {
         code: input.code.toUpperCase(),
         rewardAmount: input.rewardAmount,
@@ -88,7 +88,7 @@ const deleteOfferFlow = ai.defineFlow({
     outputSchema: OfferOutputSchema,
 }, async (offerId) => {
     if (!offerId) throw new Error('Offer ID is required.');
-    const adminDb = await getAdminDb();
+    const { db: adminDb } = getFirebaseAdmin();
     await adminDb.collection('offers').doc(offerId).delete();
     return { success: true, message: 'Offer code deleted successfully.' };
 });

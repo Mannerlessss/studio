@@ -3,7 +3,7 @@
  * @fileOverview A server-side flow to securely update the status of a withdrawal request.
  */
 import { z } from 'zod';
-import { getAdminDb } from '@/lib/firebaseAdmin';
+import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -26,7 +26,7 @@ const updateWithdrawalStatusFlow = ai.defineFlow({
     outputSchema: UpdateWithdrawalStatusOutputSchema,
 }, async ({ userId, withdrawalId, newStatus, amount }) => {
     try {
-        const adminDb = await getAdminDb();
+        const { db: adminDb } = getFirebaseAdmin();
         const withdrawalDocRef = adminDb.doc(`users/${userId}/withdrawals/${withdrawalId}`);
         const batch = adminDb.batch();
 

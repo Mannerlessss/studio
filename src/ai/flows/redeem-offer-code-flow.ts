@@ -3,7 +3,7 @@
  * @fileOverview A server-side flow to securely redeem an offer code.
  */
 import { z } from 'zod';
-import { getAdminDb } from '@/lib/firebaseAdmin';
+import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
@@ -23,7 +23,7 @@ const redeemOfferCodeFlow = ai.defineFlow({
     inputSchema: RedeemOfferCodeInputSchema,
     outputSchema: RedeemOfferCodeOutputSchema,
 }, async ({ userId, code }) => {
-    const adminDb = await getAdminDb();
+    const { db: adminDb } = getFirebaseAdmin();
     const userRef = adminDb.collection('users').doc(userId);
     const offersRef = adminDb.collection('offers');
 

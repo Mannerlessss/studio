@@ -3,7 +3,7 @@
  * @fileOverview A server-side flow to securely credit an investment to a user.
  */
 import { z } from 'zod';
-import { getAdminDb } from '@/lib/firebaseAdmin';
+import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
 import { ai } from '@/ai/genkit';
 import * as admin from 'firebase-admin';
 
@@ -31,7 +31,7 @@ const creditInvestmentFlow = ai.defineFlow(
   async ({ userId, amount }) => {
     
     try {
-        const adminDb = await getAdminDb();
+        const { db: adminDb } = getFirebaseAdmin();
 
         await adminDb.runTransaction(async (transaction) => {
             const userDocRef = adminDb.collection('users').doc(userId);

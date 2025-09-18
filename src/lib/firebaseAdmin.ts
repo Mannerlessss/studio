@@ -1,35 +1,28 @@
-'use server';
 import * as admin from 'firebase-admin';
-import { getApp, getApps, initializeApp } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-import fs from 'fs';
-import path from 'path';
 
-let app: admin.app.App;
+let initialized = false;
 
-const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
-let serviceAccount;
-if (fs.existsSync(serviceAccountPath)) {
-    serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-} else {
-    console.warn("serviceAccountKey.json not found. Admin SDK will not be initialized.");
-}
-
-if (!getApps().length && serviceAccount) {
-    app = initializeApp({
+// This function ensures that Firebase is initialized only once.
+export function getFirebaseAdmin() {
+  if (!initialized) {
+    try {
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}');
+      if (!serviceAccount.project_id) {
+          throw new Error('Firebase service account key not found or invalid in environment variables.');
+      }
+      admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
-    });
-} else {
-    app = getApp();
-}
+      });
+      initialized = true;
+    } catch (error: any) {
+      console.error('Firebase admin initialization error', error.stack);
+      throw new Error('Failed to initialize Firebase Admin SDK. Check server logs and environment variables.');
+    }
+  }
 
-export async function getAdminDb() {
-    if (!app) throw new Error("Admin SDK not initialized");
-    return getFirestore(app);
-}
-
-export async function getAdminAuth() {
-    if (!app) throw new Error("Admin SDK not initialized");
-    return getAuth(app);
+  return {
+    db: admin.firestore(),
+    auth: admin.auth(),
+    admin,
+  };
 }
