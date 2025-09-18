@@ -115,7 +115,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     // Function to process earnings for all active investments for a user
-    const processInvestmentEarnings = async (currentUserId: string, currentUserData?: UserData) => {
+    const processInvestmentEarnings = async (currentUserId: string) => {
         const investmentsColRef = collection(clientDb, `users/${currentUserId}/investments`);
         const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
         
@@ -150,8 +150,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                     const investment = currentInvestmentDoc.data() as Investment;
 
-                    // --- START OF THE FIX ---
-                    // This logic now correctly calculates days passed based on calendar date, not timestamp.
                     const now = new Date();
                     const lastUpdateDate = investment.lastUpdate.toDate();
 
@@ -160,7 +158,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                     const msInDay = 24 * 60 * 60 * 1000;
                     const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
-                    // --- END OF THE FIX ---
                     
                     if (daysPassed <= 0) continue;
 
@@ -256,6 +253,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                      setUserData(null);
                      setLoading(false);
                 } else {
+                    
+                    await processInvestmentEarnings(currentUser.uid);
+                    
                     const userDocRef = doc(clientDb, 'users', currentUser.uid);
                     unsubFromUser = onSnapshot(userDocRef, async (userDocSnap) => {
                         if (!userDocSnap.exists()) {
@@ -265,15 +265,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         
                         const baseUserData = { uid: userDocSnap.id, ...userDocSnap.data() } as UserData;
                         
-                        await processInvestmentEarnings(currentUser.uid, baseUserData);
-
                         const investmentsColRef = collection(clientDb, `users/${currentUser.uid}/investments`);
                         unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
                             const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));
-                            // We need to re-fetch the user data after processing earnings
+                            // We need to re-fetch the user data after processing earnings might have run
                             getDoc(userDocRef).then(refreshedUserDoc => {
-                                const refreshedBaseUserData = { uid: refreshedUserDoc.id, ...refreshedUserDoc.data() } as UserData;
-                                setUserData({ ...refreshedBaseUserData, investments });
+                                if (refreshedUserDoc.exists()){
+                                    const refreshedBaseUserData = { uid: refreshedUserDoc.id, ...refreshedUserDoc.data() } as UserData;
+                                    setUserData({ ...refreshedBaseUserData, investments });
+                                } else {
+                                     setUserData({ ...baseUserData, investments });
+                                }
                                 setLoading(false);
                             })
                         }, (error) => {
@@ -536,6 +538,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         redeemReferralCode,
         redeemOfferCode,
     };
+    
+    if (loading) {
+         return (
+            <div className="flex items-center justify-center min-h-screen bg-background">
+                <div className="text-center">
+                    <Gem className="w-12 h-12 text-primary animate-spin mb-4 mx-auto" />
+                    <p className="text-lg text-muted-foreground">Loading...</p>
+                </div>
+            </div>
+        );
+    }
     
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
