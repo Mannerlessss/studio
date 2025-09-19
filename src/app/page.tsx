@@ -14,8 +14,7 @@ import { GuidedTour } from '@/components/vaultboost/guided-tour';
 import { ProfileCompletionCard } from '@/components/vaultboost/profile-completion-card';
 import { AnnouncementPopup } from '@/components/vaultboost/announcement-popup';
 import { CollectBonusCard } from '@/components/vaultboost/collect-bonus-card';
-import { SpecialOfferPopup } from '@/components/vaultboost/special-offer-popup';
-import { TrustStatsCard } from '@/components/vaultboost/trust-stats-card';
+import { ActiveInvestmentsCard } from '@/components/vaultboost/active-investments-card';
 
 
 const Dashboard: NextPage = () => {
@@ -40,7 +39,6 @@ const Dashboard: NextPage = () => {
     <div className="bg-background min-h-full">
       <Header />
       <AnnouncementPopup />
-      <SpecialOfferPopup />
       <GuidedTour />
       <div className="p-4 space-y-6">
         <div id="welcome-card">
@@ -56,26 +54,26 @@ const Dashboard: NextPage = () => {
           />
           <InfoCard
             title="Earnings"
-            value={`${(userData.totalEarnings || 0).toLocaleString('en-IN')} Rs.`}
+            value={`${userData.totalEarnings || 0} Rs.`}
             icon={<TrendingUp className="h-6 w-6 text-primary" />}
           />
            <InfoCard
             title="Total ROI"
-            value={`${totalROI.toLocaleString('en-IN')} Rs.`}
+            value={`300% (${totalROI.toLocaleString('en-IN')} Rs.)`}
             icon={<PiggyBank className="h-6 w-6 text-primary" />}
           />
           <InfoCard
             title="Referral"
-            value={`${(userData.totalReferralEarnings || 0).toLocaleString('en-IN')} Rs.`}
+            value={`${userData.totalReferralEarnings || 0} Rs.`}
             icon={<Users className="h-6 w-6 text-primary" />}
           />
         </div>
+        <ActiveInvestmentsCard />
         <DailyBonusCard onBonusClaim={handleBonusClaim} />
         <div id="withdraw-card">
             <WithdrawCard />
         </div>
         <TransactionHistoryCard />
-        <TrustStatsCard />
         <UpgradeCard />
       </div>
       <BottomNav activePage="dashboard" />

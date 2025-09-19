@@ -122,7 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
             if (activeInvestmentsSnapshot.empty) {
-                return; // No active investments to process
+                return;
             }
     
             await runTransaction(clientDb, async (transaction) => {
@@ -145,9 +145,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
                     // This logic calculates the total number of calendar days passed.
                     const msPerDay = 1000 * 60 * 60 * 24;
-                    const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / msPerDay);
-    
-                    const newDaysProcessed = Math.min(daysPassed, plan.durationDays);
+                    // To calculate calendar days, we compare the start of each day.
+                    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                    const startOfStartDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                    const daysPassed = Math.round((startOfToday.getTime() - startOfStartDate.getTime()) / msPerDay);
+                    
+                    const newDaysProcessed = Math.min(daysPassed + 1, plan.durationDays);
     
                     if (newDaysProcessed > plan.daysProcessed) {
                         const daysToCredit = newDaysProcessed - plan.daysProcessed;
