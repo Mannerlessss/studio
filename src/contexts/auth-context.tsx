@@ -148,18 +148,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const currentInvestmentRef = doc(clientDb, `users/${currentUserId}/investments`, investmentDoc.id);
                     const investment = investmentDoc.data() as Investment;
 
+                    // --- CORRECTED DATE CALCULATION LOGIC ---
                     const today = new Date();
-                    const purchaseDate = investment.startDate.toDate(); // This is the purchase date
+                    const purchaseDate = investment.startDate.toDate();
 
-                    // Calculate the difference in days
-                    const daysPassed = Math.floor(
-                        (today.getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24)
-                    );
+                    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                    const startOfPurchaseDay = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth(), purchaseDate.getDate());
+
+                    const msInDay = 1000 * 60 * 60 * 24;
+                    const daysPassed = Math.round((startOfToday.getTime() - startOfPurchaseDay.getTime()) / msInDay);
+                    // --- END OF CORRECTED LOGIC ---
                     
-                    // Determine how many days we should actually process
                     const totalDaysToProcess = Math.min(daysPassed, investment.durationDays);
                     
-                    // Check if there are any new days to process
                     const missedDays = totalDaysToProcess - investment.daysProcessed;
 
                     if (missedDays > 0) {
@@ -180,7 +181,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         // Create transaction records for the missed days
                         for (let i = 0; i < missedDays; i++) {
                             const transactionRef = doc(collection(clientDb, `users/${currentUserId}/transactions`));
-                            const earningDay = new Date(purchaseDate.getTime() + (investment.daysProcessed + i + 1) * (1000 * 60 * 60 * 24));
+                            const dayIndex = investment.daysProcessed + i;
+                            const earningDay = new Date(startOfPurchaseDay.getTime() + (dayIndex + 1) * msInDay);
+
                             transaction.set(transactionRef, {
                                 type: 'earning',
                                 amount: investment.dailyReturn,
@@ -231,6 +234,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let unsubFromInvestments: (() => void) | undefined;
         
         const unsubscribe = onAuthStateChanged(clientAuth, async (currentUser) => {
+            setLoading(true);
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             
