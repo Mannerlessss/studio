@@ -1,4 +1,3 @@
-
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
 import { 
@@ -13,7 +12,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { clientAuth, clientDb } from '@/lib/firebaseClient';
 import { doc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, addDoc, increment, setDoc, getDoc } from 'firebase/firestore';
-import { redeemCode } from '@/ai/flows/redeem-code-flow';
+import { redeemCode as redeemReferralCodeFlow } from '@/ai/flows/redeem-code-flow';
 import { Gem } from 'lucide-react';
 import { redeemOfferCode as redeemOfferCodeFlow } from '@/ai/flows/redeem-offer-code-flow';
 
@@ -101,7 +100,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
     const logOut = async () => {
-        setLoading(true);
         try {
             await signOut(clientAuth);
             router.push('/login');
@@ -113,8 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             sessionStorage.removeItem('vaultboost-special-offer-10k-seen');
         } catch (error) {
             console.error("Error signing out: ", error);
-        } finally {
-            setLoading(false);
+            toast({ variant: 'destructive', title: 'Logout Failed', description: 'Could not log out. Please try again.' });
         }
     };
 
@@ -249,7 +246,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const userDocRef = doc(clientDb, 'users', currentUser.uid);
                     unsubFromUser = onSnapshot(userDocRef, async (userDocSnap) => {
                         if (!userDocSnap.exists()) {
-                            console.warn(`No Firestore document for user ${currentUser.uid}. This can happen briefly during signup.`);
+                             setLoading(false); // User doc doesn't exist, stop loading
                             return;
                         }
                         
@@ -273,6 +270,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                     }, (error) => {
                         console.error("Error fetching user data:", error);
+                        setLoading(false);
                         logOut();
                     });
                 }
@@ -328,14 +326,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             const usedCode = localStorage.getItem('referralCode') || providedCode;
             if (usedCode) {
-                 const { success } = await redeemCode({ userId: newUser.uid, userName: name, userEmail: email, code: usedCode });
-                if(success) newUserDocData.usedReferralCode = usedCode.toUpperCase();
+                 const { success } = await redeemReferralCodeFlow({ userId: newUser.uid, userName: name, userEmail: email, code: usedCode });
+                if(success) {
+                    newUserDocData.usedReferralCode = usedCode.toUpperCase();
+                } else {
+                     toast({ variant: 'destructive', title: 'Invalid Referral Code', description: 'The provided referral code was not valid.' });
+                }
                 localStorage.removeItem('referralCode');
             }
             await setDoc(userDocRef, newUserDocData);
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Sign Up Failed', description: error.message });
-        } finally {
             setLoading(false);
         }
     };
@@ -347,7 +348,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await setDoc(doc(clientDb, 'users', credential.user.uid), { lastLogin: serverTimestamp() }, { merge: true });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Sign In Failed', description: error.message });
-        } finally {
             setLoading(false);
         }
     };
@@ -414,11 +414,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const redeemReferralCode = async (code: string) => {
-        if (!user || !userData) throw new Error("User data is not available.");
-        if (userData.usedReferralCode) throw new Error("A referral code has already been used for this account.");
+        if (!user || !userData) {
+            throw new Error("User data is not available.");
+        }
+        if (userData.usedReferralCode) {
+            throw new Error("A referral code has already been used for this account.");
+        }
 
         try {
-            const result = await redeemCode({ userId: user.uid, userName: userData.name, userEmail: userData.email, code });
+            const result = await redeemReferralCodeFlow({ userId: user.uid, userName: userData.name, userEmail: userData.email, code });
             toast({ title: 'Code Redeemed!', description: result.message });
         } catch (error: any) {
             console.error("Redemption failed:", error);
