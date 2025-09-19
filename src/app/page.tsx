@@ -13,7 +13,6 @@ import { useAuth } from '@/contexts/auth-context';
 import { GuidedTour } from '@/components/vaultboost/guided-tour';
 import { ProfileCompletionCard } from '@/components/vaultboost/profile-completion-card';
 import { AnnouncementPopup } from '@/components/vaultboost/announcement-popup';
-import { ActiveInvestmentsCard } from '@/components/vaultboost/active-investments-card';
 import { CollectBonusCard } from '@/components/vaultboost/collect-bonus-card';
 import { SpecialOfferPopup } from '@/components/vaultboost/special-offer-popup';
 
@@ -70,7 +69,6 @@ const Dashboard: NextPage = () => {
             icon={<Users className="h-6 w-6 text-primary" />}
           />
         </div>
-        <ActiveInvestmentsCard />
         <DailyBonusCard onBonusClaim={handleBonusClaim} />
         <div id="withdraw-card">
             <WithdrawCard />
