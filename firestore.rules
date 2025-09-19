@@ -1,26 +1,44 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can read their own document, but cannot write to it.
-    // All writes are handled by trusted server flows.
-    match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if false; // Deny all client-side writes
+    // Helper function to check if a user is an admin
+    function isAdmin() {
+      return request.auth.token.admin == true;
+    }
 
-      // Users can read their own subcollections.
-      match /{allSubcollections}/{docId} {
-        allow read: if request.auth != null && request.auth.uid == userId;
-        allow write: if false; // Deny all client-side writes
+    // Helper function to check if the user is the owner of the document
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Rules for the 'users' collection
+    match /users/{userId} {
+      // Admins can read and write any user document
+      allow read, write: if isAdmin();
+      
+      // A user can read their own document
+      allow get: if isOwner(userId);
+      
+      // A user can update their own name and phone number
+      allow update: if isOwner(userId)
+                    && request.resource.data.keys().hasOnly(['name', 'phone']);
+
+      // A user can create/read their own subcollection documents
+      match /{subcollection}/{docId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && subcollection == 'withdrawals';
       }
     }
-    
-    // Offers are public-read, but admin-only write (handled by server flow).
+
+    // Rules for the 'offers' collection
     match /offers/{offerId} {
-        allow read: if true;
-        allow write: if false; // Deny all client-side writes
+      // Admins can manage offer codes
+      allow read, write, delete: if isAdmin();
+      
+      // Logged-in users can read offer codes (e.g., for redemption validation)
+      allow get: if request.auth != null;
     }
   }
 }
