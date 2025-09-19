@@ -13,7 +13,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { clientAuth, clientDb } from '@/lib/firebaseClient';
 import { doc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, addDoc, increment, getDoc } from 'firebase/firestore';
-import { redeemCode as redeemReferralCodeFlow } from '@/ai/flows/redeem-code-flow';
+import { redeemCode } from '@/ai/flows/redeem-code-flow';
 import { Gem } from 'lucide-react';
 import { redeemOfferCode as redeemOfferCodeFlow } from '@/ai/flows/redeem-offer-code-flow';
 
@@ -94,7 +94,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const totalInvestedInActivePlans = userData.investments
             .filter(inv => inv.status === 'active')
             .reduce((acc, inv) => acc + inv.planAmount, 0);
-        return totalInvestedInActivePlans * 3; // 300% ROI
+        const isPro = userData.membership === 'Pro';
+        const roiMultiplier = isPro ? 6 : 3; // 600% for Pro, 300% for Basic
+        return totalInvestedInActivePlans * roiMultiplier;
     }, [userData]);
 
 
@@ -352,7 +354,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             const usedCode = localStorage.getItem('referralCode') || providedCode;
             if (usedCode) {
-                 const { success, message } = await redeemReferralCodeFlow({
+                 const { success, message } = await redeemCode({
                     userId: newUser.uid,
                     userName: name,
                     userEmail: email,
@@ -492,7 +494,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         try {
-            const result = await redeemReferralCodeFlow({
+            const result = await redeemCode({
                 userId: user.uid,
                 userName: userData.name,
                 userEmail: userData.email,
