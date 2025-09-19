@@ -135,7 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
                 
                 const currentData = userDoc.data() as UserData;
-                let totalAccruedInvestmentEarnings = 0;
+                let totalEarningsToAdd = 0;
                 
                 const commissionParentRef = currentData.commissionParent ? doc(clientDb, 'users', currentData.commissionParent) : null;
                 let commissionParentDoc: any = null;
@@ -149,34 +149,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const isPro = currentData.membership === 'Pro';
                     const dailyReturnRate = isPro ? 0.20 : 0.10;
 
-                    const today = new Date();
+                    // This is the critical fix. Firestore Timestamps must be converted to JS Dates.
                     const startDate = investment.startDate.toDate();
-                    const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+                    const today = new Date();
                     
-                    let daysCompleted = 0;
-                    let calculatedEarnings = 0;
+                    // Logic to calculate days based on calendar date, not 24-hour periods.
+                    const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                    const daysPassed = Math.floor((startOfDay(today).getTime() - startOfDay(startDate).getTime()) / (1000 * 60 * 60 * 24));
                     
-                    if (daysPassed < investment.durationDays) {
-                        daysCompleted = daysPassed + 1;
-                        calculatedEarnings = investment.planAmount * dailyReturnRate * daysCompleted;
-                    } else {
-                        daysCompleted = investment.durationDays;
-                        calculatedEarnings = investment.planAmount * dailyReturnRate * investment.durationDays;
-                    }
-                    
-                    const earningsToAdd = calculatedEarnings - investment.earnings;
-                    totalAccruedInvestmentEarnings += calculatedEarnings;
+                    const newDaysProcessed = Math.min(daysPassed, investment.durationDays);
 
-                    if (earningsToAdd > 0) {
+                    if (newDaysProcessed > investment.daysProcessed) {
+                         const daysToCredit = newDaysProcessed - investment.daysProcessed;
+                         const earningsForThisPeriod = daysToCredit * investment.dailyReturn;
+                         
+                         totalEarningsToAdd += earningsForThisPeriod;
+
+                         const newTotalEarningsForPlan = investment.earnings + earningsForThisPeriod;
+                         const newStatus = newDaysProcessed >= investment.durationDays ? 'completed' : 'active';
+                        
                          transaction.update(investmentRef, {
-                            earnings: calculatedEarnings,
-                            daysProcessed: daysCompleted,
-                            status: daysCompleted >= investment.durationDays ? 'completed' : 'active',
+                            earnings: newTotalEarningsForPlan,
+                            daysProcessed: newDaysProcessed,
+                            status: newStatus,
                             lastUpdate: serverTimestamp()
                          });
 
                          if (commissionParentDoc?.exists) {
-                            const commissionAmount = earningsToAdd * 0.03;
+                            const commissionAmount = earningsForThisPeriod * 0.03;
                              transaction.update(commissionParentRef!, {
                                 totalBalance: increment(commissionAmount),
                                 totalReferralEarnings: increment(commissionAmount),
@@ -186,14 +186,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     }
                 }
                 
-                const currentTotalInvestmentEarnings = currentData.totalInvestmentEarnings || 0;
-                const netChange = totalAccruedInvestmentEarnings - currentTotalInvestmentEarnings;
-                
-                if (netChange !== 0) {
+                if (totalEarningsToAdd > 0) {
                     transaction.update(userDocRef, {
-                        totalInvestmentEarnings: totalAccruedInvestmentEarnings,
-                        totalBalance: increment(netChange),
-                        totalEarnings: increment(netChange),
+                        totalInvestmentEarnings: increment(totalEarningsToAdd),
+                        totalBalance: increment(totalEarningsToAdd),
+                        totalEarnings: increment(totalEarningsToAdd),
                     });
                 }
             });
