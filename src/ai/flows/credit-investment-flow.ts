@@ -50,11 +50,13 @@ const creditInvestmentFlow = ai.defineFlow(
                 referrerDocRef = adminDb.collection('users').doc(userInTransaction.referredBy);
                 referrerDoc = await transaction.get(referrerDocRef);
 
-                const referrerReferralsRef = adminDb.collection('users').doc(userInTransaction.referredBy).collection('referrals');
-                const q = referrerReferralsRef.where("userId", "==", userId);
-                const referredUserQuerySnapshot = await transaction.get(q);
-                if (!referredUserQuerySnapshot.empty) {
-                    referredUserDocRefToUpdate = referredUserQuerySnapshot.docs[0].ref;
+                if (referrerDoc.exists) {
+                    const referrerReferralsRef = adminDb.collection('users').doc(userInTransaction.referredBy).collection('referrals');
+                    const q = referrerReferralsRef.where("userId", "==", userId);
+                    const referredUserQuerySnapshot = await transaction.get(q);
+                    if (!referredUserQuerySnapshot.empty) {
+                        referredUserDocRefToUpdate = referredUserQuerySnapshot.docs[0].ref;
+                    }
                 }
             }
             // --- END OF READS ---
@@ -91,8 +93,8 @@ const creditInvestmentFlow = ai.defineFlow(
                 }
             }
             
-            if (referrerDoc && referrerDoc.exists) {
-                 const bonusAmount = 75;
+            if (referrerDoc?.exists) {
+                 const bonusAmount = 151;
                  userUpdates.totalBalance = admin.firestore.FieldValue.increment(bonusAmount);
                  userUpdates.totalBonusEarnings = admin.firestore.FieldValue.increment(bonusAmount);
                  userUpdates.totalEarnings = admin.firestore.FieldValue.increment(bonusAmount);
@@ -105,9 +107,9 @@ const creditInvestmentFlow = ai.defineFlow(
 
             transaction.update(userDocRef, userUpdates);
 
-            if (referrerDocRef && referrerDoc && referrerDoc.exists) {
+            if (referrerDocRef && referrerDoc?.exists) {
                 const referrerData = referrerDoc.data()!;
-                const bonusAmount = 75;
+                const bonusAmount = 151;
 
                 const newReferralCount = (referrerData.investedReferralCount || 0) + 1;
                 

@@ -186,5 +186,3 @@ const ReferPage: NextPage = () => {
 };
 
 export default ReferPage;
-
-    
