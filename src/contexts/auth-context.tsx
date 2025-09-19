@@ -328,7 +328,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const referralCode = `${name.split(' ')[0].toUpperCase().substring(0, 5)}${(Math.random() * 9000 + 1000).toFixed(0)}`;
             const userDocRef = doc(clientDb, 'users', newUser.uid);
 
-            await setDoc(userDocRef, {
+            const newUserDocData: any = {
                 uid: newUser.uid,
                 name,
                 email,
@@ -348,13 +348,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 lastLogin: serverTimestamp(),
                 claimedMilestones: [],
                 redeemedOfferCodes: [],
-            });
+            };
             
             const usedCode = localStorage.getItem('referralCode') || providedCode;
             if (usedCode) {
-                 await redeemReferralCode(usedCode, newUser, name, email);
-                 localStorage.removeItem('referralCode');
+                 const { success, message } = await redeemReferralCodeFlow({
+                    userId: newUser.uid,
+                    userName: name,
+                    userEmail: email,
+                    code: usedCode,
+                });
+                if(success) {
+                    newUserDocData.usedReferralCode = usedCode.toUpperCase();
+                }
+                console.log(message);
+                localStorage.removeItem('referralCode');
             }
+             await setDoc(userDocRef, newUserDocData);
+
+
         } catch (error: any) {
             toast({
                 variant: 'destructive',
@@ -471,24 +483,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: 'Bonus Collected!', description: `You received ${signupBonusAmount} Rs.` });
     }
 
-    const redeemReferralCode = async (code: string, newUser?: User, newUserName?: string, newUserEmail?: string) => {
-        const currentUser = newUser || user;
-        const currentData = userData;
-        const currentUserName = newUserName || currentData?.name;
-        const currentUserEmail = newUserEmail || currentData?.email;
-
-        if (!currentUser || !currentUserName || !currentUserEmail) {
+    const redeemReferralCode = async (code: string) => {
+        if (!user || !userData) {
             throw new Error("User data is not available.");
         }
-        if (currentData && currentData.usedReferralCode) {
+        if (userData.usedReferralCode) {
             throw new Error("A referral code has already been used for this account.");
         }
 
         try {
             const result = await redeemReferralCodeFlow({
-                userId: currentUser.uid,
-                userName: currentUserName,
-                userEmail: currentUserEmail,
+                userId: user.uid,
+                userName: userData.name,
+                userEmail: userData.email,
                 code: code,
             });
 
