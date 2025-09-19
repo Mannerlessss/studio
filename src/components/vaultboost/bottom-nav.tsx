@@ -5,7 +5,6 @@ import { LayoutDashboard, TrendingUp, Users, Settings, Award } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '@/contexts/auth-context';
 
 interface BottomNavProps {
   activePage: 'dashboard' | 'investment' | 'refer' | 'settings' | 'pro' | 'support';
@@ -13,7 +12,6 @@ interface BottomNavProps {
 
 export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {
   const pathname = usePathname();
-  const { userData } = useAuth();
 
   const navItems = [
     { href: '/', icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard' },
