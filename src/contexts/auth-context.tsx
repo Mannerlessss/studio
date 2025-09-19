@@ -11,7 +11,7 @@ import {
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { clientAuth, clientDb } from '@/lib/firebaseClient';
-import { doc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, addDoc, increment, setDoc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, addDoc, increment, setDoc, getDoc, limit } from 'firebase/firestore';
 import { redeemCode as redeemReferralCodeFlow } from '@/ai/flows/redeem-code-flow';
 import { Gem } from 'lucide-react';
 import { redeemOfferCode as redeemOfferCodeFlow } from '@/ai/flows/redeem-offer-code-flow';
@@ -148,14 +148,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const currentInvestmentRef = doc(clientDb, `users/${currentUserId}/investments`, investmentDoc.id);
                     const investment = investmentDoc.data() as Investment;
 
-                    const now = new Date();
-                    const startDate = investment.startDate.toDate();
-                    
-                    const msInDay = 24 * 60 * 60 * 1000;
-                    // Calculate total days that should have been processed since the start
-                    const totalDaysSinceStart = Math.floor((now.getTime() - startDate.getTime()) / msInDay);
-                    const totalDaysToProcess = Math.min(totalDaysSinceStart, investment.durationDays);
+                    const today = new Date();
+                    const purchaseDate = investment.startDate.toDate(); // This is the purchase date
 
+                    // Calculate the difference in days
+                    const daysPassed = Math.floor(
+                        (today.getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24)
+                    );
+                    
+                    // Determine how many days we should actually process
+                    const totalDaysToProcess = Math.min(daysPassed, investment.durationDays);
+                    
+                    // Check if there are any new days to process
                     const missedDays = totalDaysToProcess - investment.daysProcessed;
 
                     if (missedDays > 0) {
@@ -176,7 +180,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         // Create transaction records for the missed days
                         for (let i = 0; i < missedDays; i++) {
                             const transactionRef = doc(collection(clientDb, `users/${currentUserId}/transactions`));
-                            const earningDay = new Date(startDate.getTime() + (investment.daysProcessed + i + 1) * msInDay);
+                            const earningDay = new Date(purchaseDate.getTime() + (investment.daysProcessed + i + 1) * (1000 * 60 * 60 * 24));
                             transaction.set(transactionRef, {
                                 type: 'earning',
                                 amount: investment.dailyReturn,
