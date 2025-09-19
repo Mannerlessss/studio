@@ -6,20 +6,19 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { ArrowRight } from 'lucide-react';
 
-interface UpgradeCardProps {
-    userName?: string;
-}
-
-export const UpgradeCard: FC<UpgradeCardProps> = ({ userName: propUserName }) => {
+export const UpgradeCard: FC = () => {
     const { userData } = useAuth();
-    const userName = propUserName || userData?.name || 'User';
+    
+    if (userData?.membership === 'Pro') {
+        return null;
+    }
 
   return (
     <Card className="shadow-md border border-accent bg-accent/5">
         <CardHeader>
             <CardTitle className="text-accent text-lg">Upgrade to PRO Plan</CardTitle>
             <CardDescription>
-                Increase your daily earnings from 10% to 13%!
+                Increase your daily earnings from 10% to 20%!
             </CardDescription>
         </CardHeader>
       <CardContent>

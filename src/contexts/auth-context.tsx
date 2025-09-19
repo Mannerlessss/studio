@@ -41,6 +41,7 @@ interface UserData {
     commissionParent?: string; // UID of the user who gets commission
     investedReferralCount: number;
     referrals?: any[]; // Array of referred user objects
+    membership: 'Basic' | 'Pro';
     rank: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
     totalBalance: number;
     totalInvested: number; // Sum of all planAmounts
@@ -115,7 +116,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     // Function to process earnings for all active investments for a user
-    const processInvestmentEarnings = async (currentUserId: string) => {
+    const processInvestmentEarnings = async (currentUserId: string, isPro: boolean) => {
         const investmentsColRef = collection(clientDb, `users/${currentUserId}/investments`);
         const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
         
@@ -160,8 +161,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
                     
                     if (daysPassed <= 0) continue;
-
-                    const dailyReturnRate = 0.10; // Daily return is always 10%
+                    
+                    const dailyReturnRate = isPro ? 0.20 : 0.10;
                     const correctDailyReturn = investment.planAmount * dailyReturnRate;
                     
                     const remainingDaysInPlan = investment.durationDays - investment.daysProcessed;
@@ -253,26 +254,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                      setUserData(null);
                      setLoading(false);
                 } else {
-                    
-                    await processInvestmentEarnings(currentUser.uid);
-                    
                     const userDocRef = doc(clientDb, 'users', currentUser.uid);
-                    unsubFromUser = onSnapshot(userDocRef, (userDocSnap) => {
+                    unsubFromUser = onSnapshot(userDocRef, async (userDocSnap) => {
                         if (!userDocSnap.exists()) {
                             console.warn(`No Firestore document found for user ${currentUser.uid}. This can happen briefly during sign up.`);
                             return;
                         }
                         
                         const baseUserData = { uid: userDocSnap.id, ...userDocSnap.data() } as UserData;
+                        const isPro = baseUserData.membership === 'Pro';
+                        await processInvestmentEarnings(currentUser.uid, isPro);
                         
+                        const refreshedUserDoc = await getDoc(userDocRef);
+                        const refreshedBaseUserData = { uid: refreshedUserDoc.id, ...refreshedUserDoc.data() } as UserData;
+
                         const investmentsColRef = collection(clientDb, `users/${currentUser.uid}/investments`);
                         unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
                             const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));
-                            setUserData({ ...baseUserData, investments });
+                            setUserData({ ...refreshedBaseUserData, investments });
                             setLoading(false);
                         }, (error) => {
                             console.error("Error fetching investments:", error);
-                            setUserData(baseUserData);
+                            setUserData(refreshedBaseUserData);
                             setLoading(false);
                         });
 
@@ -330,6 +333,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 name,
                 email,
                 phone,
+                membership: 'Basic',
                 totalBalance: 0,
                 totalInvested: 0,
                 totalEarnings: 0,

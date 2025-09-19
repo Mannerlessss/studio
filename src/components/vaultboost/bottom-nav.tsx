@@ -1,20 +1,25 @@
 'use client';
 import type { FC } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, TrendingUp, Users, Settings } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Users, Settings, Award } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
 
 interface BottomNavProps {
-  activePage: 'dashboard' | 'investment' | 'refer' | 'settings' | 'support';
+  activePage: 'dashboard' | 'investment' | 'refer' | 'settings' | 'pro' | 'support';
 }
 
 export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {
   const pathname = usePathname();
+  const { userData } = useAuth();
+  const isPro = userData?.membership === 'Pro';
+
   const navItems = [
     { href: '/', icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard' },
     { href: '/investment', icon: TrendingUp, label: 'Invest', page: 'investment' },
+    ...(!isPro ? [{ href: '/pro', icon: Award, label: 'PRO', page: 'pro' }] : []),
     { href: '/refer', icon: Users, label: 'Refer', page: 'refer' },
     { href: '/settings', icon: Settings, label: 'Settings', page: 'settings' },
   ];

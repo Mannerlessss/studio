@@ -9,10 +9,11 @@ import { TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '../ui/button';
 
-const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
+const InvestmentItem: FC<{ investment: Investment, isPro: boolean }> = ({ investment, isPro }) => {
     
     const progress = (investment.daysProcessed / investment.durationDays) * 100;
-    const dailyReturnRate = 10; // Hardcoded to 10% as per business logic
+    const dailyReturnRate = isPro ? 20 : 10;
+    const dailyReturnAmount = investment.planAmount * (dailyReturnRate / 100);
 
     return (
         <div className="p-4 rounded-lg bg-muted/50 border relative">
@@ -39,7 +40,7 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
                 <Progress value={progress} />
                 <div className="flex justify-between items-center text-xs text-muted-foreground">
                     <p>Day {investment.daysProcessed} of {investment.durationDays}</p>
-                    <p>Daily: {(investment.planAmount * 0.10).toLocaleString()} Rs.</p>
+                    <p>Daily: {dailyReturnAmount.toLocaleString()} Rs.</p>
                 </div>
             </div>
         </div>
@@ -48,6 +49,7 @@ const InvestmentItem: FC<{ investment: Investment }> = ({ investment }) => {
 
 export const ActiveInvestmentsCard: FC = () => {
     const { userData } = useAuth();
+    const isPro = userData?.membership === 'Pro';
     const activeInvestments = useMemo(() => {
         return userData?.investments?.filter(inv => inv.status === 'active') || [];
     }, [userData?.investments]);
@@ -79,7 +81,7 @@ export const ActiveInvestmentsCard: FC = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {activeInvestments.map(inv => (
-            <InvestmentItem key={inv.id} investment={inv} />
+            <InvestmentItem key={inv.id} investment={inv} isPro={isPro} />
         ))}
       </CardContent>
     </Card>

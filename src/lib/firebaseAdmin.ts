@@ -6,9 +6,11 @@ let app: App;
 
 if (!getApps().length) {
   try {
-    const serviceAccount = JSON.parse(
-      process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string
-    );
+    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (!serviceAccountString) {
+        throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.");
+    }
+    const serviceAccount = JSON.parse(serviceAccountString);
 
     app = initializeApp({
       credential: cert(serviceAccount),

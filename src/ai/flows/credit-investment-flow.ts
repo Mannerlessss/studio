@@ -61,9 +61,10 @@ const creditInvestmentFlow = ai.defineFlow(
 
             // --- ALL WRITES START HERE ---
             const now = admin.firestore.FieldValue.serverTimestamp();
+            const isPro = userInTransaction.membership === 'Pro';
             
             const newInvestmentRef = adminDb.collection(`users/${userId}/investments`).doc();
-            const dailyReturnRate = 0.10;
+            const dailyReturnRate = isPro ? 0.20 : 0.10;
             transaction.set(newInvestmentRef, {
                 planAmount: amount,
                 dailyReturn: amount * dailyReturnRate,
@@ -90,7 +91,7 @@ const creditInvestmentFlow = ai.defineFlow(
                 }
             }
             
-            if (referrerDoc?.exists) {
+            if (referrerDoc && referrerDoc.exists) {
                  const bonusAmount = 75;
                  userUpdates.totalBalance = admin.firestore.FieldValue.increment(bonusAmount);
                  userUpdates.totalBonusEarnings = admin.firestore.FieldValue.increment(bonusAmount);

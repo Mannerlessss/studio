@@ -17,7 +17,6 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Card,
@@ -35,7 +34,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { DollarSign, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2, ArrowUpDown, Search } from 'lucide-react';
+import { DollarSign, Eye, Wallet, Gift, Users, TrendingUp, Loader2, Trash2, ArrowUpDown, Search, Crown } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -50,9 +49,11 @@ import {
 import { deleteUser } from '@/ai/flows/delete-user-flow';
 import { getAllUsers, UserForAdmin } from '@/ai/flows/get-all-users-flow';
 import { creditInvestment } from '@/ai/flows/credit-investment-flow';
+import { upgradeUserToPro } from '@/ai/flows/upgrade-user-to-pro-flow';
+import { Badge } from '@/components/ui/badge';
 
 
-type UserSortableKeys = 'name' | 'email';
+type UserSortableKeys = 'name' | 'email' | 'membership';
 const investmentPlans = [150, 300, 400, 1000, 1600, 4000, 10000, 25000, 30000, 50000, 60000, 100000];
 
 
@@ -92,8 +93,8 @@ export default function UsersPage() {
                 (user?.email ?? '').toLowerCase().includes((searchTerm ?? '').toLowerCase())
             )
             .sort((a, b) => {
-                const aValue = a[sortKey] || '';
-                const bValue = b[sortKey] || '';
+                const aValue = a[sortKey as keyof UserForAdmin] as string || '';
+                const bValue = b[sortKey as keyof UserForAdmin] as string || '';
                 if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
                 if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
                 return 0;
@@ -165,6 +166,26 @@ export default function UsersPage() {
             setIsSubmitting(null);
         }
     }
+    
+    const handleUpgrade = async (userId: string) => {
+        setIsSubmitting(userId);
+        try {
+            const result = await upgradeUserToPro(userId);
+            toast({
+                title: `Upgraded to Pro`,
+                description: result.message,
+            });
+            setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, membership: 'Pro' } : u));
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: `Upgrade Failed`,
+                description: error.message,
+            });
+        } finally {
+            setIsSubmitting(null);
+        }
+    }
 
   return (
     <>
@@ -201,6 +222,11 @@ export default function UsersPage() {
                     Email <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
               </TableHead>
+              <TableHead>
+                <Button variant="ghost" onClick={() => handleSort('membership')}>
+                    Membership <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+              </TableHead>
               <TableHead className='text-right'>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -210,6 +236,7 @@ export default function UsersPage() {
                     <TableRow key={i}>
                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="h-8 w-48" /></TableCell>
                     </TableRow>
                 ))
@@ -217,16 +244,17 @@ export default function UsersPage() {
               <TableRow key={user.id}>
                 <TableCell className="font-medium">{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>
+                <TableCell>
+                  <Badge variant={user.membership === 'Pro' ? 'default' : 'secondary'}>
+                    {user.membership}
+                  </Badge>
+                </TableCell>
                 <TableCell className="text-right">
                     <div className='flex gap-2 justify-end'>
-                        <Dialog onOpenChange={(isOpen) => { if (!isOpen) setSelectedUser(null); }}>
-                           <DialogTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={() => setSelectedUser(user)}>
-                                    <Eye className='w-4 h-4' />
-                                    <span className="sr-only">View Details</span>
-                                </Button>
-                            </DialogTrigger>
-                        </Dialog>
+                       <Button variant="ghost" size="icon" onClick={() => setSelectedUser(user)}>
+                            <Eye className='w-4 h-4' />
+                            <span className="sr-only">View Details</span>
+                        </Button>
                        <AlertDialog onOpenChange={(open) => !open && setCreditAmount('150')}>
                           <AlertDialogTrigger asChild>
                              <Button variant="outline" size="sm" disabled={!!isSubmitting}>
@@ -262,6 +290,12 @@ export default function UsersPage() {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
+                        {user.membership !== 'Pro' && (
+                            <Button size="sm" onClick={() => handleUpgrade(user.id)} disabled={!!isSubmitting}>
+                                {isSubmitting === user.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Crown className='w-4 h-4 mr-1' />}
+                                Upgrade to PRO
+                            </Button>
+                        )}
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button variant="destructive" size="sm" disabled={!!isSubmitting}>
@@ -290,7 +324,7 @@ export default function UsersPage() {
             ))}
              {!loading && filteredAndSortedUsers.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center">
+                    <TableCell colSpan={4} className="h-24 text-center">
                         No users found.
                     </TableCell>
                 </TableRow>

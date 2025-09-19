@@ -5,10 +5,9 @@ import { useAuth } from '@/contexts/auth-context';
 
 interface WelcomeCardProps {
   name: string;
-  membership: string;
 }
 
-export const WelcomeCard: FC<WelcomeCardProps> = ({ name, membership }) => {
+export const WelcomeCard: FC<WelcomeCardProps> = ({ name }) => {
   const { userData } = useAuth();
   
   return (
@@ -20,7 +19,7 @@ export const WelcomeCard: FC<WelcomeCardProps> = ({ name, membership }) => {
         <div>
           <h1 className="text-lg md:text-2xl font-bold">Welcome, {name}!</h1>
           <p className="text-xs md:text-sm opacity-90 flex items-center gap-2">
-            <span>{membership}</span>
+            <span>{userData?.membership} Member</span>
             {userData?.rank && (
                 <>
                 <span>•</span>
