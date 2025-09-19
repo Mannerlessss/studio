@@ -1,3 +1,4 @@
+
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
 import { 
@@ -227,8 +228,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         let unsubFromUser: (() => void) | undefined;
         let unsubFromInvestments: (() => void) | undefined;
+        let authTimeout: NodeJS.Timeout;
         
         const unsubscribe = onAuthStateChanged(clientAuth, async (currentUser) => {
+            clearTimeout(authTimeout);
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             
@@ -282,10 +285,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
+        authTimeout = setTimeout(() => {
+            if (loading) {
+                console.warn("Auth state change timed out. Forcing loading to false.");
+                setLoading(false);
+            }
+        }, 15000); 
+
         return () => {
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             unsubscribe();
+            clearTimeout(authTimeout);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -324,19 +335,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 createdAt: serverTimestamp(), lastLogin: serverTimestamp(), claimedMilestones: [], redeemedOfferCodes: [],
             };
             
+            // Create the user document first
+            await setDoc(userDocRef, newUserDocData);
+
+            // Now, handle the referral code if it exists
             const usedCode = localStorage.getItem('referralCode') || providedCode;
             if (usedCode) {
-                 const { success } = await redeemReferralCodeFlow({ userId: newUser.uid, userName: name, userEmail: email, code: usedCode });
-                if(success) {
-                    newUserDocData.usedReferralCode = usedCode.toUpperCase();
-                } else {
-                     toast({ variant: 'destructive', title: 'Invalid Referral Code', description: 'The provided referral code was not valid.' });
+                 try {
+                    await redeemReferralCodeFlow({ userId: newUser.uid, userName: name, userEmail: email, code: usedCode });
+                    toast({ title: "Referral Applied!", description: "Your referral code was successfully applied." });
+                } catch(e: any) {
+                    toast({ variant: 'destructive', title: 'Invalid Referral Code', description: e.message || 'The provided referral code could not be applied.' });
+                } finally {
+                     localStorage.removeItem('referralCode');
                 }
-                localStorage.removeItem('referralCode');
             }
-            await setDoc(userDocRef, newUserDocData);
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Sign Up Failed', description: error.message });
+        } finally {
             setLoading(false);
         }
     };
@@ -348,6 +364,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await setDoc(doc(clientDb, 'users', credential.user.uid), { lastLogin: serverTimestamp() }, { merge: true });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Sign In Failed', description: error.message });
+        } finally {
             setLoading(false);
         }
     };
