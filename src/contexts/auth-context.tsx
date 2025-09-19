@@ -118,84 +118,66 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const processInvestmentEarnings = async (currentUserId: string) => {
         const investmentsColRef = collection(clientDb, `users/${currentUserId}/investments`);
         const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
-        
+    
         try {
             const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
             if (activeInvestmentsSnapshot.empty) {
-                return;
+                return; // No active investments to process
             }
-
+    
             await runTransaction(clientDb, async (transaction) => {
                 const userDocRef = doc(clientDb, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
-
+    
                 if (!userDoc.exists()) {
                     console.warn("processInvestmentEarnings: User document not found.");
                     return;
                 }
-                
-                const currentData = userDoc.data() as UserData;
-                let totalEarningsToAdd = 0;
-                
-                const commissionParentRef = currentData.commissionParent ? doc(clientDb, 'users', currentData.commissionParent) : null;
-                let commissionParentDoc: any = null;
-                if(commissionParentRef){
-                    commissionParentDoc = await transaction.get(commissionParentRef);
-                }
-
+    
+                let totalNewEarningsForUser = 0;
+    
                 for (const investmentDoc of activeInvestmentsSnapshot.docs) {
                     const investmentRef = investmentDoc.ref;
-                    const investment = investmentDoc.data() as Investment;
-                    const isPro = currentData.membership === 'Pro';
-                    const dailyReturnRate = isPro ? 0.20 : 0.10;
-
-                    // This is the critical fix. Firestore Timestamps must be converted to JS Dates.
-                    const startDate = investment.startDate.toDate();
+                    const plan = investmentDoc.data() as Investment;
+    
                     const today = new Date();
-                    
-                    // Logic to calculate days based on calendar date, not 24-hour periods.
-                    const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-                    const daysPassed = Math.floor((startOfDay(today).getTime() - startOfDay(startDate).getTime()) / (1000 * 60 * 60 * 24));
-                    
-                    const newDaysProcessed = Math.min(daysPassed, investment.durationDays);
-
-                    if (newDaysProcessed > investment.daysProcessed) {
-                         const daysToCredit = newDaysProcessed - investment.daysProcessed;
-                         const earningsForThisPeriod = daysToCredit * investment.dailyReturn;
-                         
-                         totalEarningsToAdd += earningsForThisPeriod;
-
-                         const newTotalEarningsForPlan = investment.earnings + earningsForThisPeriod;
-                         const newStatus = newDaysProcessed >= investment.durationDays ? 'completed' : 'active';
-                        
-                         transaction.update(investmentRef, {
-                            earnings: newTotalEarningsForPlan,
+                    const startDate = plan.startDate.toDate(); // Correctly convert Timestamp to Date
+    
+                    // This logic calculates the total number of calendar days passed.
+                    const msPerDay = 1000 * 60 * 60 * 24;
+                    const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / msPerDay);
+    
+                    const newDaysProcessed = Math.min(daysPassed, plan.durationDays);
+    
+                    if (newDaysProcessed > plan.daysProcessed) {
+                        const daysToCredit = newDaysProcessed - plan.daysProcessed;
+                        const newEarningsForPlan = daysToCredit * plan.dailyReturn;
+                        const finalTotalEarningsForPlan = plan.earnings + newEarningsForPlan;
+    
+                        totalNewEarningsForUser += newEarningsForPlan;
+    
+                        const newStatus = newDaysProcessed >= plan.durationDays ? 'completed' : 'active';
+    
+                        transaction.update(investmentRef, {
                             daysProcessed: newDaysProcessed,
+                            earnings: finalTotalEarningsForPlan,
                             status: newStatus,
                             lastUpdate: serverTimestamp()
-                         });
-
-                         if (commissionParentDoc?.exists) {
-                            const commissionAmount = earningsForThisPeriod * 0.03;
-                             transaction.update(commissionParentRef!, {
-                                totalBalance: increment(commissionAmount),
-                                totalReferralEarnings: increment(commissionAmount),
-                                totalEarnings: increment(commissionAmount),
-                            });
-                         }
+                        });
                     }
                 }
-                
-                if (totalEarningsToAdd > 0) {
+    
+                if (totalNewEarningsForUser > 0) {
                     transaction.update(userDocRef, {
-                        totalInvestmentEarnings: increment(totalEarningsToAdd),
-                        totalBalance: increment(totalEarningsToAdd),
-                        totalEarnings: increment(totalEarningsToAdd),
+                        totalInvestmentEarnings: increment(totalNewEarningsForUser),
+                        totalBalance: increment(totalNewEarningsForUser),
+                        totalEarnings: increment(totalNewEarningsForUser),
                     });
                 }
             });
+    
         } catch (error) {
-            console.error("Error processing investment earnings transaction: ", error);
+            console.error("Error in processInvestmentEarnings transaction: ", error);
         }
     };
 
