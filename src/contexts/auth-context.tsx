@@ -1,4 +1,3 @@
-
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
 import { 
@@ -146,6 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     if (!currentInvestmentDoc.exists()) continue;
 
                     const investment = currentInvestmentDoc.data() as Investment;
+                    const investmentDailyReturn = investment.dailyReturn; // Use the value from the document
 
                     const now = new Date();
                     const lastUpdateDate = investment.lastUpdate.toDate();
@@ -158,14 +158,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     
                     if (daysPassed <= 0) continue;
                     
-                    const dailyReturnRate = isPro ? 0.20 : 0.10;
-                    const correctDailyReturn = investment.planAmount * dailyReturnRate;
-                    
                     const remainingDaysInPlan = investment.durationDays - investment.daysProcessed;
                     const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
 
                     if (daysToCredit > 0) {
-                        const earningsForThisPlan = correctDailyReturn * daysToCredit;
+                        const earningsForThisPlan = investmentDailyReturn * daysToCredit;
                         totalEarningsToAdd += earningsForThisPlan;
 
                         const newEarnings = investment.earnings + earningsForThisPlan;
@@ -184,14 +181,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             const earningDay = new Date(startOfLastUpdateDay.getTime() + (i + 1) * msInDay);
                             transaction.set(transactionRef, {
                                 type: 'earning',
-                                amount: correctDailyReturn,
+                                amount: investmentDailyReturn,
                                 description: `Earning from Plan ${investment.planAmount}`,
                                 status: 'Completed',
                                 date: Timestamp.fromDate(earningDay),
                             });
                         }
 
-                        if (commissionParentDoc?.exists()) {
+                        if (commissionParentDoc?.exists) {
                             const commissionAmount = earningsForThisPlan * 0.03;
                             transaction.update(commissionParentRef!, {
                                 totalBalance: increment(commissionAmount),
@@ -228,10 +225,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         let unsubFromUser: (() => void) | undefined;
         let unsubFromInvestments: (() => void) | undefined;
-        let authTimeout: NodeJS.Timeout;
         
         const unsubscribe = onAuthStateChanged(clientAuth, async (currentUser) => {
-            clearTimeout(authTimeout);
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             
@@ -285,18 +280,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
-        authTimeout = setTimeout(() => {
-            if (loading) {
-                console.warn("Auth state change timed out. Forcing loading to false.");
-                setLoading(false);
-            }
-        }, 15000); 
-
         return () => {
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             unsubscribe();
-            clearTimeout(authTimeout);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -364,8 +351,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await setDoc(doc(clientDb, 'users', credential.user.uid), { lastLogin: serverTimestamp() }, { merge: true });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Sign In Failed', description: error.message });
-        } finally {
-            setLoading(false);
+             setLoading(false);
         }
     };
 
@@ -431,13 +417,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const redeemReferralCode = async (code: string) => {
-        if (!user || !userData) {
-            throw new Error("User data is not available.");
-        }
+        if (!user || !userData) throw new Error("User data is not available.");
         if (userData.usedReferralCode) {
             throw new Error("A referral code has already been used for this account.");
         }
-
         try {
             const result = await redeemReferralCodeFlow({ userId: user.uid, userName: userData.name, userEmail: userData.email, code });
             toast({ title: 'Code Redeemed!', description: result.message });

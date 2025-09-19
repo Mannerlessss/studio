@@ -15,6 +15,8 @@ import { ProfileCompletionCard } from '@/components/vaultboost/profile-completio
 import { AnnouncementPopup } from '@/components/vaultboost/announcement-popup';
 import { CollectBonusCard } from '@/components/vaultboost/collect-bonus-card';
 import { SpecialOfferPopup } from '@/components/vaultboost/special-offer-popup';
+import { TrustStatsCard } from '@/components/vaultboost/trust-stats-card';
+import { ActiveInvestmentsCard } from '@/components/vaultboost/active-investments-card';
 
 
 const Dashboard: NextPage = () => {
@@ -69,11 +71,13 @@ const Dashboard: NextPage = () => {
             icon={<Users className="h-6 w-6 text-primary" />}
           />
         </div>
+        <ActiveInvestmentsCard />
         <DailyBonusCard onBonusClaim={handleBonusClaim} />
         <div id="withdraw-card">
             <WithdrawCard />
         </div>
         <TransactionHistoryCard />
+        <TrustStatsCard />
         <UpgradeCard />
       </div>
       <BottomNav activePage="dashboard" />
