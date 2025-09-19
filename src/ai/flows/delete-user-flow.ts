@@ -14,36 +14,38 @@ export async function deleteUser(uid: string): Promise<{ success: boolean; messa
     }
     
     try {
+        // Attempt to delete from Firebase Authentication first
         await adminAuth.deleteUser(uid);
-
-        const userDocRef = adminDb.collection('users').doc(uid);
-        
-        const docSnap = await userDocRef.get();
-        if (docSnap.exists) {
-            await userDocRef.delete();
-        }
-        
-        return {
-            success: true,
-            message: `Successfully deleted user ${uid} from Authentication and Firestore.`,
-        };
     } catch (error: any) {
-        console.error(`Failed to delete user ${uid}:`, error);
-        if (error.code === 'auth/user-not-found') {
-            try {
-                const userDocRef = adminDb.collection('users').doc(uid);
-                const docSnap = await userDocRef.get();
-                if (docSnap.exists) {
-                    await userDocRef.delete();
-                }
-                return {
-                    success: true,
-                    message: `User ${uid} was already deleted from Authentication. Removed from Firestore.`,
-                };
-            } catch (dbError: any) {
-                 throw new Error(`User not found in Auth, but failed to delete from Firestore: ${dbError.message}`);
-            }
+        console.error(`Auth deletion error for user ${uid}:`, error.message);
+        // If user is not found in Auth, we still want to proceed to delete from Firestore.
+        if (error.code !== 'auth/user-not-found') {
+            throw new Error(`An error occurred while deleting the user from Authentication: ${error.message}`);
         }
-        throw new Error(`An error occurred while deleting the user: ${error.message}`);
+        console.log(`User ${uid} not found in Authentication. Proceeding with Firestore cleanup.`);
+    }
+
+    try {
+        // Always attempt to delete from Firestore database
+        const userDocRef = adminDb.collection('users').doc(uid);
+        const docSnap = await userDocRef.get();
+        
+        if (docSnap.exists) {
+            // Note: This does not delete subcollections. A Cloud Function trigger
+            // would be needed for a full recursive delete.
+            await userDocRef.delete();
+            return {
+                success: true,
+                message: `Successfully deleted user ${uid} from Authentication and Firestore.`,
+            };
+        } else {
+             return {
+                success: true,
+                message: `User ${uid} was removed from Authentication. No Firestore document was found.`,
+            };
+        }
+    } catch (error: any) {
+         console.error(`Firestore deletion failed for user ${uid}:`, error);
+         throw new Error(`Failed to delete user document from Firestore: ${error.message}`);
     }
 }
