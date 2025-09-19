@@ -115,7 +115,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
     
-    // Function to process earnings for all active investments for a user
     const processInvestmentEarnings = async (currentUserId: string) => {
         const investmentsColRef = collection(clientDb, `users/${currentUserId}/investments`);
         const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
@@ -123,7 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
             if (activeInvestmentsSnapshot.empty) {
-                return; // No active investments to process
+                return;
             }
 
             await runTransaction(clientDb, async (transaction) => {
@@ -136,7 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
                 
                 const currentData = userDoc.data() as UserData;
-                let totalEarningsToAdd = 0;
+                let totalAccruedInvestmentEarnings = 0;
                 
                 const commissionParentRef = currentData.commissionParent ? doc(clientDb, 'users', currentData.commissionParent) : null;
                 let commissionParentDoc: any = null;
@@ -145,81 +144,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 for (const investmentDoc of activeInvestmentsSnapshot.docs) {
-                    const currentInvestmentRef = doc(clientDb, `users/${currentUserId}/investments`, investmentDoc.id);
+                    const investmentRef = investmentDoc.ref;
                     const investment = investmentDoc.data() as Investment;
+                    const isPro = currentData.membership === 'Pro';
+                    const dailyReturnRate = isPro ? 0.20 : 0.10;
 
-                    // --- CORRECTED DATE CALCULATION LOGIC ---
                     const today = new Date();
-                    const purchaseDate = investment.startDate.toDate();
-
-                    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                    const startOfPurchaseDay = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth(), purchaseDate.getDate());
-
-                    const msInDay = 1000 * 60 * 60 * 24;
-                    const daysPassed = Math.round((startOfToday.getTime() - startOfPurchaseDay.getTime()) / msInDay);
-                    // --- END OF CORRECTED LOGIC ---
+                    const startDate = investment.startDate.toDate();
+                    const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
                     
-                    const totalDaysToProcess = Math.min(daysPassed, investment.durationDays);
+                    let daysCompleted = 0;
+                    let calculatedEarnings = 0;
                     
-                    const missedDays = totalDaysToProcess - investment.daysProcessed;
+                    if (daysPassed < investment.durationDays) {
+                        daysCompleted = daysPassed + 1;
+                        calculatedEarnings = investment.planAmount * dailyReturnRate * daysCompleted;
+                    } else {
+                        daysCompleted = investment.durationDays;
+                        calculatedEarnings = investment.planAmount * dailyReturnRate * investment.durationDays;
+                    }
+                    
+                    const earningsToAdd = calculatedEarnings - investment.earnings;
+                    totalAccruedInvestmentEarnings += calculatedEarnings;
 
-                    if (missedDays > 0) {
-                        const earningsForThisPlan = investment.dailyReturn * missedDays;
-                        totalEarningsToAdd += earningsForThisPlan;
+                    if (earningsToAdd > 0) {
+                         transaction.update(investmentRef, {
+                            earnings: calculatedEarnings,
+                            daysProcessed: daysCompleted,
+                            status: daysCompleted >= investment.durationDays ? 'completed' : 'active',
+                            lastUpdate: serverTimestamp()
+                         });
 
-                        const newEarnings = investment.earnings + earningsForThisPlan;
-                        const newDaysProcessed = investment.daysProcessed + missedDays;
-                        const newStatus = newDaysProcessed >= investment.durationDays ? 'completed' : 'active';
-                        
-                        transaction.update(currentInvestmentRef, {
-                            earnings: newEarnings,
-                            daysProcessed: newDaysProcessed,
-                            lastUpdate: serverTimestamp(),
-                            status: newStatus
-                        });
-
-                        // Create transaction records for the missed days
-                        for (let i = 0; i < missedDays; i++) {
-                            const transactionRef = doc(collection(clientDb, `users/${currentUserId}/transactions`));
-                            const dayIndex = investment.daysProcessed + i;
-                            const earningDay = new Date(startOfPurchaseDay.getTime() + (dayIndex + 1) * msInDay);
-
-                            transaction.set(transactionRef, {
-                                type: 'earning',
-                                amount: investment.dailyReturn,
-                                description: `Earning from Plan ${investment.planAmount}`,
-                                status: 'Completed',
-                                date: Timestamp.fromDate(earningDay),
-                            });
-                        }
-                        
-                        // Handle lifetime commission for the newly calculated earnings
-                        if (commissionParentDoc?.exists) {
-                            const commissionAmount = earningsForThisPlan * 0.03;
-                            transaction.update(commissionParentRef!, {
+                         if (commissionParentDoc?.exists) {
+                            const commissionAmount = earningsToAdd * 0.03;
+                             transaction.update(commissionParentRef!, {
                                 totalBalance: increment(commissionAmount),
                                 totalReferralEarnings: increment(commissionAmount),
                                 totalEarnings: increment(commissionAmount),
                             });
-                            
-                            const commissionTransactionRef = doc(collection(clientDb, `users/${commissionParentRef!.id}/transactions`));
-                            transaction.set(commissionTransactionRef, {
-                                type: 'referral',
-                                amount: commissionAmount,
-                                description: `3% commission from ${currentData.name}`,
-                                status: 'Completed',
-                                date: serverTimestamp(),
-                            });
-                        }
+                         }
                     }
                 }
                 
-                // Update user's main balance if there were any new earnings
-                if (totalEarningsToAdd > 0) {
+                const currentTotalInvestmentEarnings = currentData.totalInvestmentEarnings || 0;
+                const netChange = totalAccruedInvestmentEarnings - currentTotalInvestmentEarnings;
+                
+                if (netChange !== 0) {
                     transaction.update(userDocRef, {
-                        totalInvestmentEarnings: increment(totalEarningsToAdd),
-                        totalBalance: increment(totalEarningsToAdd),
-                        totalEarnings: increment(totalEarningsToAdd),
+                        totalInvestmentEarnings: totalAccruedInvestmentEarnings,
+                        totalBalance: increment(netChange),
+                        totalEarnings: increment(netChange),
                     });
                 }
             });
