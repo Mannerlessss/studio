@@ -14,12 +14,11 @@ interface BottomNavProps {
 export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {
   const pathname = usePathname();
   const { userData } = useAuth();
-  const isPro = userData?.membership === 'Pro';
 
   const navItems = [
     { href: '/', icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard' },
     { href: '/investment', icon: TrendingUp, label: 'Invest', page: 'investment' },
-    ...(!isPro ? [{ href: '/pro', icon: Award, label: 'PRO', page: 'pro' }] : []),
+    { href: '/pro', icon: Award, label: 'PRO', page: 'pro' },
     { href: '/refer', icon: Users, label: 'Refer', page: 'refer' },
     { href: '/settings', icon: Settings, label: 'Settings', page: 'settings' },
   ];
