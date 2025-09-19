@@ -104,15 +104,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             await signOut(clientAuth);
+            router.push('/login');
+            // Clear state AFTER redirecting
+            setUser(null);
+            setUserData(null);
+            setIsAdmin(false);
             sessionStorage.removeItem('vaultboost-announcement-seen');
             sessionStorage.removeItem('vaultboost-special-offer-10k-seen');
         } catch (error) {
             console.error("Error signing out: ", error);
         } finally {
-            setUser(null);
-            setUserData(null);
-            setIsAdmin(false);
-            router.push('/login');
             setLoading(false);
         }
     };
@@ -229,10 +230,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         let unsubFromUser: (() => void) | undefined;
         let unsubFromInvestments: (() => void) | undefined;
-        let authTimeout: NodeJS.Timeout;
-
+        
         const unsubscribe = onAuthStateChanged(clientAuth, async (currentUser) => {
-            clearTimeout(authTimeout);
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             
@@ -250,6 +249,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const userDocRef = doc(clientDb, 'users', currentUser.uid);
                     unsubFromUser = onSnapshot(userDocRef, async (userDocSnap) => {
                         if (!userDocSnap.exists()) {
+                            console.warn(`No Firestore document for user ${currentUser.uid}. This can happen briefly during signup.`);
                             return;
                         }
                         
@@ -284,18 +284,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
-        authTimeout = setTimeout(() => {
-            if (loading) {
-                console.warn("Auth state change timed out after 15 seconds. Forcing logout.");
-                logOut();
-            }
-        }, 15000); 
-
         return () => {
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             unsubscribe();
-            clearTimeout(authTimeout);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -343,9 +335,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await setDoc(userDocRef, newUserDocData);
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Sign Up Failed', description: error.message });
-            setLoading(false);
         } finally {
-            // Do not set loading to false here; onAuthStateChanged will handle it
+            setLoading(false);
         }
     };
 
@@ -356,6 +347,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await setDoc(doc(clientDb, 'users', credential.user.uid), { lastLogin: serverTimestamp() }, { merge: true });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Sign In Failed', description: error.message });
+        } finally {
             setLoading(false);
         }
     };
