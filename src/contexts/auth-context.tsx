@@ -12,7 +12,7 @@ import {
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { clientAuth, clientDb } from '@/lib/firebaseClient';
-import { doc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, addDoc, increment, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, serverTimestamp, writeBatch, collection, query, where, getDocs, updateDoc, Timestamp, runTransaction, addDoc, increment, setDoc, getDoc } from 'firebase/firestore';
 import { redeemCode } from '@/ai/flows/redeem-code-flow';
 import { Gem } from 'lucide-react';
 import { redeemOfferCode as redeemOfferCodeFlow } from '@/ai/flows/redeem-offer-code-flow';
@@ -113,11 +113,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setUserData(null);
             setIsAdmin(false);
             router.push('/login');
-            setLoading(false); // Ensure loading is false after redirect
+            setLoading(false);
         }
     };
 
-    // Function to process earnings for all active investments for a user
     const processInvestmentEarnings = async (currentUserId: string, isPro: boolean) => {
         const investmentsColRef = collection(clientDb, `users/${currentUserId}/investments`);
         const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
@@ -130,10 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const userDocRef = doc(clientDb, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
 
-                if (!userDoc.exists()) {
-                    console.warn("processInvestmentEarnings: User document not found.");
-                    return;
-                }
+                if (!userDoc.exists()) return;
                 
                 let totalEarningsToAdd = 0;
                 const currentData = userDoc.data() as UserData;
@@ -143,7 +139,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 if(commissionParentRef){
                     commissionParentDoc = await transaction.get(commissionParentRef);
                 }
-
 
                 for (const investmentDoc of activeInvestmentsSnapshot.docs) {
                     const currentInvestmentRef = doc(clientDb, `users/${currentUserId}/investments`, investmentDoc.id);
@@ -197,14 +192,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             });
                         }
 
-                        // Handle lifetime commission
-                        if (commissionParentDoc && commissionParentDoc.exists()) {
+                        if (commissionParentDoc?.exists()) {
                             const commissionAmount = earningsForThisPlan * 0.03;
-                            const parentData = commissionParentDoc.data();
                             transaction.update(commissionParentRef!, {
-                                totalBalance: (parentData.totalBalance || 0) + commissionAmount,
-                                totalReferralEarnings: (parentData.totalReferralEarnings || 0) + commissionAmount,
-                                totalEarnings: (parentData.totalEarnings || 0) + commissionAmount,
+                                totalBalance: increment(commissionAmount),
+                                totalReferralEarnings: increment(commissionAmount),
+                                totalEarnings: increment(commissionAmount),
                             });
                             
                             const commissionTransactionRef = doc(collection(clientDb, `users/${commissionParentRef!.id}/transactions`));
@@ -221,18 +214,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                 if (totalEarningsToAdd > 0) {
                     transaction.update(userDocRef, {
-                        totalInvestmentEarnings: (currentData.totalInvestmentEarnings || 0) + totalEarningsToAdd,
-                        totalBalance: (currentData.totalBalance || 0) + totalEarningsToAdd,
-                        totalEarnings: (currentData.totalEarnings || 0) + totalEarningsToAdd,
+                        totalInvestmentEarnings: increment(totalEarningsToAdd),
+                        totalBalance: increment(totalEarningsToAdd),
+                        totalEarnings: increment(totalEarningsToAdd),
                     });
                 }
             });
         } catch (error) {
-             if (String(error).includes("document does not exist")) {
-                console.warn("processInvestmentEarnings failed because user document doesn't exist. This is expected during signup race conditions.");
-            } else {
-                console.error("Error processing investment earnings: ", error);
-            }
+            console.error("Error processing investment earnings: ", error);
         }
     };
 
@@ -240,8 +229,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         let unsubFromUser: (() => void) | undefined;
         let unsubFromInvestments: (() => void) | undefined;
+        let authTimeout: NodeJS.Timeout;
 
         const unsubscribe = onAuthStateChanged(clientAuth, async (currentUser) => {
+            clearTimeout(authTimeout);
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             
@@ -259,7 +250,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const userDocRef = doc(clientDb, 'users', currentUser.uid);
                     unsubFromUser = onSnapshot(userDocRef, async (userDocSnap) => {
                         if (!userDocSnap.exists()) {
-                            console.warn(`No Firestore document found for user ${currentUser.uid}. This can happen briefly during sign up.`);
                             return;
                         }
                         
@@ -283,7 +273,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                     }, (error) => {
                         console.error("Error fetching user data:", error);
-                        toast({ variant: 'destructive', title: "Permissions Error", description: "Could not load user profile. Logging out." });
                         logOut();
                     });
                 }
@@ -295,10 +284,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
+        authTimeout = setTimeout(() => {
+            if (loading) {
+                console.warn("Auth state change timed out after 15 seconds. Forcing logout.");
+                logOut();
+            }
+        }, 15000); 
+
         return () => {
             if (unsubFromUser) unsubFromUser();
             if (unsubFromInvestments) unsubFromInvestments();
             unsubscribe();
+            clearTimeout(authTimeout);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -331,51 +328,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const userDocRef = doc(clientDb, 'users', newUser.uid);
 
             const newUserDocData: any = {
-                uid: newUser.uid,
-                name,
-                email,
-                phone,
-                membership: 'Basic',
-                totalBalance: 0,
-                totalInvested: 0,
-                totalEarnings: 0,
-                totalReferralEarnings: 0,
-                totalBonusEarnings: 0,
-                totalInvestmentEarnings: 0,
-                hasInvested: false,
-                hasCollectedSignupBonus: false,
-                investedReferralCount: 0,
-                referralCode: referralCode,
-                createdAt: serverTimestamp(),
-                lastLogin: serverTimestamp(),
-                claimedMilestones: [],
-                redeemedOfferCodes: [],
+                uid: newUser.uid, name, email, phone, membership: 'Basic', totalBalance: 0, totalInvested: 0,
+                totalEarnings: 0, totalReferralEarnings: 0, totalBonusEarnings: 0, totalInvestmentEarnings: 0,
+                hasInvested: false, hasCollectedSignupBonus: false, investedReferralCount: 0, referralCode,
+                createdAt: serverTimestamp(), lastLogin: serverTimestamp(), claimedMilestones: [], redeemedOfferCodes: [],
             };
             
             const usedCode = localStorage.getItem('referralCode') || providedCode;
             if (usedCode) {
-                 const { success, message } = await redeemCode({
-                    userId: newUser.uid,
-                    userName: name,
-                    userEmail: email,
-                    code: usedCode,
-                });
-                if(success) {
-                    newUserDocData.usedReferralCode = usedCode.toUpperCase();
-                }
-                console.log(message);
+                 const { success } = await redeemCode({ userId: newUser.uid, userName: name, userEmail: email, code: usedCode });
+                if(success) newUserDocData.usedReferralCode = usedCode.toUpperCase();
                 localStorage.removeItem('referralCode');
             }
-             await setDoc(userDocRef, newUserDocData);
-
-
+            await setDoc(userDocRef, newUserDocData);
         } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Sign Up Failed',
-                description: error.message,
-            });
+            toast({ variant: 'destructive', title: 'Sign Up Failed', description: error.message });
             setLoading(false);
+        } finally {
+            // Do not set loading to false here; onAuthStateChanged will handle it
         }
     };
 
@@ -383,31 +353,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         try {
             const credential = await signInWithEmailAndPassword(clientAuth, email, password);
-            const userDocRef = doc(clientDb, 'users', credential.user.uid);
-            await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
+            await setDoc(doc(clientDb, 'users', credential.user.uid), { lastLogin: serverTimestamp() }, { merge: true });
         } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Sign In Failed',
-                description: error.message,
-            });
-             setLoading(false);
+            toast({ variant: 'destructive', title: 'Sign In Failed', description: error.message });
+            setLoading(false);
         }
     };
 
     const sendPasswordReset = async (email: string) => {
         try {
             await sendPasswordResetEmail(clientAuth, email);
-            toast({
-                title: 'Password Reset Link Sent',
-                description: `If an account with ${email} exists, a reset link has been sent.`,
-            });
+            toast({ title: 'Password Reset Link Sent', description: `If an account with ${email} exists, a reset link has been sent.` });
         } catch (error: any) {
-             toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: error.message,
-            });
+             toast({ variant: 'destructive', title: 'Error', description: error.message });
         }
     };
     
@@ -423,35 +381,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const claimDailyBonus = async (amount: number) => {
         if (!user || !userData) throw new Error("User not found");
-
         const now = Timestamp.now();
         if (userData.lastBonusClaim) {
             const fourHours = 4 * 60 * 60 * 1000;
-            const lastClaimMillis = userData.lastBonusClaim.toMillis();
-            if (now.toMillis() - lastClaimMillis < fourHours) {
+            if (now.toMillis() - userData.lastBonusClaim.toMillis() < fourHours) {
                 throw new Error("You have already claimed your bonus recently.");
             }
         }
         
         const batch = writeBatch(clientDb);
         const userDocRef = doc(clientDb, 'users', user.uid);
-        
         batch.update(userDocRef, {
-            totalBalance: increment(amount),
-            totalBonusEarnings: increment(amount),
-            totalEarnings: increment(amount),
-            lastBonusClaim: now
+            totalBalance: increment(amount), totalBonusEarnings: increment(amount),
+            totalEarnings: increment(amount), lastBonusClaim: now
         });
         
         const transactionRef = doc(collection(clientDb, `users/${user.uid}/transactions`));
-        batch.set(transactionRef, {
-            type: 'bonus',
-            amount: amount,
-            description: 'Daily Bonus Claim',
-            status: 'Completed',
-            date: now
-        });
-
+        batch.set(transactionRef, { type: 'bonus', amount, description: 'Daily Bonus Claim', status: 'Completed', date: now });
         await batch.commit();
         toast({ title: 'Bonus Claimed!', description: `You received ${amount} Rs.` });
     };
@@ -461,53 +407,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userData.hasCollectedSignupBonus) throw new Error("Sign-up bonus already collected.");
 
         const signupBonusAmount = 200;
-        
         const batch = writeBatch(clientDb);
         const userDocRef = doc(clientDb, 'users', user.uid);
         
         batch.update(userDocRef, {
-            totalBalance: increment(signupBonusAmount),
-            totalBonusEarnings: increment(signupBonusAmount),
-            totalEarnings: increment(signupBonusAmount),
-            hasCollectedSignupBonus: true,
+            totalBalance: increment(signupBonusAmount), totalBonusEarnings: increment(signupBonusAmount),
+            totalEarnings: increment(signupBonusAmount), hasCollectedSignupBonus: true,
         });
         
         const transactionRef = doc(collection(clientDb, `users/${user.uid}/transactions`));
-        batch.set(transactionRef, {
-            type: 'bonus',
-            amount: signupBonusAmount,
-            description: 'Sign-up Bonus',
-            status: 'Completed',
-            date: serverTimestamp()
-        });
-
+        batch.set(transactionRef, { type: 'bonus', amount: signupBonusAmount, description: 'Sign-up Bonus', status: 'Completed', date: serverTimestamp() });
         await batch.commit();
         toast({ title: 'Bonus Collected!', description: `You received ${signupBonusAmount} Rs.` });
     }
 
     const redeemReferralCode = async (code: string) => {
-        if (!user || !userData) {
-            throw new Error("User data is not available.");
-        }
-        if (userData.usedReferralCode) {
-            throw new Error("A referral code has already been used for this account.");
-        }
+        if (!user || !userData) throw new Error("User data is not available.");
+        if (userData.usedReferralCode) throw new Error("A referral code has already been used for this account.");
 
         try {
-            const result = await redeemCode({
-                userId: user.uid,
-                userName: userData.name,
-                userEmail: userData.email,
-                code: code,
-            });
-
-            toast({
-                title: 'Code Redeemed!',
-                description: result.message,
-            });
+            const result = await redeemCode({ userId: user.uid, userName: userData.name, userEmail: userData.email, code });
+            toast({ title: 'Code Redeemed!', description: result.message });
         } catch (error: any) {
             console.error("Redemption failed:", error);
-            throw error; // Re-throw to be caught in the component
+            throw error;
         }
     };
 
@@ -515,10 +438,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!user) throw new Error("User is not authenticated.");
         try {
             const result = await redeemOfferCodeFlow({ userId: user.uid, code });
-            toast({
-                title: 'Success!',
-                description: result.message,
-            });
+            toast({ title: 'Success!', description: result.message });
         } catch (error: any) {
              console.error("Offer code redemption failed:", error);
              throw error;
@@ -527,21 +447,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
     const value: AuthContextType = {
-        user,
-        userData,
-        loading,
-        isAdmin,
-        totalROI,
-        signUpWithEmail,
-        signInWithEmail,
-        logOut,
-        updateUserPhone,
-        updateUserName,
-        claimDailyBonus,
-        collectSignupBonus,
-        sendPasswordReset,
-        redeemReferralCode,
-        redeemOfferCode,
+        user, userData, loading, isAdmin, totalROI, signUpWithEmail, signInWithEmail, logOut, updateUserPhone,
+        updateUserName, claimDailyBonus, collectSignupBonus, sendPasswordReset, redeemReferralCode, redeemOfferCode,
     };
     
     if (loading) {
