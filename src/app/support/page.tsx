@@ -1,4 +1,3 @@
-
 'use client';
 import type { NextPage } from 'next';
 import { Header } from '@/components/vaultboost/header';
@@ -65,7 +64,7 @@ const SupportPage: NextPage = () => {
           </CardContent>
         </Card>
       </div>
-      <BottomNav activePage={'dashboard'} />
+      <BottomNav />
     </div>
   );
 };

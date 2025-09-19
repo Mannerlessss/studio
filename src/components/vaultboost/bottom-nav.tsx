@@ -6,26 +6,22 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 
-interface BottomNavProps {
-  activePage: 'dashboard' | 'investment' | 'refer' | 'settings' | 'pro' | 'support';
-}
+const navItems = [
+    { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/investment', icon: TrendingUp, label: 'Invest' },
+    { href: '/pro', icon: Award, label: 'PRO' },
+    { href: '/refer', icon: Users, label: 'Refer' },
+    { href: '/settings', icon: Settings, label: 'Settings' },
+];
 
-export const BottomNav: FC<BottomNavProps> = ({ activePage }) => {
+export const BottomNav: FC = () => {
   const pathname = usePathname();
-
-  const navItems = [
-    { href: '/', icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard' },
-    { href: '/investment', icon: TrendingUp, label: 'Invest', page: 'investment' },
-    { href: '/pro', icon: Award, label: 'PRO', page: 'pro' },
-    { href: '/refer', icon: Users, label: 'Refer', page: 'refer' },
-    { href: '/settings', icon: Settings, label: 'Settings', page: 'settings' },
-  ];
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-t-lg z-20">
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => (
-          <Link href={item.href} key={item.label} className="flex-1" id={`bottom-nav-${item.page}`}>
+          <Link href={item.href} key={item.label} className="flex-1" id={`bottom-nav-${item.label.toLowerCase()}`}>
             <Button
               variant="ghost"
               className={cn(

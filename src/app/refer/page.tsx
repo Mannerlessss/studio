@@ -180,7 +180,7 @@ const ReferPage: NextPage = () => {
              </CardContent>
         </Card>
       </div>
-      <BottomNav activePage="refer" />
+      <BottomNav />
     </div>
   );
 };

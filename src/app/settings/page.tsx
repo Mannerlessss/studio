@@ -144,7 +144,7 @@ const SettingsPage: NextPage = () => {
                     </CardContent>
                 </Card>
             </div>
-            <BottomNav activePage="settings" />
+            <BottomNav />
         </div>
       );
   }
@@ -289,7 +289,7 @@ const SettingsPage: NextPage = () => {
         </Button>
 
       </div>
-      <BottomNav activePage="settings" />
+      <BottomNav />
     </div>
   );
 };

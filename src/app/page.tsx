@@ -76,7 +76,7 @@ const Dashboard: NextPage = () => {
         <TransactionHistoryCard />
         <UpgradeCard />
       </div>
-      <BottomNav activePage="dashboard" />
+      <BottomNav />
     </div>
   );
 };

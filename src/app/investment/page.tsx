@@ -85,7 +85,7 @@ const InvestmentPage: NextPage = () => {
           </TabsContent>
         </Tabs>
       </div>
-      <BottomNav activePage="investment" />
+      <BottomNav />
     </div>
   );
 };

@@ -32,7 +32,7 @@ const PrivacyPage: NextPage = () => {
             </CardContent>
         </Card>
       </div>
-      <BottomNav activePage="dashboard" />
+      <BottomNav />
     </div>
   );
 };

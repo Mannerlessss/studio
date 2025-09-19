@@ -162,7 +162,7 @@ const ProPage: NextPage = () => {
         </Card>
 
       </div>
-      <BottomNav activePage="pro" />
+      <BottomNav />
     </div>
   );
 };
