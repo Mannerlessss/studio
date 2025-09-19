@@ -3,45 +3,34 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is the owner of a document
+    // Helper function to check if a user is an admin
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true || request.auth.token.admin == true;
+    }
+
+    // Helper function to check if the user is the owner of the document
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
-    // Helper function to check if the user is an admin
-    function isAdmin() {
-      return request.auth.token.admin == true;
-    }
-
-    // Rules for the 'users' collection
+    // Users can read their own document and admins can read any.
+    // Users can create their own document on signup.
+    // Users can only update their own name and phone number.
     match /users/{userId} {
-      // Admins can do anything.
-      // Users can read their own document.
-      allow read: if isAdmin() || isOwner(userId);
-
-      // Admins can create/delete user documents.
-      // Users can create their own document when signing up.
-      allow create: if isAdmin() || isOwner(userId);
-
-      // Admins can update any user document.
-      // Users can only update their own 'name' and 'phone' fields.
-      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'lastLogin', 'hasCollectedSignupBonus', 'lastBonusClaim', 'redeemedOfferCodes', 'usedReferralCode', 'referredBy']));
-      
-      // Only admins can delete user documents.
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if (isOwner(userId) && request.resource.data.keys().hasOnly(['name', 'phone', 'lastLogin', 'hasCollectedSignupBonus', 'usedReferralCode', 'redeemedOfferCodes', 'lastBonusClaim'])) || isAdmin();
       allow delete: if isAdmin();
 
-      // Rules for subcollections within a user document
+      // Subcollections
       match /{subcollection}/{docId} {
-        // Admins can do anything.
-        // Users can read/write to their own subcollections.
-        allow read, write: if isAdmin() || isOwner(userId);
+        allow read, write: if isOwner(userId) || isAdmin();
       }
     }
-
-    // Rules for the 'offers' collection
+    
+    // Offers can be read by any authenticated user (to check validity)
+    // Offers can only be created, updated, or deleted by an admin.
     match /offers/{offerId} {
-        // Allow read for any authenticated user (so they can see offer details if needed).
-        // Allow write only for admins.
         allow read: if request.auth != null;
         allow write: if isAdmin();
     }
