@@ -114,23 +114,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             toast({ variant: 'destructive', title: 'Logout Failed', description: 'Could not log out. Please try again.' });
         }
     };
-
-    const processInvestmentEarnings = async (currentUserId: string, isPro: boolean) => {
+    
+    // Function to process earnings for all active investments for a user
+    const processInvestmentEarnings = async (currentUserId: string) => {
         const investmentsColRef = collection(clientDb, `users/${currentUserId}/investments`);
         const activeInvestmentsQuery = query(investmentsColRef, where('status', '==', 'active'));
         
         try {
             const activeInvestmentsSnapshot = await getDocs(activeInvestmentsQuery);
-            if (activeInvestmentsSnapshot.empty) return;
+            if (activeInvestmentsSnapshot.empty) {
+                return; // No active investments to process
+            }
 
-             await runTransaction(clientDb, async (transaction) => {
+            await runTransaction(clientDb, async (transaction) => {
                 const userDocRef = doc(clientDb, 'users', currentUserId);
                 const userDoc = await transaction.get(userDocRef);
 
-                if (!userDoc.exists()) return;
+                if (!userDoc.exists()) {
+                    console.warn("processInvestmentEarnings: User document not found.");
+                    return;
+                }
                 
-                let totalEarningsToAdd = 0;
                 const currentData = userDoc.data() as UserData;
+                let totalEarningsToAdd = 0;
                 
                 const commissionParentRef = currentData.commissionParent ? doc(clientDb, 'users', currentData.commissionParent) : null;
                 let commissionParentDoc: any = null;
@@ -140,33 +146,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                 for (const investmentDoc of activeInvestmentsSnapshot.docs) {
                     const currentInvestmentRef = doc(clientDb, `users/${currentUserId}/investments`, investmentDoc.id);
-                    const currentInvestmentDoc = await transaction.get(currentInvestmentRef);
-
-                    if (!currentInvestmentDoc.exists()) continue;
-
-                    const investment = currentInvestmentDoc.data() as Investment;
-                    const investmentDailyReturn = investment.dailyReturn; // Use the value from the document
+                    const investment = investmentDoc.data() as Investment;
 
                     const now = new Date();
-                    const lastUpdateDate = investment.lastUpdate.toDate();
-
-                    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                    const startOfLastUpdateDay = new Date(lastUpdateDate.getFullYear(), lastUpdateDate.getMonth(), lastUpdateDate.getDate());
-
+                    const startDate = investment.startDate.toDate();
+                    
                     const msInDay = 24 * 60 * 60 * 1000;
-                    const daysPassed = Math.floor((startOfToday.getTime() - startOfLastUpdateDay.getTime()) / msInDay);
-                    
-                    if (daysPassed <= 0) continue;
-                    
-                    const remainingDaysInPlan = investment.durationDays - investment.daysProcessed;
-                    const daysToCredit = Math.min(daysPassed, remainingDaysInPlan);
+                    // Calculate total days that should have been processed since the start
+                    const totalDaysSinceStart = Math.floor((now.getTime() - startDate.getTime()) / msInDay);
+                    const totalDaysToProcess = Math.min(totalDaysSinceStart, investment.durationDays);
 
-                    if (daysToCredit > 0) {
-                        const earningsForThisPlan = investmentDailyReturn * daysToCredit;
+                    const missedDays = totalDaysToProcess - investment.daysProcessed;
+
+                    if (missedDays > 0) {
+                        const earningsForThisPlan = investment.dailyReturn * missedDays;
                         totalEarningsToAdd += earningsForThisPlan;
 
                         const newEarnings = investment.earnings + earningsForThisPlan;
-                        const newDaysProcessed = investment.daysProcessed + daysToCredit;
+                        const newDaysProcessed = investment.daysProcessed + missedDays;
                         const newStatus = newDaysProcessed >= investment.durationDays ? 'completed' : 'active';
                         
                         transaction.update(currentInvestmentRef, {
@@ -176,18 +173,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             status: newStatus
                         });
 
-                        for (let i = 0; i < daysToCredit; i++) {
+                        // Create transaction records for the missed days
+                        for (let i = 0; i < missedDays; i++) {
                             const transactionRef = doc(collection(clientDb, `users/${currentUserId}/transactions`));
-                            const earningDay = new Date(startOfLastUpdateDay.getTime() + (i + 1) * msInDay);
+                            const earningDay = new Date(startDate.getTime() + (investment.daysProcessed + i + 1) * msInDay);
                             transaction.set(transactionRef, {
                                 type: 'earning',
-                                amount: investmentDailyReturn,
+                                amount: investment.dailyReturn,
                                 description: `Earning from Plan ${investment.planAmount}`,
                                 status: 'Completed',
                                 date: Timestamp.fromDate(earningDay),
                             });
                         }
-
+                        
+                        // Handle lifetime commission for the newly calculated earnings
                         if (commissionParentDoc?.exists) {
                             const commissionAmount = earningsForThisPlan * 0.03;
                             transaction.update(commissionParentRef!, {
@@ -207,7 +206,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         }
                     }
                 }
-
+                
+                // Update user's main balance if there were any new earnings
                 if (totalEarningsToAdd > 0) {
                     transaction.update(userDocRef, {
                         totalInvestmentEarnings: increment(totalEarningsToAdd),
@@ -217,7 +217,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
             });
         } catch (error) {
-            console.error("Error processing investment earnings: ", error);
+            console.error("Error processing investment earnings transaction: ", error);
         }
     };
 
@@ -241,28 +241,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                      setUserData(null);
                      setLoading(false);
                 } else {
+                    await processInvestmentEarnings(currentUser.uid);
+                    
                     const userDocRef = doc(clientDb, 'users', currentUser.uid);
-                    unsubFromUser = onSnapshot(userDocRef, async (userDocSnap) => {
+                    unsubFromUser = onSnapshot(userDocRef, (userDocSnap) => {
                         if (!userDocSnap.exists()) {
-                             setLoading(false); // User doc doesn't exist, stop loading
+                             setLoading(false);
                             return;
                         }
                         
                         const baseUserData = { uid: userDocSnap.id, ...userDocSnap.data() } as UserData;
-                        const isPro = baseUserData.membership === 'Pro';
-                        await processInvestmentEarnings(currentUser.uid, isPro);
                         
-                        const refreshedUserDoc = await getDoc(userDocRef);
-                        const refreshedBaseUserData = { uid: refreshedUserDoc.id, ...refreshedUserDoc.data() } as UserData;
-
                         const investmentsColRef = collection(clientDb, `users/${currentUser.uid}/investments`);
                         unsubFromInvestments = onSnapshot(investmentsColRef, (investmentsSnap) => {
                             const investments = investmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Investment));
-                            setUserData({ ...refreshedBaseUserData, investments });
+                            setUserData({ ...baseUserData, investments });
                             setLoading(false);
                         }, (error) => {
                             console.error("Error fetching investments:", error);
-                            setUserData(refreshedBaseUserData);
+                            setUserData(baseUserData);
                             setLoading(false);
                         });
 
@@ -322,14 +319,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 createdAt: serverTimestamp(), lastLogin: serverTimestamp(), claimedMilestones: [], redeemedOfferCodes: [],
             };
             
-            // Create the user document first
             await setDoc(userDocRef, newUserDocData);
 
-            // Now, handle the referral code if it exists
             const usedCode = localStorage.getItem('referralCode') || providedCode;
             if (usedCode) {
-                 try {
-                    await redeemReferralCodeFlow({ userId: newUser.uid, userName: name, userEmail: email, code: usedCode });
+                try {
+                     await runTransaction(clientDb, async (transaction) => {
+                        const userRef = doc(clientDb, 'users', newUser.uid);
+                        const usersRef = collection(clientDb, 'users');
+                        const referrerQuery = query(usersRef, where('referralCode', '==', usedCode.toUpperCase()), limit(1));
+                        
+                        const referrerSnapshot = await getDocs(referrerQuery);
+                        
+                        if (referrerSnapshot.empty) {
+                            throw new Error('Invalid referral code.');
+                        }
+
+                        const referrerDoc = referrerSnapshot.docs[0];
+                        if (referrerDoc.id === newUser.uid) {
+                            throw new Error('You cannot use your own referral code.');
+                        }
+                        
+                        transaction.update(userRef, {
+                            usedReferralCode: usedCode.toUpperCase(),
+                            referredBy: referrerDoc.id,
+                        });
+
+                        const newReferralRef = doc(collection(clientDb, `users/${referrerDoc.id}/referrals`));
+                        transaction.set(newReferralRef, {
+                            userId: newUser.uid,
+                            name: name,
+                            email: email,
+                            hasInvested: false,
+                            joinedAt: serverTimestamp(),
+                        });
+                    });
                     toast({ title: "Referral Applied!", description: "Your referral code was successfully applied." });
                 } catch(e: any) {
                     toast({ variant: 'destructive', title: 'Invalid Referral Code', description: e.message || 'The provided referral code could not be applied.' });
