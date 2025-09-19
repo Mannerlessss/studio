@@ -40,9 +40,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-   experimental: {
-    serverComponentsExternalPackages: ['firebase-admin'],
-  },
+  serverExternalPackages: ['firebase-admin'],
   env: {
     FIREBASE_SERVICE_ACCOUNT_KEY: serviceAccountKey,
     NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyDLhmKP9BeoHGn_zz8UaVURix83lPfWSds",
