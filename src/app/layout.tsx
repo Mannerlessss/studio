@@ -8,6 +8,7 @@ import Link from 'next/link';
 export const metadata: Metadata = {
   title: 'VaultBoost',
   description: 'Boost your investments with VaultBoost.',
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
@@ -18,7 +19,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full dark">
       <head>
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/icons/icon-192x192.svg" type="image/svg+xml" sizes="any" />
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
